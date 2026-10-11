@@ -161,6 +161,10 @@ services:
     # Solo `caddy` llega aquí (ruta /media); el puerto S3 no se publica fuera del stack.
     expose:
       - "8333"
+    networks:
+      default:
+        aliases:
+          - eventarium-seaweedfs
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://seaweedfs:8333/status || exit 1"]
       interval: 10s
@@ -191,6 +195,11 @@ services:
       <<: *entorno-api
     expose:
       - "8000"
+    # Alias único para Caddy: ver la nota en el servicio `caddy`.
+    networks:
+      default:
+        aliases:
+          - eventarium-api
 
   worker:
     <<: *imagen-api
@@ -242,10 +251,19 @@ services:
       NG_ALLOWED_HOSTS: ${NG_ALLOWED_HOSTS:-}
     expose:
       - "4000"
+    networks:
+      default:
+        aliases:
+          - eventarium-web
 
   # Único servicio al que el orquestador enruta el dominio. El Caddyfile está versionado,
   # así que sí existe en el checkout que hace el orquestador (a diferencia de
   # infra/env/.env o infra/seaweedfs/s3.json, que son secretos).
+  #
+  # Caddy llama a sus upstreams por alias propios (`eventarium-api`, `eventarium-web`,
+  # `eventarium-seaweedfs`) y no por el nombre del servicio: Dokploy lo conecta también
+  # a `dokploy-network`, compartida con otros proyectos, y si alguno tiene servicios
+  # llamados `api` o `web` el DNS de Docker puede resolverlos a sus contenedores.
   caddy:
     image: caddy:2.11.4-alpine
     restart: unless-stopped
