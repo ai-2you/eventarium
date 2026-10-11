@@ -55,7 +55,7 @@
 	}
 
 	handle /api/* {
-		reverse_proxy api:8000
+		reverse_proxy eventarium-api:8000
 	}
 
 	# Servidor MCP y sus metadatos OAuth (RFC 9728 y 8414): los sirve la API,
@@ -65,7 +65,7 @@
 	# partes.
 	@mcp path /mcp /mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/* /.well-known/oauth-authorization-server /.well-known/oauth-authorization-server/*
 	handle @mcp {
-		reverse_proxy api:8000 {
+		reverse_proxy eventarium-api:8000 {
 			flush_interval -1
 		}
 	}
@@ -91,13 +91,13 @@
 	# objeto en S3. Los objetos son inmutables (la clave lleva un UUID), de ahí la caché
 	# larga.
 	handle /media/* {
-		reverse_proxy seaweedfs:8333 {
+		reverse_proxy eventarium-seaweedfs:8333 {
 			header_up Host {upstream_hostport}
 		}
 		header Cache-Control "public, max-age=86400, immutable"
 	}
 
 	handle {
-		reverse_proxy web:4000
+		reverse_proxy eventarium-web:4000
 	}
 }
