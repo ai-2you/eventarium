@@ -137,7 +137,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="API de la plataforma de eventos IA Week",
+        title="API de la plataforma de eventos Eventarium",
         version="0.1.0",
         description=(
             "API multi-organización para el registro y la gestión de eventos. "
