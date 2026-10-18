@@ -180,6 +180,13 @@ async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_i
     return evento
 
 
+def _media_id_o_422(valor: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(valor)
+    except ValueError as exc:
+        raise ValidationDomainError("«media_id» no es un identificador válido.") from exc
+
+
 @router.get(
     "",
     summary="Listar eventos",
@@ -257,7 +264,8 @@ async def update_event(
     description=(
         "Multipart (`fichero`): sube una imagen nueva, PNG/JPEG/WebP de hasta "
         "5 MB. JSON (`{media_id}`): asigna una imagen ya subida a la "
-        "biblioteca de medios."
+        "biblioteca de medios. JSON (`{url}`): descarga una imagen https "
+        "pública (hasta 5 MB) y la guarda en la biblioteca."
     ),
     response_model=EventResponse,
     dependencies=[require_permission(Permission.EVENTS_WRITE)],
@@ -278,18 +286,34 @@ async def upload_cover(
     if request.headers.get("content-type", "").startswith("application/json"):
         cuerpo = await request.json()
         media_id = cuerpo.get("media_id")
-        if not media_id:
-            raise ValidationDomainError("Falta «media_id».")
-        media = await media_service.obtener_visible(
-            session,
-            media_id=uuid.UUID(media_id),
-            organization_id=usuario.organization_id,
-            kind="events",
-            user_id=usuario.id,
-            permisos=permisos,
-        )
-        evento.cover_media_id = media.id
-        evento.cover_object_key = None
+        url = cuerpo.get("url")
+        if media_id and url:
+            raise ValidationDomainError("Indica «media_id» o «url», no los dos.")
+        if media_id:
+            if not isinstance(media_id, str):
+                raise ValidationDomainError("«media_id» debe ser una cadena.")
+            media = await media_service.obtener_visible(
+                session,
+                media_id=_media_id_o_422(media_id),
+                organization_id=usuario.organization_id,
+                kind="events",
+                user_id=usuario.id,
+                permisos=permisos,
+            )
+            evento.cover_media_id = media.id
+            evento.cover_object_key = None
+        elif url:
+            if not isinstance(url, str):
+                raise ValidationDomainError("«url» debe ser una cadena.")
+            await service.set_cover_from_url(
+                session,
+                evento=evento,
+                url=url,
+                uploaded_by_user_id=usuario.id,
+                permisos=permisos,
+            )
+        else:
+            raise ValidationDomainError("Falta «media_id» o «url».")
     else:
         if fichero is None:
             raise ValidationDomainError("Falta el fichero.")

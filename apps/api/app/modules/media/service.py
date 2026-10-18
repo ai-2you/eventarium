@@ -165,24 +165,43 @@ async def subir_desde_url(
     folder_id: uuid.UUID | None = None,
 ) -> Media:
     """Descarga la URL en el servidor y la trata como cualquier subida —
-    nunca se guarda la URL externa tal cual."""
+    nunca se guarda la URL externa tal cual. En streaming: corta en cuanto
+    se supera el tamaño máximo, sin esperar a que termine una respuesta
+    arbitrariamente grande (o que no deja de enviar bytes)."""
     _requerir_permiso_del_kind(kind, permisos)
     url_segura = validar_url_publica_segura(url)
 
-    async with httpx.AsyncClient(follow_redirects=False, timeout=_TIMEOUT_DESCARGA_URL) as cliente:
-        try:
-            respuesta = await cliente.get(url_segura)
-        except httpx.HTTPError as error:
-            raise ValidationDomainError("No se ha podido descargar la URL.") from error
-
-    if respuesta.status_code >= 300:
-        # Incluye 3xx: sin seguir redirecciones, cualquier salto se rechaza
-        # sin más (hallazgo de red-team — nunca revalidar un host "final").
-        raise ValidationDomainError("La URL no se ha podido descargar (redirección o error).")
-
-    contenido = respuesta.content
-    if len(contenido) > _TAMANO_MAXIMO_DESCARGA_URL:
-        raise ValidationDomainError("El fichero descargado supera el tamaño máximo permitido.")
+    try:
+        async with (
+            httpx.AsyncClient(follow_redirects=False, timeout=_TIMEOUT_DESCARGA_URL) as cliente,
+            cliente.stream("GET", url_segura) as respuesta,
+        ):
+            if respuesta.status_code >= 300:
+                # Incluye 3xx: sin seguir redirecciones, cualquier salto se
+                # rechaza sin más (hallazgo de red-team — nunca revalidar un
+                # host «final»).
+                raise ValidationDomainError(
+                    "La URL no se ha podido descargar (redirección o error)."
+                )
+            longitud_declarada = respuesta.headers.get("content-length")
+            if (
+                longitud_declarada is not None
+                and longitud_declarada.isdigit()
+                and int(longitud_declarada) > _TAMANO_MAXIMO_DESCARGA_URL
+            ):
+                raise ValidationDomainError(
+                    "El fichero descargado supera el tamaño máximo permitido."
+                )
+            trozos = bytearray()
+            async for trozo in respuesta.aiter_bytes():
+                trozos.extend(trozo)
+                if len(trozos) > _TAMANO_MAXIMO_DESCARGA_URL:
+                    raise ValidationDomainError(
+                        "El fichero descargado supera el tamaño máximo permitido."
+                    )
+            contenido = bytes(trozos)
+    except httpx.HTTPError as error:
+        raise ValidationDomainError("No se ha podido descargar la URL.") from error
 
     filename = url_segura.rsplit("/", 1)[-1].split("?", 1)[0] or "imagen"
     mime, _extension = validate_upload(contenido, allowed_mimes=MEDIA_LIBRARY_IMAGE_MIMES)

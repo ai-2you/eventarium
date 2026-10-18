@@ -25,6 +25,7 @@ import time
 import uuid
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
@@ -35,6 +36,7 @@ from app.core.audit import registrar_auditoria
 from app.core.config import get_settings
 from app.core.database import maintenance_session
 from app.core.permissions import Permission
+from app.core.storage import get_storage
 from app.modules.events import cancelacion
 from app.modules.events import categories as events_categories
 from app.modules.events import service as events_service
@@ -115,6 +117,14 @@ async def _auditar(
 
 def _sin_nulos(**campos: Any) -> dict[str, Any]:
     return {clave: valor for clave, valor in campos.items() if valor is not None}
+
+
+def _url_sin_query(url: str) -> str:
+    """Esquema, host y ruta, sin la cadena de consulta: una URL firmada
+    (token de descarga temporal, credenciales en la query) no debe acabar
+    completa en la auditoría."""
+    partes = urlsplit(url)
+    return urlunsplit((partes.scheme, partes.netloc, partes.path, "", ""))
 
 
 async def _id_de_categoria(session: Any, slug: str) -> str | None:  # noqa: ANN401 - AsyncSession
@@ -284,6 +294,58 @@ def registrar(mcp: MCPServer) -> None:
             )
             respuesta = _resumen(evento)
         await _auditar(contexto, "editar_evento", "event", respuesta.id, {"campos": sorted(datos)})
+        return respuesta
+
+    @mcp.tool(annotations=ESCRITURA)
+    async def asignar_portada_evento(event_id: str, url: str) -> schemas.Portada:
+        """Pone o cambia la imagen destacada (portada) del evento a partir de
+        una URL https pública a una imagen PNG, JPEG o WebP de hasta 5 MB
+        (esta herramienta no puede recibir un fichero, solo una URL). Se
+        recorta y comprime igual que cualquier imagen subida desde el panel."""
+        contexto = await preparar()
+        contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
+        async with sesion(contexto) as session:
+            evento = await _evento_permitido(session, contexto, event_id)
+            # Captura previa a la asignación: si la portada anterior era un
+            # objeto legado (sin pasar por la biblioteca de medios), queda
+            # huérfana tras asignar la nueva y hay que borrarla; si ya estaba
+            # en la biblioteca, su ciclo de vida ya no es cosa de esta
+            # herramienta (igual que el endpoint del panel).
+            anterior_object_key = evento.cover_object_key if evento.cover_media_id is None else None
+            portada_url = await events_service.set_cover_from_url(
+                session,
+                evento=evento,
+                url=url,
+                uploaded_by_user_id=contexto.user_id,
+                permisos=set(contexto.permisos),
+            )
+            respuesta = schemas.Portada(
+                event_id=str(evento.id),
+                portada_url=portada_url,
+                enlace_panel=_enlace_panel(evento.id),
+            )
+        # El borrado, como la auditoría, es un efecto posterior al commit: si
+        # falla (red, almacenamiento caído), la portada ya quedó asignada de
+        # verdad y no debe ni parecer un fallo de la herramienta ni dejar la
+        # escritura sin auditar (mismo criterio que `_auditar` de abajo). El
+        # endpoint REST delega este mismo borrado a un `BackgroundTask`; aquí
+        # no existe ese mecanismo, así que se protege a mano.
+        if anterior_object_key:
+            try:
+                await get_storage().delete_object(anterior_object_key)
+            except Exception:
+                logger.exception(
+                    "No se pudo borrar el objeto de portada huérfano %s del evento %s",
+                    anterior_object_key,
+                    respuesta.event_id,
+                )
+        await _auditar(
+            contexto,
+            "asignar_portada_evento",
+            "event",
+            respuesta.event_id,
+            {"url": _url_sin_query(url)},
+        )
         return respuesta
 
     @mcp.tool(annotations=ESCRITURA)

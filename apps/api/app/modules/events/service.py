@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import set_organization_context
+from app.core.permissions import Permission
 from app.core.storage import get_storage, public_url_versionada
 from app.modules.events import categories, repository
 from app.modules.events import schemas as events_schemas
@@ -30,6 +31,7 @@ from app.modules.events.models import (
     EventSessionParticipant,
     EventVenue,
 )
+from app.modules.media import service as media_service
 from app.modules.media.models import Media
 from app.modules.organizations import repository as organizations_repository
 from app.modules.organizations import service as organizations_service
@@ -325,6 +327,34 @@ async def update_event(
     if categoria_cambiada:
         await session.refresh(evento, ["category"])
     return evento
+
+
+async def set_cover_from_url(
+    session: AsyncSession,
+    *,
+    evento: Event,
+    url: str,
+    uploaded_by_user_id: uuid.UUID,
+    permisos: set[Permission],
+) -> str:
+    """Descarga una imagen por URL y la asigna como portada del evento —
+    misma validación (SSRF, tamaño, formato) que cualquier importación a la
+    biblioteca de medios, porque es `media_service.subir_desde_url` quien la
+    hace. Es la vía que usa el MCP, que no puede mandar un fichero; el
+    endpoint del panel la ofrece como alternativa al multipart y al
+    `media_id` ya subido. Devuelve la URL pública de la nueva portada."""
+    media = await media_service.subir_desde_url(
+        session,
+        organization_id=evento.organization_id,
+        kind="events",
+        uploaded_by_user_id=uploaded_by_user_id,
+        permisos=permisos,
+        url=url,
+    )
+    evento.cover_media_id = media.id
+    evento.cover_object_key = None
+    await session.flush()
+    return public_url_versionada(media.object_key, media.updated_at)
 
 
 def _validar_sesion_dentro_del_evento(

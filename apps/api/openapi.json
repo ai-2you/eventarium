@@ -4332,7 +4332,7 @@
           "eventos"
         ],
         "summary": "Subir o asignar la portada del evento",
-        "description": "Multipart (`fichero`): sube una imagen nueva, PNG/JPEG/WebP de hasta 5 MB. JSON (`{media_id}`): asigna una imagen ya subida a la biblioteca de medios.",
+        "description": "Multipart (`fichero`): sube una imagen nueva, PNG/JPEG/WebP de hasta 5 MB. JSON (`{media_id}`): asigna una imagen ya subida a la biblioteca de medios. JSON (`{url}`): descarga una imagen https pública (hasta 5 MB) y la guarda en la biblioteca.",
         "operationId": "upload_cover_api_v1_events__event_id__cover_put",
         "parameters": [
           {

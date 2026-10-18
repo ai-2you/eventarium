@@ -57,6 +57,14 @@ class Sesion(BaseModel):
     enlace_panel: str | None = None
 
 
+class Portada(BaseModel):
+    """Respuesta de `asignar_portada_evento`."""
+
+    event_id: str
+    portada_url: str
+    enlace_panel: str | None = None
+
+
 class Patrocinador(BaseModel):
     id: str
     nombre: str

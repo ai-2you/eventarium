@@ -6,10 +6,8 @@ from __future__ import annotations
 
 import base64
 import io
-import socket
 from unittest.mock import AsyncMock, patch
 
-import httpx
 from httpx import AsyncClient
 from PIL import Image
 
@@ -21,6 +19,7 @@ from tests.conftest import (
     iniciar_sesion,
     iniciar_sesion_con,
 )
+from tests.media_url_test_helpers import HOST_DE_PRUEBA, mock_descarga_por_url
 
 MEDIA = "/api/v1/organizations/me/media"
 
@@ -87,62 +86,34 @@ async def test_subir_sin_el_permiso_del_kind_da_403(
     assert respuesta.status_code == 403, respuesta.text
 
 
-_HOST_DE_PRUEBA = "ejemplo-de-prueba.invalid"
-_GETADDRINFO_REAL = socket.getaddrinfo
-
-
-def _resolucion_dns_publica_falsa(host: str, *args: object, **kwargs: object) -> list[tuple]:
-    """Sustituye `socket.getaddrinfo` SOLO para `_HOST_DE_PRUEBA` — es un
-    patch sobre el módulo `socket` global (`ssrf.py` hace `import socket`,
-    no una copia), así que debe reenviar cualquier otro host (el almacén
-    local en `localhost`, p. ej.) a la función real o rompe subidas que no
-    tienen nada que ver con esta prueba. Un host de prueba resuelve a una IP
-    pública genuina — los rangos TEST-NET (203.0.113.0/24 y similares)
-    cuentan como `is_private` en el propio módulo `ipaddress`, así que no
-    sirven aquí."""
-    if host == _HOST_DE_PRUEBA:
-        return [(2, 1, 6, "", ("93.184.216.34", 0))]
-    return _GETADDRINFO_REAL(host, *args, **kwargs)
-
-
 async def test_subir_por_url_descarga_y_reprocesa_sin_guardar_la_url_externa(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba
 ) -> None:
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
-    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
 
-    with (
-        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
-        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
-    ):
+    with mock_descarga_por_url(content=PNG):
         respuesta = await cliente.post(
             MEDIA,
             headers=cabeceras,
-            json={"kind": "branding", "url": "https://ejemplo-de-prueba.invalid/logo.png"},
+            json={"kind": "branding", "url": f"https://{HOST_DE_PRUEBA}/logo.png"},
         )
     assert respuesta.status_code == 200, respuesta.text
     cuerpo = respuesta.json()
-    assert "ejemplo-de-prueba.invalid" not in cuerpo["url"]
+    assert HOST_DE_PRUEBA not in cuerpo["url"]
 
 
 async def test_subir_por_url_rechaza_una_redireccion_sin_seguirla(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba
 ) -> None:
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
-    redireccion = httpx.Response(
-        302,
-        headers={"location": "https://otro-sitio.invalid/logo.png"},
-        request=httpx.Request("GET", "https://x"),
-    )
 
-    with (
-        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
-        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=redireccion)),
+    with mock_descarga_por_url(
+        status_code=302, headers={"location": "https://otro-sitio.invalid/logo.png"}
     ):
         respuesta = await cliente.post(
             MEDIA,
             headers=cabeceras,
-            json={"kind": "branding", "url": "https://ejemplo-de-prueba.invalid/logo.png"},
+            json={"kind": "branding", "url": f"https://{HOST_DE_PRUEBA}/logo.png"},
         )
     assert respuesta.status_code == 422, respuesta.text
 
@@ -151,7 +122,7 @@ async def test_subir_por_url_a_una_ip_privada_se_rechaza_sin_llegar_a_la_red(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba
 ) -> None:
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
-    with patch("httpx.AsyncClient.get", new=AsyncMock()) as descarga:
+    with patch("httpx.AsyncClient.stream", new=AsyncMock()) as descarga:
         respuesta = await cliente.post(
             MEDIA,
             headers=cabeceras,
