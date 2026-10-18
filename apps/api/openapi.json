@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "API de la plataforma de eventos IA Week",
+    "title": "API de la plataforma de eventos Eventarium",
     "description": "API multi-organización para el registro y la gestión de eventos. La organización se resuelve por el host de la petición.",
     "version": "0.1.0"
   },
