@@ -180,6 +180,13 @@ async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_i
     return evento
 
 
+def _media_id_o_422(valor: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(valor)
+    except ValueError as exc:
+        raise ValidationDomainError("«media_id» no es un identificador válido.") from exc
+
+
 @router.get(
     "",
     summary="Listar eventos",
@@ -287,7 +294,7 @@ async def upload_cover(
                 raise ValidationDomainError("«media_id» debe ser una cadena.")
             media = await media_service.obtener_visible(
                 session,
-                media_id=uuid.UUID(media_id),
+                media_id=_media_id_o_422(media_id),
                 organization_id=usuario.organization_id,
                 kind="events",
                 user_id=usuario.id,

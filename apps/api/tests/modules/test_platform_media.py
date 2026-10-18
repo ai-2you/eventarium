@@ -6,9 +6,7 @@ from __future__ import annotations
 
 import base64
 import io
-from unittest.mock import AsyncMock, patch
 
-import httpx
 from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy import update
@@ -16,6 +14,7 @@ from sqlalchemy import update
 from app.core.database import SessionMaintenance
 from app.modules.users.models import User
 from tests.conftest import OrganizacionDePrueba, iniciar_sesion
+from tests.media_url_test_helpers import mock_descarga_por_url
 
 PLATFORM_MEDIA = "/api/v1/admin/platform/media"
 
@@ -53,9 +52,8 @@ async def test_subir_por_url_a_la_biblioteca_de_plataforma(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba
 ) -> None:
     cabeceras = await _superadmin_headers(cliente, organizacion)
-    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
 
-    with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)):
+    with mock_descarga_por_url(content=PNG):
         respuesta = await cliente.post(
             PLATFORM_MEDIA, headers=cabeceras, json={"url": "https://169.254.169.254/x"}
         )

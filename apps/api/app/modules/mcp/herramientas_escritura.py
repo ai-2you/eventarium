@@ -25,6 +25,7 @@ import time
 import uuid
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
@@ -116,6 +117,14 @@ async def _auditar(
 
 def _sin_nulos(**campos: Any) -> dict[str, Any]:
     return {clave: valor for clave, valor in campos.items() if valor is not None}
+
+
+def _url_sin_query(url: str) -> str:
+    """Esquema, host y ruta, sin la cadena de consulta: una URL firmada
+    (token de descarga temporal, credenciales en la query) no debe acabar
+    completa en la auditoría."""
+    partes = urlsplit(url)
+    return urlunsplit((partes.scheme, partes.netloc, partes.path, "", ""))
 
 
 async def _id_de_categoria(session: Any, slug: str) -> str | None:  # noqa: ANN401 - AsyncSession
@@ -318,9 +327,9 @@ def registrar(mcp: MCPServer) -> None:
         # El borrado, como la auditoría, es un efecto posterior al commit: si
         # falla (red, almacenamiento caído), la portada ya quedó asignada de
         # verdad y no debe ni parecer un fallo de la herramienta ni dejar la
-        # escritura sin auditar (mismo criterio que `_auditar` de abajo,
-        # hallazgo de code-review — el endpoint REST lo hace en un
-        # `BackgroundTask`, aquí no existe ese mecanismo).
+        # escritura sin auditar (mismo criterio que `_auditar` de abajo). El
+        # endpoint REST delega este mismo borrado a un `BackgroundTask`; aquí
+        # no existe ese mecanismo, así que se protege a mano.
         if anterior_object_key:
             try:
                 await get_storage().delete_object(anterior_object_key)
@@ -331,7 +340,11 @@ def registrar(mcp: MCPServer) -> None:
                     respuesta.event_id,
                 )
         await _auditar(
-            contexto, "asignar_portada_evento", "event", respuesta.event_id, {"url": url}
+            contexto,
+            "asignar_portada_evento",
+            "event",
+            respuesta.event_id,
+            {"url": _url_sin_query(url)},
         )
         return respuesta
 

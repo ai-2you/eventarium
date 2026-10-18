@@ -8,15 +8,14 @@ aislamiento por `kind`/organización al resolver un `media_id`.
 from __future__ import annotations
 
 import base64
-import socket
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
-import httpx
 from httpx import AsyncClient
 
 from app.core.permissions import Permission
 from tests.conftest import OrganizacionDePrueba, crear_rol, iniciar_sesion
+from tests.media_url_test_helpers import HOST_DE_PRUEBA, mock_descarga_por_url
 
 MEDIA = "/api/v1/organizations/me/media"
 BRANDING_LOGO = "/api/v1/organizations/me/branding/logo"
@@ -27,18 +26,6 @@ PNG = base64.b64decode(
 )
 
 AHORA = datetime.now(UTC).replace(microsecond=0)
-
-# Mismo patrón que `test_media_upload.py`: sustituye `socket.getaddrinfo` SOLO
-# para este host de prueba, reenviando cualquier otro (localhost del almacén
-# local, p. ej.) a la función real.
-_HOST_DE_PRUEBA = "ejemplo-de-prueba.invalid"
-_GETADDRINFO_REAL = socket.getaddrinfo
-
-
-def _resolucion_dns_publica_falsa(host: str, *args: object, **kwargs: object) -> list[tuple]:
-    if host == _HOST_DE_PRUEBA:
-        return [(2, 1, 6, "", ("93.184.216.34", 0))]
-    return _GETADDRINFO_REAL(host, *args, **kwargs)
 
 
 async def _subir_a_biblioteca(
@@ -229,21 +216,17 @@ async def test_asignar_una_portada_por_url_la_descarga_y_la_guarda_en_la_bibliot
 ) -> None:
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
     evento = await _crear_evento(cliente, cabeceras, "portada-por-url")
-    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
 
-    with (
-        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
-        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
-    ):
+    with mock_descarga_por_url(content=PNG):
         asignada = await cliente.put(
             f"{EVENTS}/{evento['id']}/cover",
             headers=cabeceras,
-            json={"url": f"https://{_HOST_DE_PRUEBA}/portada.png"},
+            json={"url": f"https://{HOST_DE_PRUEBA}/portada.png"},
         )
     assert asignada.status_code == 200, asignada.text
     cuerpo = asignada.json()
     assert cuerpo["cover_url"]
-    assert _HOST_DE_PRUEBA not in cuerpo["cover_url"]
+    assert HOST_DE_PRUEBA not in cuerpo["cover_url"]
 
 
 async def test_reemplazar_una_portada_legada_por_una_de_url_borra_el_objeto_anterior(
@@ -261,17 +244,15 @@ async def test_reemplazar_una_portada_legada_por_una_de_url_borra_el_objeto_ante
         files={"fichero": ("legado.png", PNG, "image/png")},
     )
     assert heredada.status_code == 200, heredada.text
-    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
 
     with (
-        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
-        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+        mock_descarga_por_url(content=PNG),
         patch("app.core.storage.S3StorageProvider.delete_object", new_callable=AsyncMock) as borrar,
     ):
         asignada = await cliente.put(
             f"{EVENTS}/{evento['id']}/cover",
             headers=cabeceras,
-            json={"url": f"https://{_HOST_DE_PRUEBA}/portada.png"},
+            json={"url": f"https://{HOST_DE_PRUEBA}/portada.png"},
         )
     assert asignada.status_code == 200, asignada.text
     borrar.assert_called_once()
@@ -310,6 +291,18 @@ async def test_cover_con_url_no_textual_da_422_en_vez_de_500(
 
     respuesta = await cliente.put(
         f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={"url": ["no", "es", "texto"]}
+    )
+    assert respuesta.status_code == 422, respuesta.text
+
+
+async def test_cover_con_media_id_mal_formado_da_422_en_vez_de_500(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-media-id-mal-formado")
+
+    respuesta = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={"media_id": "no-es-un-uuid"}
     )
     assert respuesta.status_code == 422, respuesta.text
 
