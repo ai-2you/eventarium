@@ -7,11 +7,14 @@ servidor MCP en marcha y llamadas JSON-RPC directas a `/mcp`).
 
 from __future__ import annotations
 
+import base64
 import json
+import socket
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, text
@@ -32,6 +35,21 @@ TODOS = [
     "patrocinadores:editar",
     "inscripciones:cifras",
 ]
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+# Mismo patrón que `tests/modules/test_media_upload.py`: sustituye
+# `socket.getaddrinfo` SOLO para este host de prueba.
+_HOST_DE_PRUEBA = "ejemplo-de-prueba.invalid"
+_GETADDRINFO_REAL = socket.getaddrinfo
+
+
+def _resolucion_dns_publica_falsa(host: str, *args: object, **kwargs: object) -> list[tuple]:
+    if host == _HOST_DE_PRUEBA:
+        return [(2, 1, 6, "", ("93.184.216.34", 0))]
+    return _GETADDRINFO_REAL(host, *args, **kwargs)
 
 
 @pytest.fixture(autouse=True)
@@ -143,6 +161,155 @@ class TestCrearYEditar:
         assert dentro["titulo"] == "Apertura"
         assert fuera["isError"] is True
         assert "rango de fechas" in json.dumps(fuera, ensure_ascii=False)
+
+
+class TestPortada:
+    async def test_asignar_portada_evento_descarga_la_url_y_la_audita(
+        self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        evento = await _evento(cliente, cabeceras, "mcp-portada")
+        clave = await _clave(cliente, cabeceras, ["eventos:editar"])
+        respuesta_falsa = httpx.Response(
+            200, content=PNG, request=httpx.Request("GET", "https://x")
+        )
+
+        with (
+            patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
+            patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+        ):
+            resultado = _datos(
+                await _herramienta(
+                    cliente_mcp,
+                    clave,
+                    "asignar_portada_evento",
+                    event_id=evento["id"],
+                    url=f"https://{_HOST_DE_PRUEBA}/portada.png",
+                )
+            )
+
+        assert resultado["event_id"] == evento["id"]
+        assert resultado["portada_url"]
+        assert _HOST_DE_PRUEBA not in resultado["portada_url"]
+        async with SessionMaintenance() as session:
+            accion = await session.scalar(
+                text(
+                    "SELECT detail FROM audit_log WHERE action = 'mcp.asignar_portada_evento' "
+                    "AND entity_id = :id"
+                ),
+                {"id": evento["id"]},
+            )
+        assert accion["via"] == "mcp"
+
+    async def test_asignar_portada_evento_sobre_portada_legada_borra_el_objeto_anterior(
+        self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        """Paridad con el test REST: si la portada anterior era un objeto
+        legado (subido por fichero, sin pasar por la biblioteca), asignar
+        una nueva por URL vía MCP también lo borra (hallazgo de
+        code-review: antes no había ningún test que dejara
+        `anterior_object_key` con contenido, así que esa rama nunca se
+        ejecutaba en la suite)."""
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        evento = await _evento(cliente, cabeceras, "mcp-portada-legada")
+        heredada = await cliente.put(
+            f"{EVENTS}/{evento['id']}/cover",
+            headers=cabeceras,
+            files={"fichero": ("legado.png", PNG, "image/png")},
+        )
+        assert heredada.status_code == 200, heredada.text
+        clave = await _clave(cliente, cabeceras, ["eventos:editar"])
+        respuesta_falsa = httpx.Response(
+            200, content=PNG, request=httpx.Request("GET", "https://x")
+        )
+
+        with (
+            patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
+            patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+            patch(
+                "app.core.storage.S3StorageProvider.delete_object", new_callable=AsyncMock
+            ) as borrar,
+        ):
+            resultado = _datos(
+                await _herramienta(
+                    cliente_mcp,
+                    clave,
+                    "asignar_portada_evento",
+                    event_id=evento["id"],
+                    url=f"https://{_HOST_DE_PRUEBA}/portada.png",
+                )
+            )
+
+        assert resultado["portada_url"]
+        borrar.assert_called_once()
+
+    async def test_asignar_portada_evento_si_falla_el_borrado_sigue_auditando(
+        self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        """Si `delete_object` del objeto legado huérfano falla (red,
+        almacenamiento caído), la herramienta igual devuelve éxito — la
+        portada ya quedó asignada — y la auditoría se escribe igual
+        (hallazgo de code-review y adversarial: antes una excepción ahí
+        tapaba la auditoría de una escritura que sí se hizo)."""
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        evento = await _evento(cliente, cabeceras, "mcp-portada-borrado-falla")
+        heredada = await cliente.put(
+            f"{EVENTS}/{evento['id']}/cover",
+            headers=cabeceras,
+            files={"fichero": ("legado.png", PNG, "image/png")},
+        )
+        assert heredada.status_code == 200, heredada.text
+        clave = await _clave(cliente, cabeceras, ["eventos:editar"])
+        respuesta_falsa = httpx.Response(
+            200, content=PNG, request=httpx.Request("GET", "https://x")
+        )
+
+        with (
+            patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
+            patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+            patch(
+                "app.core.storage.S3StorageProvider.delete_object",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("almacenamiento caído"),
+            ),
+        ):
+            resultado = _datos(
+                await _herramienta(
+                    cliente_mcp,
+                    clave,
+                    "asignar_portada_evento",
+                    event_id=evento["id"],
+                    url=f"https://{_HOST_DE_PRUEBA}/portada.png",
+                )
+            )
+
+        assert resultado["portada_url"]
+        async with SessionMaintenance() as session:
+            accion = await session.scalar(
+                text(
+                    "SELECT detail FROM audit_log WHERE action = 'mcp.asignar_portada_evento' "
+                    "AND entity_id = :id"
+                ),
+                {"id": evento["id"]},
+            )
+        assert accion["via"] == "mcp"
+
+    async def test_asignar_portada_evento_sin_ambito_de_editar_falla(
+        self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        evento = await _evento(cliente, cabeceras, "mcp-portada-sin-ambito")
+        clave = await _clave(cliente, cabeceras, ["eventos:leer"])
+
+        resultado = await _herramienta(
+            cliente_mcp,
+            clave,
+            "asignar_portada_evento",
+            event_id=evento["id"],
+            url=f"https://{_HOST_DE_PRUEBA}/portada.png",
+        )
+
+        assert resultado["isError"] is True
 
 
 class TestPublicarYCancelar:

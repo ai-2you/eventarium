@@ -42,9 +42,9 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
   `listar_eventos` filtra por `estado`, por `categoria` (slug) y por hasta 3
   `etiquetas` (el evento debe tener todas). No hay filtro por organización:
   una conexión pertenece a una sola.
-- Escritura: `crear_evento`, `editar_evento`, `anadir_sesion`,
-  `editar_sesion`, `quitar_sesion`, `anadir_sede`, `anadir_patrocinador`,
-  `editar_patrocinador`.
+- Escritura: `crear_evento`, `editar_evento`, `asignar_portada_evento`,
+  `anadir_sesion`, `editar_sesion`, `quitar_sesion`, `anadir_sede`,
+  `anadir_patrocinador`, `editar_patrocinador`.
 - Estado: `publicar_evento`, `despublicar_evento` (se niega si hay
   inscripciones vivas) y `cancelar_evento`.
 
@@ -61,6 +61,11 @@ lista vacía. El tope de 3 etiquetas del filtro se cuenta antes de quitar
 repetidas. El catálogo
 de categorías solo lo gestiona la superadministración desde el panel: el MCP
 no lo modifica.
+
+**Portada.** `asignar_portada_evento` pone o cambia la imagen destacada del
+evento a partir de una URL https pública (PNG, JPEG o WebP, hasta 5 MB): el
+servidor la descarga, la valida y la guarda él mismo — el MCP no admite
+mandar un fichero. Devuelve la URL ya servida desde Eventarium.
 
 `cancelar_evento` va en dos pasos: la primera llamada devuelve un resumen
 (inscripciones y cobros afectados) y un código de confirmación válido unos

@@ -8,9 +8,11 @@ aislamiento por `kind`/organización al resolver un `media_id`.
 from __future__ import annotations
 
 import base64
+import socket
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+import httpx
 from httpx import AsyncClient
 
 from app.core.permissions import Permission
@@ -25,6 +27,18 @@ PNG = base64.b64decode(
 )
 
 AHORA = datetime.now(UTC).replace(microsecond=0)
+
+# Mismo patrón que `test_media_upload.py`: sustituye `socket.getaddrinfo` SOLO
+# para este host de prueba, reenviando cualquier otro (localhost del almacén
+# local, p. ej.) a la función real.
+_HOST_DE_PRUEBA = "ejemplo-de-prueba.invalid"
+_GETADDRINFO_REAL = socket.getaddrinfo
+
+
+def _resolucion_dns_publica_falsa(host: str, *args: object, **kwargs: object) -> list[tuple]:
+    if host == _HOST_DE_PRUEBA:
+        return [(2, 1, 6, "", ("93.184.216.34", 0))]
+    return _GETADDRINFO_REAL(host, *args, **kwargs)
 
 
 async def _subir_a_biblioteca(
@@ -208,6 +222,96 @@ async def test_reemplazar_la_portada_gestionada_por_la_biblioteca_no_borra_el_ob
         )
     assert reemplazada.status_code == 200, reemplazada.text
     borrar.assert_not_called()
+
+
+async def test_asignar_una_portada_por_url_la_descarga_y_la_guarda_en_la_biblioteca(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-por-url")
+    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
+
+    with (
+        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
+        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+    ):
+        asignada = await cliente.put(
+            f"{EVENTS}/{evento['id']}/cover",
+            headers=cabeceras,
+            json={"url": f"https://{_HOST_DE_PRUEBA}/portada.png"},
+        )
+    assert asignada.status_code == 200, asignada.text
+    cuerpo = asignada.json()
+    assert cuerpo["cover_url"]
+    assert _HOST_DE_PRUEBA not in cuerpo["cover_url"]
+
+
+async def test_reemplazar_una_portada_legada_por_una_de_url_borra_el_objeto_anterior(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    """Igual que reemplazar un logo heredado por uno de biblioteca: si la
+    portada anterior nunca pasó por la biblioteca (`cover_object_key` de
+    siempre), sustituirla por una traída por URL sigue borrando el objeto
+    huérfano."""
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-legada-reemplazada")
+    heredada = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover",
+        headers=cabeceras,
+        files={"fichero": ("legado.png", PNG, "image/png")},
+    )
+    assert heredada.status_code == 200, heredada.text
+    respuesta_falsa = httpx.Response(200, content=PNG, request=httpx.Request("GET", "https://x"))
+
+    with (
+        patch("app.modules.media.ssrf.socket.getaddrinfo", new=_resolucion_dns_publica_falsa),
+        patch("httpx.AsyncClient.get", new=AsyncMock(return_value=respuesta_falsa)),
+        patch("app.core.storage.S3StorageProvider.delete_object", new_callable=AsyncMock) as borrar,
+    ):
+        asignada = await cliente.put(
+            f"{EVENTS}/{evento['id']}/cover",
+            headers=cabeceras,
+            json={"url": f"https://{_HOST_DE_PRUEBA}/portada.png"},
+        )
+    assert asignada.status_code == 200, asignada.text
+    borrar.assert_called_once()
+
+
+async def test_cover_sin_media_id_ni_url_da_422(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-sin-datos")
+
+    respuesta = await cliente.put(f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={})
+    assert respuesta.status_code == 422, respuesta.text
+
+
+async def test_cover_con_media_id_y_url_a_la_vez_da_422(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-con-los-dos")
+    subido = await _subir_a_biblioteca(cliente, cabeceras, "events")
+
+    respuesta = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover",
+        headers=cabeceras,
+        json={"media_id": subido["id"], "url": "https://ejemplo-de-prueba.invalid/x.png"},
+    )
+    assert respuesta.status_code == 422, respuesta.text
+
+
+async def test_cover_con_url_no_textual_da_422_en_vez_de_500(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-url-no-textual")
+
+    respuesta = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={"url": ["no", "es", "texto"]}
+    )
+    assert respuesta.status_code == 422, respuesta.text
 
 
 async def test_asignar_una_imagen_de_biblioteca_al_logo_de_un_patrocinador(
