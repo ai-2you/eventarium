@@ -542,7 +542,8 @@ async def get_public_speaker(public_slug: str, session: SessionDep) -> PublicSpe
 
     miembro = await session.get(OrganizationMember, perfil.source_organization_member_id)
     persona = await session.get(User, perfil.user_id)
-    if miembro is None or persona is None:
+    # Una cuenta dada de baja deja de tener página pública, como en la ficha del evento.
+    if miembro is None or persona is None or not persona.is_active:
         raise NotFoundError("El ponente no existe.")
 
     enlaces = (

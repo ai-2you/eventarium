@@ -407,8 +407,11 @@ async def confirmar_pago_y_registro(
     inscripcion.confirmed_at = datetime.now(UTC)
     await registrations_service._enviar_email_por_estado(session, inscripcion)  # noqa: SLF001
     # El aviso al organizador de una inscripción de pago sale aquí, al cobrarse,
-    # no al abrir el checkout.
-    await registrations_service.avisar_al_organizador(session, inscripcion, pagada=True)
+    # no al abrir el checkout. Quien llega al pago desde la lista de espera o
+    # tras aprobarse ya se avisó al inscribirse: no se le avisa dos veces.
+    ya_avisada = inscripcion.waitlist_promoted_at is not None or inscripcion.approved_at is not None
+    if not ya_avisada:
+        await registrations_service.avisar_al_organizador(session, inscripcion, pagada=True)
     return "processed"
 
 

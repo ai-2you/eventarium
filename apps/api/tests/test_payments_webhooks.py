@@ -177,6 +177,54 @@ async def test_webhook_confirma_la_inscripcion_y_es_idempotente(
     aviso.assert_awaited_once()
 
 
+@pytest.mark.parametrize("columna", ["waitlist_promoted_at", "approved_at"])
+async def test_pagar_tras_lista_de_espera_o_aprobacion_no_vuelve_a_avisar(
+    cliente: AsyncClient,
+    organizacion: OrganizacionDePrueba,
+    monkeypatch: pytest.MonkeyPatch,
+    columna: str,
+) -> None:
+    """El organizador ya recibió el aviso al entrar en la lista de espera o al
+    quedar pendiente de aprobación; pagar después no genera un segundo."""
+    monkeypatch.setattr(stripe_client, "get_settings", _settings_con_stripe)
+    stripe_account_id = await _crear_organizacion_con_stripe(organizacion)
+    registration_id, _ = await _crear_pago_pending(
+        organizacion, stripe_account_id=stripe_account_id, session_id="cs_ya_avisada"
+    )
+    async with SessionMaintenance() as session:
+        await session.execute(
+            text(f"UPDATE event_registrations SET {columna} = now() WHERE id = :id"),  # noqa: S608
+            {"id": registration_id},
+        )
+        await session.execute(
+            text("UPDATE users SET email_verified_at = now() WHERE id = :id"),
+            {"id": organizacion.owner_id},
+        )
+        await session.commit()
+
+    async def _procesar_sincrono(kicked_event_id: str) -> None:
+        await payments_webhooks.procesar_evento(kicked_event_id)
+
+    monkeypatch.setattr(
+        "app.core.tasks.process_stripe_webhook_task.kiq", AsyncMock(side_effect=_procesar_sincrono)
+    )
+    aviso = AsyncMock()
+    monkeypatch.setattr(send_registration_received_organizer_email, "kiq", aviso)
+    cuerpo = _cuerpo_checkout_completed(
+        event_id=f"evt_{uuid.uuid4().hex}", session_id="cs_ya_avisada", account=stripe_account_id
+    )
+
+    respuesta = await cliente.post(
+        WEBHOOK_URL, content=cuerpo, headers={"stripe-signature": _firmar(cuerpo, int(time.time()))}
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    async with SessionMaintenance() as session:
+        inscripcion = await session.get(EventRegistration, registration_id)
+        assert inscripcion is not None and inscripcion.status == "confirmed"
+    aviso.assert_not_awaited()
+
+
 async def test_webhook_payment_status_no_pagado_no_confirma(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba, monkeypatch: pytest.MonkeyPatch
 ) -> None:

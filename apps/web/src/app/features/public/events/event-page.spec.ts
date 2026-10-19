@@ -243,6 +243,19 @@ describe('EventPage', () => {
       )
       .flush({
         ...eventoDetalle(),
+        // Quien solo modera (sin perfil público) sale en la agenda, no aquí.
+        sessions: eventoDetalle().sessions.map((sesion) => ({
+          ...sesion,
+          participants: [
+            ...sesion.participants,
+            {
+              display_name: 'Carlos Moderador',
+              role_key: 'moderator',
+              public_slug: null,
+              ref: 'r-carlos',
+            },
+          ],
+        })),
         speakers: [
           { display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana', ref: 'r-ana' },
           { display_name: 'Bea Sin Perfil', role_key: 'speaker', public_slug: null, ref: 'r-bea' },

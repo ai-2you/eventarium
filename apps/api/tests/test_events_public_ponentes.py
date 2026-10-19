@@ -162,3 +162,28 @@ async def test_una_cuenta_de_baja_no_sale_ni_por_la_agenda(
     assert detalle["speakers"] == []
     assert detalle["sessions"][0]["participants"] == []
     assert de_la_sesion["participants"] == []
+
+
+async def test_el_perfil_publico_de_una_cuenta_de_baja_no_existe(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    ponente = await crear_miembro(organizacion, "speaker")
+    _, cabeceras = await iniciar_sesion_con(cliente, organizacion, ponente.email, ponente.password)
+    activado = await cliente.patch(
+        "/api/v1/users/me/public-profile",
+        headers=cabeceras,
+        json={
+            "public_slug": "se-da-de-baja",
+            "source_organization_member_id": str(ponente.member_id),
+        },
+    )
+    assert activado.status_code == 200, activado.text
+    assert (await cliente.get("/api/v1/public/speakers/se-da-de-baja")).status_code == 200
+
+    async with SessionMaintenance() as session:
+        await session.execute(
+            text("UPDATE users SET is_active = false WHERE id = :id"), {"id": ponente.user_id}
+        )
+        await session.commit()
+
+    assert (await cliente.get("/api/v1/public/speakers/se-da-de-baja")).status_code == 404

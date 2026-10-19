@@ -721,8 +721,9 @@ export class EventPage implements OnInit {
   });
 
   /** Los ponentes enlazados al evento (`speakers`, tengan o no sesión) y, tras
-   * ellos, quien sale en la agenda sin estar en ese roster (moderación, etc.),
-   * cada grupo por nombre. Se deduplica por `ref`, que la API hace igual en los
+   * ellos, quien sale en la agenda sin estar en ese roster (moderación, etc.)
+   * solo si tiene perfil público: en la agenda ya sale con su nombre, y aquí no
+   * se presenta como ponente a quien no lo es. Cada grupo, por nombre. Se deduplica por `ref`, que la API hace igual en los
    * dos sitios: quien participa en varias sesiones se queda con su primer rol. */
   protected readonly ponentes = computed<Speaker[]>(() => {
     const evento = this.evento();
@@ -742,7 +743,11 @@ export class EventPage implements OnInit {
       }
     };
     anadir(evento?.speakers ?? []);
-    anadir((evento?.sessions ?? []).flatMap((sesion) => sesion.participants));
+    anadir(
+      (evento?.sessions ?? [])
+        .flatMap((sesion) => sesion.participants)
+        .filter((persona) => persona.public_slug !== null),
+    );
     return [...vistos.values()];
   });
 
