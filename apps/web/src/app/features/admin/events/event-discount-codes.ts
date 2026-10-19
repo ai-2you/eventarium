@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import {
+  computed,
   ChangeDetectionStrategy,
   Component,
   type OnInit,
@@ -8,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -73,7 +75,7 @@ function vacio(): {
 @Component({
   selector: 'app-event-discount-codes',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Input, PageHeader],
+  imports: [TranslocoDirective, Alert, Button, Card, Input, PageHeader, Select],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.discountCodes.titulo')">
@@ -155,21 +157,13 @@ function vacio(): {
               [(value)]="code"
             />
 
-            <div class="campo-select">
-              <label for="codigo-tipo-descuento">
-                {{ t('admin.events.discountCodes.tipoDescuento') }}
-              </label>
-              <select
-                id="codigo-tipo-descuento"
-                [value]="discountType()"
-                (change)="alCambiarTipoDescuento($event)"
-              >
-                <option value="percentage">{{ t('admin.events.discountCodes.porcentaje') }}</option>
-                <option value="fixed_amount">
-                  {{ t('admin.events.discountCodes.importeFijo') }}
-                </option>
-              </select>
-            </div>
+            <app-select
+              fieldId="codigo-tipo-descuento"
+              [label]="t('admin.events.discountCodes.tipoDescuento')"
+              [options]="opcionesDeTipoDescuento()"
+              [value]="discountType()"
+              (valueChange)="discountType.set($any($event))"
+            />
 
             <div class="campo-numero">
               <label for="codigo-valor">
@@ -205,21 +199,12 @@ function vacio(): {
               </p>
             </div>
 
-            <div class="campo-select">
-              <label for="codigo-tipo-entrada">
-                {{ t('admin.events.discountCodes.tipoEntrada') }}
-              </label>
-              <select
-                id="codigo-tipo-entrada"
-                [value]="ticketTypeId()"
-                (change)="alCambiarTipoEntrada($event)"
-              >
-                <option value="">{{ t('admin.events.discountCodes.todosLosTipos') }}</option>
-                @for (tipo of tiposDisponibles(); track tipo.id) {
-                  <option [value]="tipo.id">{{ tipo.name }}</option>
-                }
-              </select>
-            </div>
+            <app-select
+              fieldId="codigo-tipo-entrada"
+              [label]="t('admin.events.discountCodes.tipoEntrada')"
+              [options]="opcionesDeTipoEntrada()"
+              [(value)]="ticketTypeId"
+            />
 
             <div class="campo-fecha">
               <label for="codigo-vigente-desde">
@@ -308,13 +293,11 @@ function vacio(): {
       border-top: 1px solid var(--border);
       max-width: 34rem;
     }
-    .campo-select,
     .campo-numero,
     .campo-fecha {
       display: grid;
       gap: var(--space-xs);
     }
-    .campo-select select,
     .campo-numero input,
     .campo-fecha input {
       width: 100%;
@@ -437,13 +420,21 @@ export class EventDiscountCodes implements OnInit {
     }
   }
 
-  protected alCambiarTipoDescuento(evento: Event): void {
-    this.discountType.set((evento.target as HTMLSelectElement).value as DiscountType);
-  }
+  protected readonly opcionesDeTipoDescuento = computed<SelectOption[]>(() => [
+    {
+      value: 'percentage',
+      label: this.transloco.translate('admin.events.discountCodes.porcentaje'),
+    },
+    {
+      value: 'fixed_amount',
+      label: this.transloco.translate('admin.events.discountCodes.importeFijo'),
+    },
+  ]);
 
-  protected alCambiarTipoEntrada(evento: Event): void {
-    this.ticketTypeId.set((evento.target as HTMLSelectElement).value);
-  }
+  protected readonly opcionesDeTipoEntrada = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('admin.events.discountCodes.todosLosTipos') },
+    ...this.tiposDisponibles().map((tipo) => ({ value: tipo.id, label: tipo.name })),
+  ]);
 
   protected editar(codigo: DiscountCode): void {
     this.editandoId.set(codigo.id);

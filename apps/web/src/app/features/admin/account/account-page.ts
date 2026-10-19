@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 
 import { ApiError } from '../../../core/api/error.interceptor';
 import {
@@ -28,7 +29,17 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
 @Component({
   selector: 'app-account-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Checkbox, Input, PasswordStrength, PageHeader],
+  imports: [
+    TranslocoDirective,
+    Alert,
+    Button,
+    Card,
+    Checkbox,
+    Input,
+    PasswordStrength,
+    PageHeader,
+    Select,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.cuenta.rotulo')">
@@ -150,25 +161,12 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
         <app-card [heading]="t('admin.cuenta.perfilPublico.titulo')">
           <p>{{ t('admin.cuenta.perfilPublico.descripcion') }}</p>
           <form (submit)="guardarPerfilPublico($event)" novalidate>
-            <div class="campo-select">
-              <label for="perfil-publico-membresia">
-                {{ t('admin.cuenta.perfilPublico.membresia') }}
-              </label>
-              <select
-                id="perfil-publico-membresia"
-                [value]="membresiaElegida()"
-                (change)="alCambiarMembresia($event)"
-              >
-                @for (
-                  membresia of membresiasPublicables();
-                  track membresia.organization_member_id
-                ) {
-                  <option [value]="membresia.organization_member_id">
-                    {{ membresia.role_name }}
-                  </option>
-                }
-              </select>
-            </div>
+            <app-select
+              fieldId="perfil-publico-membresia"
+              [label]="t('admin.cuenta.perfilPublico.membresia')"
+              [options]="opcionesDeMembresia()"
+              [(value)]="membresiaElegida"
+            />
             <app-input
               [label]="t('admin.cuenta.perfilPublico.slug')"
               [hint]="t('admin.cuenta.perfilPublico.slugAyuda')"
@@ -224,14 +222,9 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
       gap: var(--space-md);
       max-width: 26rem;
     }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
+    app-select {
+      display: block;
       max-width: 26rem;
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
     }
     .acciones-perfil-publico {
       display: flex;
@@ -401,9 +394,12 @@ export class AccountPage {
     }
   }
 
-  protected alCambiarMembresia(evento: Event): void {
-    this.membresiaElegida.set((evento.target as HTMLSelectElement).value);
-  }
+  protected readonly opcionesDeMembresia = computed<SelectOption[]>(() =>
+    this.membresiasPublicables().map((membresia) => ({
+      value: membresia.organization_member_id,
+      label: membresia.role_name,
+    })),
+  );
 
   protected async comprobarSlug(): Promise<void> {
     const slug = this.slugPublico().trim();

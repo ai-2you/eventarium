@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -44,6 +45,7 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
     ErrorSummary,
     Input,
     PageHeader,
+    Select,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -87,18 +89,16 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
               (blurred)="validarBase('lastName')"
             />
 
-            <div class="campo-select">
-              <label for="miembro-rol">{{ t('admin.members.formulario.rol') }}</label>
-              <select id="miembro-rol" [value]="roleId()" (change)="alElegirRol($event)">
-                <option value="" disabled>{{ t('admin.members.formulario.rolRequerido') }}</option>
-                @for (rol of roles(); track rol.id) {
-                  <option [value]="rol.id">{{ rol.name }}</option>
-                }
-              </select>
-              @if (erroresBase().roleId) {
-                <p class="error">{{ erroresBase().roleId }}</p>
-              }
-            </div>
+            <app-select
+              fieldId="miembro-rol"
+              [label]="t('admin.members.formulario.rol')"
+              [placeholder]="t('admin.members.formulario.rolRequerido')"
+              [required]="true"
+              [options]="opcionesDeRol()"
+              [error]="erroresBase().roleId"
+              [value]="roleId()"
+              (valueChange)="alElegirRol($event)"
+            />
           </app-card>
 
           @if (rolElegido(); as rol) {
@@ -149,19 +149,6 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
       gap: var(--space-lg);
       margin-top: var(--space-md);
       max-width: 34rem;
-    }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
-    }
-    .error {
-      margin: 0;
-      color: var(--danger);
-      font-size: 0.875rem;
     }
     .acciones-finales {
       display: flex;
@@ -229,8 +216,12 @@ export class MemberForm {
     }
   }
 
-  protected alElegirRol(evento: Event): void {
-    this.roleId.set((evento.target as HTMLSelectElement).value);
+  protected readonly opcionesDeRol = computed<SelectOption[]>(() =>
+    this.roles().map((rol) => ({ value: rol.id, label: rol.name })),
+  );
+
+  protected alElegirRol(valor: string): void {
+    this.roleId.set(valor);
     this.valoresDePerfil.set({});
     this.erroresDePerfil.set({});
   }

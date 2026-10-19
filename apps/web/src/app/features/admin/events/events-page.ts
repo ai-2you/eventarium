@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -31,7 +32,17 @@ interface Page<T> {
 @Component({
   selector: 'app-events-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, RouterLink, DatePipe, Alert, Button, Chip, DataTable, PageHeader],
+  imports: [
+    TranslocoDirective,
+    RouterLink,
+    DatePipe,
+    Alert,
+    Button,
+    Chip,
+    DataTable,
+    PageHeader,
+    Select,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.rotulo')">
@@ -44,16 +55,14 @@ interface Page<T> {
         </div>
       </app-page-header>
 
-      <div class="filtro">
-        <label for="filtro-estado">{{ t('admin.events.filtrarPorEstado') }}</label>
-        <select id="filtro-estado" [value]="estado()" (change)="alCambiarEstado($event)">
-          <option value="">{{ t('admin.events.estadoTodos') }}</option>
-          <option value="draft">{{ t('admin.events.estadoDraft') }}</option>
-          <option value="published">{{ t('admin.events.estadoPublished') }}</option>
-          <option value="archived">{{ t('admin.events.estadoArchived') }}</option>
-          <option value="cancelled">{{ t('admin.events.estadoCancelled') }}</option>
-        </select>
-      </div>
+      <app-select
+        class="filtro"
+        fieldId="filtro-estado"
+        [label]="t('admin.events.filtrarPorEstado')"
+        [options]="opcionesDeEstado()"
+        [value]="estado()"
+        (valueChange)="alCambiarEstado($event)"
+      />
 
       @if (error(); as mensaje) {
         <app-alert tone="error">{{ mensaje }}</app-alert>
@@ -84,14 +93,9 @@ interface Page<T> {
   `,
   styles: `
     .filtro {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
+      display: block;
+      max-width: 18rem;
       margin: var(--space-md) 0;
-    }
-    .filtro select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      min-height: 2.5rem;
     }
   `,
 })
@@ -157,8 +161,16 @@ export class EventsPage {
     }
   }
 
-  protected alCambiarEstado(evento: Event): void {
-    this.estado.set((evento.target as HTMLSelectElement).value as EventStatus | '');
+  protected readonly opcionesDeEstado = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('admin.events.estadoTodos') },
+    { value: 'draft', label: this.transloco.translate('admin.events.estadoDraft') },
+    { value: 'published', label: this.transloco.translate('admin.events.estadoPublished') },
+    { value: 'archived', label: this.transloco.translate('admin.events.estadoArchived') },
+    { value: 'cancelled', label: this.transloco.translate('admin.events.estadoCancelled') },
+  ]);
+
+  protected alCambiarEstado(valor: string): void {
+    this.estado.set(valor as EventStatus | '');
     void this.cargar();
   }
 }

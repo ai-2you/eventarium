@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import { SuperadminPage } from './superadmin-page';
+import { emularDialogoNativo, pulsarEnDialogo } from '../../../../testing/dialog';
 
 const AUDIT_LOG_URL = '/api/v1/admin/audit-log';
 
@@ -98,7 +99,7 @@ describe('SuperadminPage', () => {
     http.expectOne((p) => p.url === AUDIT_LOG_URL).flush(pagina());
     await avanzar(fixture);
 
-    vi.stubGlobal('confirm', () => true);
+    emularDialogoNativo();
 
     function escribir(id: string, valor: string): void {
       const campo = fixture.nativeElement.querySelector(`#${id}`) as HTMLInputElement;
@@ -112,6 +113,9 @@ describe('SuperadminPage', () => {
 
     const formularios = fixture.nativeElement.querySelectorAll('form');
     formularios[2].dispatchEvent(new Event('submit', { cancelable: true }));
+    await avanzar(fixture);
+    http.expectNone((p) => p.method === 'DELETE');
+    pulsarEnDialogo(fixture, 'Borrar inscripción');
     await avanzar(fixture);
 
     const peticion = http.expectOne(
@@ -129,7 +133,6 @@ describe('SuperadminPage', () => {
     await avanzar(fixture);
 
     expect(fixture.nativeElement.textContent).toContain('Inscripción borrada.');
-    vi.unstubAllGlobals();
   });
 
   it('exporta RGPD con POST y body, nunca con GET (la Fetch API prohíbe body en GET)', async () => {

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { EventsPage } from './events-page';
+import { elegirEnSelect } from '../../../../testing/select';
 
 function pagina() {
   return {
@@ -93,9 +94,7 @@ describe('EventsPage', () => {
     http.expectOne((peticion) => peticion.url === '/api/v1/events').flush(pagina());
     await avanzar(fixture);
 
-    const select = fixture.nativeElement.querySelector('#filtro-estado') as HTMLSelectElement;
-    select.value = 'published';
-    select.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'filtro-estado', 'published');
     await avanzar(fixture);
 
     const peticion = http.expectOne((peticion) => peticion.url === '/api/v1/events');

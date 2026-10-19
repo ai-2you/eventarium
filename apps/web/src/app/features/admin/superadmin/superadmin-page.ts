@@ -1,6 +1,14 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Dialog } from '../../../shared/ui/dialog';
 import { firstValueFrom } from 'rxjs';
 
 import { version as VERSION_WEB } from '../../../../../package.json';
@@ -64,6 +72,7 @@ const AUDIT_LOG_URL = '/admin/audit-log';
     ChangelogPanel,
     Chip,
     DataTable,
+    Dialog,
     Input,
     KpiCard,
     PageHeader,
@@ -292,6 +301,28 @@ const AUDIT_LOG_URL = '/admin/audit-log';
       }
 
       <app-changelog-panel class="bloque" [versiones]="changelog" />
+
+      <app-dialog #dialogoBorrar>
+        <p>{{ t('admin.superadmin.borrar.confirmar') }}</p>
+        <app-button
+          pie
+          variant="secundario"
+          type="button"
+          [disabled]="borrando()"
+          (pulsado)="dialogoBorrar.cerrar()"
+        >
+          {{ t('comun.cancelar') }}
+        </app-button>
+        <app-button
+          pie
+          variant="peligro"
+          type="button"
+          [loading]="borrando()"
+          (pulsado)="confirmarBorrado()"
+        >
+          {{ t('admin.superadmin.borrar.boton') }}
+        </app-button>
+      </app-dialog>
     </ng-container>
   `,
   styles: `
@@ -633,15 +664,18 @@ export class SuperadminPage {
     }
   }
 
-  protected async borrar(evento: Event): Promise<void> {
+  private readonly dialogoBorrar = viewChild.required<Dialog>('dialogoBorrar');
+
+  /** Pide confirmación con el modal del sistema de diseño, nunca con un
+   * diálogo nativo del navegador. */
+  protected borrar(evento: Event): void {
     evento.preventDefault();
-    if (typeof window !== 'undefined') {
-      const confirmado = window.confirm(
-        this.transloco.translate('admin.superadmin.borrar.confirmar'),
-      );
-      if (!confirmado) {
-        return;
-      }
+    this.dialogoBorrar().abrir();
+  }
+
+  protected async confirmarBorrado(): Promise<void> {
+    if (this.borrando()) {
+      return;
     }
     this.errorBorrar.set(null);
     this.borrarOk.set(false);
@@ -667,6 +701,7 @@ export class SuperadminPage {
       );
     } finally {
       this.borrando.set(false);
+      this.dialogoBorrar().cerrar();
     }
   }
 }
