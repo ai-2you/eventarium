@@ -32,7 +32,12 @@ import { Reveal } from '../../../shared/ui/reveal.directive';
 import { ShareLinks } from '../../../shared/ui/share-links';
 import { VenueMap } from '../../../shared/ui/venue-map';
 import { MarkdownSeguro } from '../../../shared/legal/markdown-seguro';
-import type { LocationMode, PublicEventDetail, RegistrationMode } from './event-page.types';
+import type {
+  LocationMode,
+  PublicEventDetail,
+  PublicParticipant,
+  RegistrationMode,
+} from './event-page.types';
 import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-section';
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
 
@@ -64,7 +69,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
 /**
  * Página pública de un evento, sobre `evento-iawic.html` del prototipo de
  * OpenDesign: hero con ficha de datos reales, agenda por día con pestañas
- * accesibles, ponentes derivados de la agenda, patrocinadores por nivel y
+ * accesibles, ponentes (roster del evento y agenda), patrocinadores por nivel y
  * lugar — sin ningún dato que la API no devuelva (ver cabecera de
  * `event-page.types.ts`).
  *
@@ -715,23 +720,29 @@ export class EventPage implements OnInit {
       .map(([fecha, sesiones]) => ({ fecha, sesiones }));
   });
 
-  /** Ponentes reales derivados de la agenda: no existe ningún endpoint
-   * aparte de la agenda, así que se agrupan los participantes con perfil
-   * público (`public_slug`), sin duplicar a quien participa en varias
-   * sesiones (se queda con el primer rol con el que aparece). */
+  /** Los ponentes enlazados al evento (`speakers`, tengan o no sesión) y, tras
+   * ellos, quien sale en la agenda sin estar en ese roster (moderación, etc.),
+   * cada grupo por nombre. Se deduplica por `ref`, que la API hace igual en los
+   * dos sitios: quien participa en varias sesiones se queda con su primer rol. */
   protected readonly ponentes = computed<Speaker[]>(() => {
+    const evento = this.evento();
     const vistos = new Map<string, Speaker>();
-    for (const sesion of this.evento()?.sessions ?? []) {
-      for (const persona of sesion.participants) {
-        if (persona.public_slug && !vistos.has(persona.public_slug)) {
-          vistos.set(persona.public_slug, {
-            publicSlug: persona.public_slug,
-            displayName: persona.display_name,
-            roleKey: persona.role_key,
-          });
-        }
+    const anadir = (personas: readonly PublicParticipant[]): void => {
+      const nuevas = personas
+        .filter((persona) => !vistos.has(persona.ref))
+        .sort((a, b) => a.display_name.localeCompare(b.display_name, 'es'));
+      for (const persona of nuevas) {
+        if (vistos.has(persona.ref)) continue;
+        vistos.set(persona.ref, {
+          ref: persona.ref,
+          publicSlug: persona.public_slug,
+          displayName: persona.display_name,
+          roleKey: persona.role_key,
+        });
       }
-    }
+    };
+    anadir(evento?.speakers ?? []);
+    anadir((evento?.sessions ?? []).flatMap((sesion) => sesion.participants));
     return [...vistos.values()];
   });
 

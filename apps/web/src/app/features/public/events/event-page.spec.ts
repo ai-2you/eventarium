@@ -49,7 +49,9 @@ function eventoDetalle() {
         video_platform: null,
         video_url: null,
         materials: [],
-        participants: [{ display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana' }],
+        participants: [
+          { display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana', ref: 'r-ana' },
+        ],
       },
     ],
     venues: [],
@@ -227,6 +229,37 @@ describe('EventPage', () => {
     expect(texto).toContain('Inscripción con aprobación');
     expect(texto).toContain('Ponente');
     expect(texto).not.toContain('speaker');
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('lista los ponentes del roster aunque no tengan sesión, sin enlace si no tienen perfil y sin duplicar', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({
+        ...eventoDetalle(),
+        speakers: [
+          { display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana', ref: 'r-ana' },
+          { display_name: 'Bea Sin Perfil', role_key: 'speaker', public_slug: null, ref: 'r-bea' },
+        ],
+      });
+    await avanzar(fixture);
+
+    const rejilla = fixture.nativeElement.querySelector(
+      'app-event-speakers-section',
+    ) as HTMLElement;
+    const fichas = Array.from(rejilla.querySelectorAll('.ponente')) as HTMLElement[];
+    expect(fichas.map((ficha) => ficha.querySelector('strong')?.textContent)).toEqual([
+      'Ana Ponente',
+      'Bea Sin Perfil',
+    ]);
+    expect(fichas[0]!.tagName).toBe('A');
+    expect(fichas[1]!.tagName).toBe('DIV');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 

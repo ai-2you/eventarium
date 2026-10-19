@@ -4,6 +4,7 @@
 import { PublicCategoryRef } from '../models/public-category-ref';
 import { PublicEventSession } from '../models/public-event-session';
 import { PublicOrganizationRef } from '../models/public-organization-ref';
+import { PublicParticipant } from '../models/public-participant';
 import { PublicSponsorTier } from '../models/public-sponsor-tier';
 import { PublicTheme } from '../models/public-theme';
 import { PublicVenue } from '../models/public-venue';
@@ -37,6 +38,7 @@ export interface PublicEventDetail {
   reserved_count: number;
   sessions: Array<PublicEventSession>;
   slug: string;
+  speakers?: Array<PublicParticipant>;
   sponsor_tiers?: Array<PublicSponsorTier>;
   starts_at: string;
   summary: (string | null);

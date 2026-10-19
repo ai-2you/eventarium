@@ -20674,6 +20674,13 @@
             "type": "array",
             "title": "Sessions"
           },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicParticipant"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
           "venues": {
             "items": {
               "$ref": "#/components/schemas/PublicVenue"
@@ -21183,13 +21190,18 @@
               }
             ],
             "title": "Public Slug"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
           }
         },
         "type": "object",
         "required": [
           "display_name",
           "role_key",
-          "public_slug"
+          "public_slug",
+          "ref"
         ],
         "title": "PublicParticipant",
         "description": "Participante tal y como se muestra en las páginas públicas.\n\nNunca lleva el correo — a diferencia de `SessionParticipantResponse`, que es\npara el panel de administración. `public_slug` solo está presente si esa\npersona activó su perfil público; si no, es `None` y la página no enlaza a\nningún sitio."

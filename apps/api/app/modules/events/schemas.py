@@ -450,6 +450,9 @@ class PublicParticipant(BaseModel):
     display_name: str
     role_key: str
     public_slug: str | None
+    # Identificador opaco y estable de la persona en esta organización (nunca su
+    # UUID): deja a la página juntar ponentes de la agenda y del roster sin duplicar.
+    ref: str
 
 
 class PublicEventSummary(BaseModel):
@@ -582,6 +585,8 @@ class PublicEventDetail(BaseModel):
     # el catálogo estuviera vacío, que no es un estado posible hoy.
     theme: PublicTheme | None = None
     sessions: list[PublicEventSession]
+    # Ponentes enlazados al evento, tengan o no sesión en la agenda.
+    speakers: list[PublicParticipant] = Field(default_factory=list)
     # Ordenadas por `display_order`. El frontend decide, a partir de su
     # longitud, si activa la vista de "programa por sede" (2 sedes o más) —
     # decisión de tanda 3, aquí solo se exponen los datos.
