@@ -1284,6 +1284,9 @@
       "sinEventos": "Todavía no hay eventos.",
       "columnaTitulo": "Título",
       "columnaEstado": "Estado",
+      "columnaInscripcion": "Inscripción",
+      "columnaPrecio": "Precio",
+      "columnaAforo": "Aforo",
       "columnaFecha": "Fecha de inicio",
       "error": "No hemos podido completar la operación.",
       "formulario": {
@@ -2089,7 +2092,14 @@
         "eliminarDialogoTitulo": "¿Eliminar este evento?",
         "eliminarDialogoTexto": "Dejará de aparecer en el panel y en la web pública. Los registros de inscripciones, cobros y contabilidad se conservan. El identificador del evento seguirá reservado.",
         "eliminarConfirmar": "Sí, eliminar el evento"
-      }
+      },
+      "modoLibre": "Acceso libre",
+      "modoAprobacion": "Con aprobación",
+      "modoPago": "De pago",
+      "precioGratis": "Gratis",
+      "precioDesde": "Desde {{precio}}",
+      "precioSinEntradas": "Sin entradas",
+      "sinLimite": "Sin límite"
     },
     "sponsorTiersNav": "Niveles de patrocinio",
     "stripeNav": "Pagos con Stripe",

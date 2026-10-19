@@ -13,8 +13,10 @@ import { Button } from '../../../shared/ui/button';
 import { Chip, ChipTone } from '../../../shared/ui/chip';
 import { DataTable, DataTableColumn } from '../../../shared/ui/data-table';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { formatearPrecio } from '../../../shared/text/formatear-precio';
 
 type EventStatus = 'draft' | 'published' | 'archived' | 'cancelled';
+type RegistrationMode = 'free' | 'approval' | 'paid';
 
 interface EventSummary {
   readonly id: string;
@@ -22,6 +24,13 @@ interface EventSummary {
   readonly title: string;
   readonly status: EventStatus;
   readonly starts_at: string;
+  readonly registration_mode: RegistrationMode;
+  /** `null`: sin límite de plazas. */
+  readonly capacity: number | null;
+  /** Entrada más barata (solo eventos de pago con entradas definidas). */
+  readonly price_from_cents?: number | null;
+  readonly price_currency?: string | null;
+  readonly price_multiple?: boolean;
 }
 
 interface Page<T> {
@@ -84,6 +93,11 @@ interface Page<T> {
                   t('admin.events.estado' + estadoClave(evento.status))
                 }}</app-chip>
               </td>
+              <td>{{ t(claveDeModo(evento.registration_mode)) }}</td>
+              <td>{{ precioTexto(evento, t) }}</td>
+              <td>
+                {{ evento.capacity === null ? t('admin.events.sinLimite') : evento.capacity }}
+              </td>
               <td>{{ evento.starts_at | date: 'short' }}</td>
             </tr>
           }
@@ -115,12 +129,38 @@ export class EventsPage {
     return [
       { key: 'titulo', label: t('admin.events.columnaTitulo') },
       { key: 'estado', label: t('admin.events.columnaEstado') },
+      { key: 'inscripcion', label: t('admin.events.columnaInscripcion') },
+      { key: 'precio', label: t('admin.events.columnaPrecio') },
+      { key: 'aforo', label: t('admin.events.columnaAforo') },
       { key: 'fecha', label: t('admin.events.columnaFecha') },
     ];
   });
 
   constructor() {
     void this.cargar();
+  }
+
+  protected claveDeModo(modo: RegistrationMode): string {
+    const claves: Record<RegistrationMode, string> = {
+      free: 'admin.events.modoLibre',
+      approval: 'admin.events.modoAprobacion',
+      paid: 'admin.events.modoPago',
+    };
+    return claves[modo];
+  }
+
+  /** «Gratis» si no es de pago; el precio, o «Desde X» si hay varios; y, si es de
+   * pago pero aún no tiene entradas, que faltan (sin inventar un importe). */
+  protected precioTexto(
+    evento: EventSummary,
+    traducir: (clave: string, params?: Record<string, unknown>) => string,
+  ): string {
+    if (evento.registration_mode !== 'paid') return traducir('admin.events.precioGratis');
+    if (evento.price_from_cents == null || !evento.price_currency) {
+      return traducir('admin.events.precioSinEntradas');
+    }
+    const precio = formatearPrecio(evento.price_from_cents, evento.price_currency);
+    return evento.price_multiple ? traducir('admin.events.precioDesde', { precio }) : precio;
   }
 
   protected estadoClave(estado: EventStatus): string {

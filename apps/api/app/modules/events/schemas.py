@@ -277,6 +277,18 @@ class EventResponse(BaseModel):
     theme_overrides: dict[str, Any] | None
 
 
+class EventListItem(EventResponse):
+    """Evento en el listado del panel: lo de `EventResponse` más su precio, que
+    el organizador quiere ver en la tabla sin abrir cada evento."""
+
+    # Entrada más barata entre los tipos activos, estén o no a la venta ahora
+    # (al organizador le importa el precio aunque la venta no haya abierto).
+    # `None` en un evento que no es de pago o que aún no tiene entradas.
+    price_from_cents: int | None = None
+    price_currency: str | None = None
+    price_multiple: bool = False
+
+
 class EventVenueCreate(BaseModel):
     """Alta de una sede de un evento multisede."""
 

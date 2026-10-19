@@ -31,12 +31,17 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
-    version: '0.27.9',
+    version: '0.27.10',
     fecha: '2026-10-20',
     secciones: [
       {
         categoria: 'agregado',
         items: [
+          {
+            titulo: 'Modo, precio y aforo en el listado de eventos',
+            descripcion:
+              'La tabla de eventos del panel muestra si la inscripción es de acceso libre, con aprobación o de pago, cuánto cuesta (o «Desde» si hay varios precios) y el aforo.',
+          },
           {
             titulo: 'Aviso al organizador por cada inscripción',
             descripcion:
