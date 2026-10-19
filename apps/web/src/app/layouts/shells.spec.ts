@@ -158,7 +158,11 @@ describe('shells', () => {
     // Sin sesión: el menú (que ahora reacciona al estado real) muestra las
     // opciones de invitado.
     TestBed.overrideProvider(AuthService, {
-      useValue: { ...configurarAuth(false), currentUser: signal(null), isAuthenticated: signal(false) },
+      useValue: {
+        ...configurarAuth(false),
+        currentUser: signal(null),
+        isAuthenticated: signal(false),
+      },
     });
     const fixture = TestBed.createComponent(PublicShell);
     await fixture.whenStable();
