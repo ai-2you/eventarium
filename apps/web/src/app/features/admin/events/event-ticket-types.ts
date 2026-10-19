@@ -83,9 +83,10 @@ function precioAEuros(cents: number): string {
       <app-card [heading]="t('admin.events.ticketTypes.titulo')">
         @if (cargandoEvento()) {
           <p>{{ t('comun.cargando') }}</p>
-        } @else if (!aceptaPagos()) {
-          <app-alert tone="info">{{ t('admin.events.ticketTypes.eventoGratuito') }}</app-alert>
         } @else {
+          @if (!aceptaPagos() && !error()) {
+            <app-alert tone="info">{{ t('admin.events.ticketTypes.eventoGratuito') }}</app-alert>
+          }
           @if (error(); as mensaje) {
             <app-alert tone="error">{{ mensaje }}</app-alert>
           }
@@ -403,9 +404,7 @@ export class EventTicketTypes implements OnInit {
     } finally {
       this.cargandoEvento.set(false);
     }
-    if (this.aceptaPagos()) {
-      await this.cargar();
-    }
+    await this.cargar();
   }
 
   private async cargar(): Promise<void> {

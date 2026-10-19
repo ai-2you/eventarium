@@ -4,12 +4,13 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { By } from '@angular/platform-browser';
 import { Select } from '../../../shared/ui/select';
+import { EventScope } from '../../../layouts/admin/event-scope';
 import { EventForm } from './event-form';
 
 function eventoDetalle(overrides: Record<string, unknown> = {}) {
@@ -17,6 +18,10 @@ function eventoDetalle(overrides: Record<string, unknown> = {}) {
     id: 'e1',
     slug: 'iawic-2026',
     title: 'IA Week in Cascais 2026',
+    summary: null,
+    description: null,
+    registration_mode: 'free',
+    capacity: null,
     starts_at: '2026-10-01T09:00:00Z',
     ends_at: '2026-10-02T18:00:00Z',
     location_mode: 'in_person',
@@ -253,6 +258,150 @@ describe('EventForm', () => {
       );
       await avanzar(fixture);
       http.expectNone((p) => p.method === 'PATCH');
+    });
+  });
+
+  describe('resumen, descripción, modo de inscripción y aforo', () => {
+    async function abrirEdicion(overrides: Record<string, unknown> = {}) {
+      configurar('e1');
+      http = TestBed.inject(HttpTestingController);
+      const fixture = TestBed.createComponent(EventForm);
+      await avanzar(fixture);
+      await flushCategorias(http, fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'GET')
+        .flush(eventoDetalle(overrides));
+      await avanzar(fixture);
+      await flushEventDetails(http, fixture);
+      return fixture;
+    }
+
+    function campo<T extends HTMLElement>(fixture: ComponentFixture<unknown>, selector: string): T {
+      return fixture.nativeElement.querySelector(selector) as T;
+    }
+
+    /** El `<select>` nativo de `app-select` es un espejo oculto: se elige por
+     * el propio componente, como haría un clic en su lista. */
+    function elegir(fixture: ComponentFixture<unknown>, id: string, valor: string): void {
+      fixture.debugElement
+        .queryAll(By.directive(Select))
+        .find((d) => d.nativeElement.querySelector(`#${id}-nativo`))
+        ?.componentInstance.value.set(valor);
+    }
+
+    async function enviar(fixture: ComponentFixture<unknown>): Promise<void> {
+      campo<HTMLFormElement>(fixture, 'form').dispatchEvent(new Event('submit'));
+      await avanzar(fixture);
+    }
+
+    it('carga los cuatro campos del evento', async () => {
+      const fixture = await abrirEdicion({
+        summary: 'Una semana de IA',
+        description: 'Charlas y talleres.',
+        registration_mode: 'approval',
+        capacity: 120,
+      });
+
+      expect(campo<HTMLInputElement>(fixture, '#evento-resumen').value).toBe('Una semana de IA');
+      expect(campo<HTMLTextAreaElement>(fixture, '#evento-descripcion').value).toBe(
+        'Charlas y talleres.',
+      );
+      expect(campo<HTMLSelectElement>(fixture, '#evento-modo-inscripcion-nativo').value).toBe(
+        'approval',
+      );
+      expect(campo<HTMLInputElement>(fixture, '#evento-aforo').value).toBe('120');
+      expect(fixture.nativeElement.textContent).toContain('queda pendiente hasta que la apruebas');
+    });
+
+    it('envía los cambios y vacía con null lo que se borra', async () => {
+      const fixture = await abrirEdicion({ description: 'Texto viejo', capacity: 50 });
+
+      const descripcion = campo<HTMLTextAreaElement>(fixture, '#evento-descripcion');
+      descripcion.value = '   ';
+      descripcion.dispatchEvent(new Event('input'));
+      const resumen = campo<HTMLInputElement>(fixture, '#evento-resumen');
+      resumen.value = ' Resumen nuevo ';
+      resumen.dispatchEvent(new Event('input'));
+      elegir(fixture, 'evento-modo-inscripcion', 'paid');
+      const aforo = campo<HTMLInputElement>(fixture, '#evento-aforo');
+      aforo.value = '';
+      aforo.dispatchEvent(new Event('input'));
+      await avanzar(fixture);
+      await enviar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body).toMatchObject({
+        summary: 'Resumen nuevo',
+        description: null,
+        registration_mode: 'paid',
+        capacity: null,
+      });
+      peticion.flush(eventoDetalle({ registration_mode: 'paid' }));
+    });
+
+    it('un aforo no entero o menor que uno bloquea el guardado', async () => {
+      const fixture = await abrirEdicion();
+
+      const aforo = campo<HTMLInputElement>(fixture, '#evento-aforo');
+      aforo.value = '0';
+      aforo.dispatchEvent(new Event('input'));
+      await avanzar(fixture);
+      await enviar(fixture);
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'El aforo debe ser un número entero mayor que cero.',
+      );
+      http.expectNone((p) => p.method === 'PATCH');
+    });
+
+    it('un aforo con texto no numérico no se guarda como «sin límite»', async () => {
+      const fixture = await abrirEdicion({ capacity: 50 });
+
+      const aforo = campo<HTMLInputElement>(fixture, '#evento-aforo');
+      Object.defineProperty(aforo, 'validity', { value: { badInput: true } });
+      aforo.value = '';
+      aforo.dispatchEvent(new Event('input'));
+      await avanzar(fixture);
+      await enviar(fixture);
+
+      expect(fixture.nativeElement.textContent).toContain(
+        'El aforo debe ser un número entero mayor que cero.',
+      );
+      http.expectNone((p) => p.method === 'PATCH');
+    });
+
+    it('tras guardar refresca el modo del evento en EventScope', async () => {
+      const fixture = await abrirEdicion();
+      const actualizar = vi.spyOn(TestBed.inject(EventScope), 'actualizar');
+
+      elegir(fixture, 'evento-modo-inscripcion', 'paid');
+      await avanzar(fixture);
+      await enviar(fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH')
+        .flush(eventoDetalle({ registration_mode: 'paid' }));
+      await avanzar(fixture);
+
+      expect(actualizar).toHaveBeenCalledWith(
+        'e1',
+        expect.objectContaining({ registration_mode: 'paid' }),
+      );
+    });
+
+    it('muestra el 409 de la API al cambiar el modo', async () => {
+      const fixture = await abrirEdicion();
+      elegir(fixture, 'evento-modo-inscripcion', 'paid');
+      await avanzar(fixture);
+      await enviar(fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH')
+        .flush(
+          { detail: 'No se puede pasar el evento a «de pago» porque ya tiene inscripciones.' },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await avanzar(fixture);
+
+      expect(fixture.nativeElement.querySelector('app-alert')).not.toBeNull();
     });
   });
 });

@@ -15,6 +15,8 @@ import { Input } from '../../../shared/ui/input';
 import { AddressMap } from '../../../shared/ui/address-map';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Select, type SelectOption } from '../../../shared/ui/select';
+import { Textarea } from '../../../shared/ui/textarea';
+import { EventScope } from '../../../layouts/admin/event-scope';
 import { isoAValorLocal } from './datetime-local';
 import { EventDetails } from './event-details';
 import {
@@ -25,6 +27,7 @@ import {
 } from '../../../core/eventos/etiquetas';
 
 type LocationMode = 'in_person' | 'online' | 'hybrid';
+type RegistrationMode = 'free' | 'approval' | 'paid';
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -32,6 +35,10 @@ interface EventoBase {
   readonly id: string;
   readonly slug: string;
   readonly title: string;
+  readonly summary: string | null;
+  readonly description: string | null;
+  readonly registration_mode: RegistrationMode;
+  readonly capacity: number | null;
   readonly starts_at: string;
   readonly ends_at: string;
   readonly location_mode: LocationMode;
@@ -52,7 +59,7 @@ interface CategoriaDelCatalogo {
   readonly is_active: boolean;
 }
 
-type CampoBase = 'slug' | 'title' | 'startsAt' | 'endsAt' | 'paymentWindow';
+type CampoBase = 'slug' | 'title' | 'startsAt' | 'endsAt' | 'paymentWindow' | 'capacity';
 
 // Rango de `events.payment_checkout_window_minutes` (fase 6 del PRD, fase 2
 // de trabajo): espejo del `CHECK` de base de datos y del schema del
@@ -109,6 +116,7 @@ function zonasHorariasDisponibles(): readonly string[] {
     EventDetails,
     PageHeader,
     Select,
+    Textarea,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -183,19 +191,28 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [error]="errorDeEtiquetas()"
                 [(value)]="etiquetasTexto"
               />
+              <app-input
+                class="campo-ancho"
+                fieldId="evento-resumen"
+                [label]="t('admin.events.formulario.resumen')"
+                [hint]="t('admin.events.formulario.resumenAyuda')"
+                [(value)]="summary"
+              />
+              <app-textarea
+                class="campo-ancho"
+                fieldId="evento-descripcion"
+                [label]="t('admin.events.formulario.descripcion')"
+                [rows]="6"
+                [(value)]="description"
+              />
 
-              <div class="campo-select">
-                <label for="evento-modalidad">{{ t('admin.events.formulario.modalidad') }}</label>
-                <select
-                  id="evento-modalidad"
-                  [value]="locationMode()"
-                  (change)="alCambiarModalidad($event)"
-                >
-                  <option value="in_person">{{ t('admin.events.formulario.presencial') }}</option>
-                  <option value="online">{{ t('admin.events.formulario.online') }}</option>
-                  <option value="hybrid">{{ t('admin.events.formulario.hibrido') }}</option>
-                </select>
-              </div>
+              <app-select
+                fieldId="evento-modalidad"
+                [label]="t('admin.events.formulario.modalidad')"
+                [options]="opcionesDeModalidad()"
+                [value]="locationMode()"
+                (valueChange)="locationMode.set($any($event))"
+              />
               <app-select
                 fieldId="evento-zona-horaria"
                 [label]="t('admin.events.formulario.zonaHoraria')"
@@ -203,6 +220,38 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [buscable]="true"
                 [(value)]="timezone"
               />
+
+              <app-select
+                fieldId="evento-modo-inscripcion"
+                [label]="t('admin.events.formulario.modoInscripcion')"
+                [options]="opcionesDeModoDeInscripcion()"
+                [hint]="t('admin.events.formulario.modoAyuda.' + registrationMode())"
+                [value]="registrationMode()"
+                (valueChange)="registrationMode.set($any($event))"
+              />
+              <div class="campo-numero">
+                <label for="evento-aforo">{{ t('admin.events.formulario.aforo') }}</label>
+                <input
+                  id="evento-aforo"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  [value]="capacity() ?? ''"
+                  [attr.aria-invalid]="errores().capacity ? 'true' : null"
+                  [attr.aria-describedby]="
+                    errores().capacity ? 'evento-aforo-error' : 'evento-aforo-ayuda'
+                  "
+                  (input)="alCambiarAforo($event)"
+                  (blur)="validar('capacity')"
+                />
+                @if (errores().capacity; as mensaje) {
+                  <p id="evento-aforo-error" class="error-campo">{{ mensaje }}</p>
+                } @else {
+                  <p id="evento-aforo-ayuda" class="ayuda-campo">
+                    {{ t('admin.events.formulario.aforoAyuda') }}
+                  </p>
+                }
+              </div>
 
               @if (locationMode() !== 'online') {
                 <app-address-map
@@ -323,12 +372,10 @@ function zonasHorariasDisponibles(): readonly string[] {
     .campo-ancho {
       grid-column: 1 / -1;
     }
-    .campo-select,
     .campo-numero {
       display: grid;
       gap: var(--space-sm);
     }
-    .campo-select select,
     .campo-numero input {
       width: 100%;
       box-sizing: border-box;
@@ -338,10 +385,8 @@ function zonasHorariasDisponibles(): readonly string[] {
       background-color: var(--surface);
       color: var(--fg);
       font: inherit;
-      /* 46px (2.875rem), la altura de .sel__btn: modalidad, zona horaria y
-       * ventana de pago —los controles de esta fila con rótulo externo—
-       * quedan alineados entre sí en la misma base. Los campos de la fila de
-       * arriba (inicio, fin, ciudad) van a 3.25rem por su etiqueta flotante. */
+      /* 46px (2.875rem), la altura de .sel__btn: aforo y ventana de pago
+       * quedan alineados con los desplegables de su misma fila. */
       min-height: 2.875rem;
     }
     .campo-numero input {
@@ -368,6 +413,7 @@ export class EventForm {
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
   private readonly route = inject(ActivatedRoute);
+  private readonly eventScope = inject(EventScope);
 
   protected readonly eventId = signal<string | null>(null);
   protected readonly esEdicion = computed(() => this.eventId() !== null);
@@ -379,6 +425,11 @@ export class EventForm {
 
   protected readonly slug = signal('');
   protected readonly title = signal('');
+  protected readonly summary = signal('');
+  protected readonly description = signal('');
+  protected readonly registrationMode = signal<RegistrationMode>('free');
+  /** `null` = sin límite de aforo; `NaN` = lo escrito no es un número. */
+  protected readonly capacity = signal<number | null>(null);
   protected readonly startsAt = signal('');
   protected readonly endsAt = signal('');
   protected readonly locationMode = signal<LocationMode>('in_person');
@@ -437,6 +488,21 @@ export class EventForm {
     }
   });
 
+  protected readonly opcionesDeModalidad = computed<SelectOption[]>(() => [
+    { value: 'in_person', label: this.transloco.translate('admin.events.formulario.presencial') },
+    { value: 'online', label: this.transloco.translate('admin.events.formulario.online') },
+    { value: 'hybrid', label: this.transloco.translate('admin.events.formulario.hibrido') },
+  ]);
+
+  protected readonly opcionesDeModoDeInscripcion = computed<SelectOption[]>(() => [
+    { value: 'free', label: this.transloco.translate('admin.events.formulario.modoLibre') },
+    {
+      value: 'approval',
+      label: this.transloco.translate('admin.events.formulario.modoAprobacion'),
+    },
+    { value: 'paid', label: this.transloco.translate('admin.events.formulario.modoPago') },
+  ]);
+
   protected readonly opcionesDeZonaHoraria = computed<SelectOption[]>(() =>
     zonasHorariasDisponibles().map((zona) => ({ value: zona, label: zona })),
   );
@@ -447,6 +513,7 @@ export class EventForm {
     startsAt: null,
     endsAt: null,
     paymentWindow: null,
+    capacity: null,
   });
 
   protected readonly resumenDeErrores = computed<ResumenDeError[]>(() => {
@@ -459,6 +526,7 @@ export class EventForm {
     if (actuales.paymentWindow) {
       resumen.push({ campoId: 'evento-ventana-pago', mensaje: actuales.paymentWindow });
     }
+    if (actuales.capacity) resumen.push({ campoId: 'evento-aforo', mensaje: actuales.capacity });
     return resumen;
   });
 
@@ -491,6 +559,10 @@ export class EventForm {
       const evento = await firstValueFrom(this.http.get<EventoBase>(this.api.url(`/events/${id}`)));
       this.slug.set(evento.slug);
       this.title.set(evento.title);
+      this.summary.set(evento.summary ?? '');
+      this.description.set(evento.description ?? '');
+      this.registrationMode.set(evento.registration_mode);
+      this.capacity.set(evento.capacity);
       this.startsAt.set(isoAValorLocal(evento.starts_at));
       this.endsAt.set(isoAValorLocal(evento.ends_at));
       this.locationMode.set(evento.location_mode);
@@ -514,8 +586,16 @@ export class EventForm {
     }
   }
 
-  protected alCambiarModalidad(evento: Event): void {
-    this.locationMode.set((evento.target as HTMLSelectElement).value as LocationMode);
+  protected alCambiarAforo(evento: Event): void {
+    const campo = evento.target as HTMLInputElement;
+    // Con `type="number"` un texto no numérico llega como `''`: sin mirar
+    // `badInput` se guardaría como «sin límite» y la API ofrecería plaza a
+    // toda la lista de espera.
+    if (campo.validity.badInput) {
+      this.capacity.set(Number.NaN);
+      return;
+    }
+    this.capacity.set(campo.value === '' ? null : Number(campo.value));
   }
 
   protected alCambiarVentanaDePago(evento: Event): void {
@@ -556,6 +636,12 @@ export class EventForm {
           ? null
           : this.transloco.translate('admin.events.formulario.ventanaDePagoFueraDeRango');
       }
+      case 'capacity': {
+        const valor = this.capacity();
+        return valor === null || (Number.isInteger(valor) && valor >= 1)
+          ? null
+          : this.transloco.translate('admin.events.formulario.aforoInvalido');
+      }
     }
   }
 
@@ -570,6 +656,7 @@ export class EventForm {
       startsAt: this.errorDe('startsAt'),
       endsAt: this.errorDe('endsAt'),
       paymentWindow: this.errorDe('paymentWindow'),
+      capacity: this.errorDe('capacity'),
     };
     this.errores.set(actuales);
     return Object.values(actuales).every((mensaje) => !mensaje);
@@ -586,6 +673,12 @@ export class EventForm {
     const payload = {
       slug: this.slug().trim(),
       title: this.title().trim(),
+      // Siempre explícitos, como la categoría: `null` vacía el resumen, la
+      // descripción o el aforo. La API solo valida modo y aforo si cambian.
+      summary: this.summary().trim() || null,
+      description: this.description().trim() || null,
+      registration_mode: this.registrationMode(),
+      capacity: this.capacity(),
       starts_at: new Date(this.startsAt()).toISOString(),
       ends_at: new Date(this.endsAt()).toISOString(),
       location_mode: this.locationMode(),
@@ -602,14 +695,13 @@ export class EventForm {
     this.guardando.set(true);
     try {
       const id = this.eventId();
-      if (id) {
-        await firstValueFrom(this.http.patch(this.api.url(`/events/${id}`), payload));
-      } else {
-        const creado = await firstValueFrom(
-          this.http.post<EventoBase>(this.api.url('/events'), payload),
-        );
-        this.eventId.set(creado.id);
-      }
+      const guardado = id
+        ? await firstValueFrom(this.http.patch<EventoBase>(this.api.url(`/events/${id}`), payload))
+        : await firstValueFrom(this.http.post<EventoBase>(this.api.url('/events'), payload));
+      this.eventId.set(guardado.id);
+      // Las pestañas de pago dependen del modo: refrescar el ámbito del evento
+      // para que aparezcan o desaparezcan sin recargar la página.
+      this.eventScope.actualizar(guardado.id, guardado);
       this.exito.set(true);
     } catch (error) {
       this.error.set(

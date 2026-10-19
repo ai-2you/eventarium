@@ -70,6 +70,20 @@ export class EventScope {
     });
   }
 
+  /** Sustituye el resumen cacheado de un evento con el que acaba de guardarse:
+   * sin esto, cambiar el modo de inscripción no mostraba ni ocultaba las
+   * pestañas de pago hasta recargar la página, porque la caché no caduca. */
+  actualizar(id: string, evento: EventoResumen): void {
+    const resumen: EventoResumen = {
+      title: evento.title,
+      registration_mode: evento.registration_mode,
+    };
+    this.cache.set(id, resumen);
+    if (this.eventId() === id) {
+      this.resumen.set(resumen);
+    }
+  }
+
   private idDesdeRuta(ruta: ActivatedRouteSnapshot): string | null {
     // `roles/:id` también declara un parámetro `id`: sin acotar por los segmentos de
     // la URL realmente emparejados por este nodo, `/admin/roles/r1` activaría por

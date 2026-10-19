@@ -76,8 +76,8 @@ export const PLATFORM_NAV_LINKS: readonly AdminNavLink[] = [
  * aparte, porque no son «una pestaña más» sino la entrada y la salida del
  * ámbito.
  *
- * Las secciones de pago solo aparecen si `aceptaPagos`, con el mismo criterio que ya
- * aplicaba `event-form.ts` antes de esta fase: `registrationMode() === 'paid'`.
+ * «Descuentos» y «Pagos» solo aparecen si `aceptaPagos` (`registrationMode() ===
+ * 'paid'`); «Entradas», siempre.
  */
 export function enlacesDeEvento(eventId: string, aceptaPagos: boolean): readonly AdminNavLink[] {
   const enlaces: AdminNavLink[] = [
@@ -88,17 +88,19 @@ export function enlacesDeEvento(eventId: string, aceptaPagos: boolean): readonly
       labelKey: 'admin.events.sponsors.titulo',
     },
   ];
+  // «Entradas» siempre: los precios se preparan antes de pasar el evento a
+  // «de pago» — publicar un evento de pago exige tener ya algún tipo de
+  // entrada, así que ocultarla en modo gratuito dejaba sin salida a un
+  // evento ya publicado.
+  enlaces.push({
+    path: ['/dashboard/events', eventId, 'entradas'],
+    labelKey: 'admin.events.ticketTypes.titulo',
+  });
   if (aceptaPagos) {
-    enlaces.push(
-      {
-        path: ['/dashboard/events', eventId, 'entradas'],
-        labelKey: 'admin.events.ticketTypes.titulo',
-      },
-      {
-        path: ['/dashboard/events', eventId, 'descuentos'],
-        labelKey: 'admin.events.discountCodes.titulo',
-      },
-    );
+    enlaces.push({
+      path: ['/dashboard/events', eventId, 'descuentos'],
+      labelKey: 'admin.events.discountCodes.titulo',
+    });
   }
   enlaces.push({
     path: ['/dashboard/events', eventId, 'ponentes'],

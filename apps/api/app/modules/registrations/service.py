@@ -297,16 +297,17 @@ async def _reservar_ventana_de_pago(
     inscripcion.payment_expires_at = datetime.now(UTC) + ventana
 
 
-async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> None:
+async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool:
     """Promueve a la primera persona en lista de espera, si hay alguna.
 
     Marca la ventana de promoción y encola el email con el enlace de
     confirmación (`waitlist_promotion_confirm`) y el de autocancelación
-    (`registration_cancel`), cada uno con su propio TTL.
+    (`registration_cancel`), cada uno con su propio TTL. Devuelve si había
+    alguien a quien promover.
     """
     siguiente = await repository.get_oldest_waitlisted(session, evento.organization_id, evento.id)
     if siguiente is None:
-        return
+        return False
     ahora = datetime.now(UTC)
     ventana = timedelta(hours=get_settings().waitlist_promotion_window_hours)
     siguiente.waitlist_promoted_at = ahora
@@ -322,6 +323,41 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> None
         cancel_token,
         (ahora + ventana).strftime("%d/%m/%Y %H:%M"),
     )
+    return True
+
+
+async def reencolar_promociones_caducadas(session: AsyncSession, evento: Event) -> None:
+    """Devuelve al final de la cola las promociones caducadas que el cron aún
+    no ha barrido: hasta entonces no ocupan plaza en
+    `count_reserved_registrations`, pero el barrido las sustituiría por una
+    promoción nueva sin mirar el aforo."""
+    caducadas = await repository.get_expired_waitlist_promotions(
+        session, evento.organization_id, evento.id
+    )
+    for inscripcion in caducadas:
+        await repository.requeue_to_back_of_waitlist(
+            session, evento.organization_id, evento.id, inscripcion
+        )
+
+
+async def promover_lista_de_espera_hasta_llenar(session: AsyncSession, evento: Event) -> int:
+    """Ofrece las plazas que haya libres a la lista de espera, por orden. Lo
+    usan el cambio de aforo y el barrido de promociones caducadas; exige el
+    bloqueo de aforo tomado. Devuelve cuántas personas se han promovido."""
+    await reencolar_promociones_caducadas(session, evento)
+    if evento.capacity is None:
+        libres = None
+    else:
+        reservadas = await repository.count_reserved_registrations(
+            session, evento.organization_id, evento.id
+        )
+        libres = evento.capacity - reservadas
+    promovidas = 0
+    while libres is None or promovidas < libres:
+        if not await _promote_next_waitlisted(session, evento):
+            break
+        promovidas += 1
+    return promovidas
 
 
 async def _cancelar_inscripcion(
@@ -802,14 +838,10 @@ async def expire_waitlist_promotions() -> None:
             # cancela el barrido de la cancelación.
             if evento.status == "cancelled":
                 continue
-            caducadas = await repository.get_expired_waitlist_promotions(
-                session, organization_id, event_id
-            )
-            for inscripcion in caducadas:
-                await repository.requeue_to_back_of_waitlist(
-                    session, organization_id, event_id, inscripcion
-                )
-                await _promote_next_waitlisted(session, evento)
+            # Reencola las caducadas y ofrece solo las plazas que de verdad
+            # quedan libres: sustituir 1:1 cada caducada por una promoción
+            # nueva ignoraba el aforo si se había bajado entretanto.
+            await promover_lista_de_espera_hasta_llenar(session, evento)
             await session.commit()
 
 

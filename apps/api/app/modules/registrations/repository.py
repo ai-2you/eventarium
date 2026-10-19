@@ -71,10 +71,16 @@ async def lock_event_for_capacity(
     este mismo bloqueo). Solo la cancelación de una inscripción pasa
     `exigir_no_cancelado=False`, porque ahí se trata de liberar, no de ocupar.
     """
+    # `populate_existing`: el llamador suele tener ya este `Event` en el mapa
+    # de identidad, leído sin bloqueo. Sin el flag, SQLAlchemy descarta la fila
+    # leída bajo bloqueo y devuelve el objeto con el aforo y el modo de antes
+    # de que otra transacción los cambiara (mismo caso que
+    # `accounting.repository.lock_event_for_budget`).
     evento = await session.scalar(
         select(Event)
         .where(Event.organization_id == organization_id, Event.id == event_id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if evento is None:
         # No debería ocurrir: la existencia del evento ya se validó antes de

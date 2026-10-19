@@ -49,9 +49,9 @@ function enlacesDe(raiz: HTMLElement): (string | null)[] {
 }
 
 describe('enlacesDeEvento', () => {
-  it('sin pagos: no incluye entradas ni descuentos', () => {
+  it('sin pagos: incluye entradas para preparar precios, pero no descuentos ni pagos', () => {
     const enlaces = enlacesDeEvento('e1', false);
-    expect(enlaces.some((e) => e.path.includes('entradas'))).toBe(false);
+    expect(enlaces.some((e) => e.path.includes('entradas'))).toBe(true);
     expect(enlaces.some((e) => e.path.includes('descuentos'))).toBe(false);
     expect(enlaces.some((e) => e.path.includes('payments'))).toBe(false);
   });
