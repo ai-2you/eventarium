@@ -21,9 +21,10 @@ from unittest.mock import AsyncMock
 import pytest
 import stripe
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.core.database import SessionApp, SessionMaintenance, set_organization_context
+from app.core.tasks import send_registration_received_organizer_email
 from app.modules.events.models import Event
 from app.modules.payments import checkout_service, stripe_client
 from app.modules.payments import repository as payments_repository
@@ -145,9 +146,21 @@ async def test_webhook_confirma_la_inscripcion_y_es_idempotente(
     monkeypatch.setattr(
         "app.core.tasks.process_stripe_webhook_task.kiq", AsyncMock(side_effect=_procesar_sincrono)
     )
+    aviso = AsyncMock()
+    monkeypatch.setattr(send_registration_received_organizer_email, "kiq", aviso)
+    async with SessionMaintenance() as session:
+        await session.execute(
+            text("UPDATE users SET email_verified_at = now() WHERE id = :id"),
+            {"id": organizacion.owner_id},
+        )
+        await session.commit()
 
     primera = await cliente.post(WEBHOOK_URL, content=cuerpo, headers={"stripe-signature": firma})
     assert primera.status_code == 200, primera.text
+    # El organizador se entera al cobrarse, no al abrir el checkout.
+    aviso.assert_awaited_once()
+    assert aviso.await_args.kwargs["to_email"] == organizacion.owner_email
+    assert aviso.await_args.kwargs["paid"] is True
 
     async with SessionMaintenance() as session:
         inscripcion = await session.get(EventRegistration, registration_id)
@@ -161,6 +174,7 @@ async def test_webhook_confirma_la_inscripcion_y_es_idempotente(
     async with SessionMaintenance() as session:
         tickets = list(await session.scalars(select(EventTicket)))
         assert len(tickets) == 1
+    aviso.assert_awaited_once()
 
 
 async def test_webhook_payment_status_no_pagado_no_confirma(

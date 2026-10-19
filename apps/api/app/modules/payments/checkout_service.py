@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import SessionApp, maintenance_session, set_organization_context
 from app.core.tenant import base_url_de_organizacion
+from app.core.tras_commit import despachar_tras_commit
 from app.modules.events.models import Event
 from app.modules.organizations.models import Organization
 from app.modules.payments import refunds_service, repository
@@ -128,6 +129,9 @@ async def iniciar_compra(
                 # los únicos que `approve_registration`/
                 # `confirm_waitlist_promotion` tendrán disponibles más
                 # adelante, cuando la inscripción llegue a `pending_payment`.
+                # Sale sin `despachar_tras_commit`: en este punto no puede haber
+                # nada apuntado (un alta de pago nunca nace confirmada). Si algún
+                # día lo hubiera, habría que despachar también aquí.
                 return ResultadoCompra(message=MENSAJE_GENERICO, checkout_url=None)
 
             ahora = datetime.now(UTC)
@@ -197,6 +201,7 @@ async def iniciar_compra(
             estado_resultante = inscripcion.status
         # --- fin de T1 (`session.begin()` ha hecho commit al salir del `with`):
         # la fila del pago ya persiste sin ningún bloqueo de fila abierto ---
+        await despachar_tras_commit(session)
 
         if sesion_a_expirar is not None:
             # Fuera de cualquier bloqueo de fila, y también
@@ -401,6 +406,9 @@ async def confirmar_pago_y_registro(
     inscripcion.status = "confirmed"
     inscripcion.confirmed_at = datetime.now(UTC)
     await registrations_service._enviar_email_por_estado(session, inscripcion)  # noqa: SLF001
+    # El aviso al organizador de una inscripción de pago sale aquí, al cobrarse,
+    # no al abrir el checkout.
+    await registrations_service.avisar_al_organizador(session, inscripcion, pagada=True)
     return "processed"
 
 

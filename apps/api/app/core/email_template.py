@@ -49,6 +49,10 @@ GRIS_PIE_BORDE = "#e5e7eb"
 #: exactamente lo que `detectar_accion` ve.
 _RE_ENLACE = re.compile(r"https?://[^\s<]+")
 
+#: El punto de «algo.com», «algo.es/ruta»…: lo que un cliente de correo
+#: convertiría en enlace aunque no lleve esquema.
+_RE_PUNTO_DE_DOMINIO = re.compile(r"(?<=\w)\.(?=[a-z]{2,}\b)", re.IGNORECASE)
+
 
 def _linea_a_html(linea: str) -> str:
     """Una línea del cuerpo: cada URL se convierte en `<a href>` de verdad.
@@ -241,3 +245,15 @@ def plantilla_html(
         f"{_pie_html(base_url)}"
         "</table></td></tr></table></body></html>"
     )
+
+
+def neutralizar_texto_de_usuario(texto: str) -> str:
+    """Texto escrito por un tercero (el nombre con el que alguien se inscribe)
+    listo para ir dentro de un cuerpo de correo del sistema: en una sola línea,
+    para que no pueda inventar párrafos («Estado: confirmada»), y sin URLs que
+    `detectar_accion` pudiera convertir en el botón del correo."""
+    plano = " ".join(texto.split())
+    plano = plano.replace("://", "[:]//").replace("www.", "www[.]")
+    # Un dominio suelto («acme-login.com/verifica») también lo enlazan los
+    # clientes de correo: se rompe el punto que precede al dominio de primer nivel.
+    return _RE_PUNTO_DE_DOMINIO.sub("[.]", plano)

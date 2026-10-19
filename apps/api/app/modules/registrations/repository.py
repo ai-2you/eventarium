@@ -14,14 +14,18 @@ from typing import Any
 from sqlalchemy import Select, and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import Permission
 from app.modules.events.models import Event
+from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.registrations.models import (
     EventRegistration,
     EventRegistrationAnswer,
     EventRegistrationConsent,
     EventRegistrationQuestion,
 )
+from app.modules.roles.models import RolePermission
 from app.modules.tickets.models import EventTicket
+from app.modules.users.models import User
 from app.shared.errors import ConflictError
 
 
@@ -496,3 +500,35 @@ async def guardar_aceptacion_de_politicas(
     if politicas:
         consentimiento.organizer_policies_accepted_at = ahora
         consentimiento.accepted_policy_version_ids = politicas
+
+
+async def correos_que_gestionan_inscripciones(
+    session: AsyncSession, organization_id: uuid.UUID
+) -> list[str]:
+    """A quién avisar de una inscripción nueva: cada persona (una vez, aunque
+    tenga varios roles) con `registrations:write` en la organización, con la
+    cuenta activa y el correo verificado. Si no hay nadie, el correo de
+    contacto de la organización; si tampoco lo hay, nadie."""
+    correos = list(
+        (
+            await session.scalars(
+                select(User.email)
+                .distinct()
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .join(RolePermission, RolePermission.role_id == OrganizationMember.role_id)
+                .where(
+                    OrganizationMember.organization_id == organization_id,
+                    RolePermission.permission == Permission.REGISTRATIONS_WRITE.value,
+                    User.is_active.is_(True),
+                    User.email_verified_at.is_not(None),
+                )
+                .order_by(User.email)
+            )
+        ).all()
+    )
+    if correos:
+        return correos
+    contacto = await session.scalar(
+        select(Organization.contact_email).where(Organization.id == organization_id)
+    )
+    return [contacto] if contacto else []

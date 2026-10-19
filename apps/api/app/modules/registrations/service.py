@@ -4,9 +4,11 @@ de espera con promoción automática, emails transaccionales y autocancelación
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -19,11 +21,14 @@ from app.core.tasks import (
     send_mis_eventos_access_email,
     send_registration_cancelled_email,
     send_registration_confirmed_email,
+    send_registration_pending_approval_email,
+    send_registration_received_organizer_email,
     send_registration_rejected_email,
     send_registration_verification_email,
     send_registration_waitlisted_email,
     send_waitlist_promotion_email,
 )
+from app.core.tras_commit import encolar_tras_commit
 from app.modules.auth.verification import (
     PROPOSITO_CANCELACION_INSCRIPCION,
     PROPOSITO_MIS_EVENTOS_ACCESO,
@@ -48,6 +53,8 @@ from app.modules.registrations.models import (
 from app.modules.registrations.schemas import MyRegistrationItem, RegistrationAnswerInput
 from app.modules.tickets.service import emitir_entrada, generar_token_qr, revocar_entrada
 from app.shared.errors import ConflictError, NotFoundError, ValidationDomainError
+
+logger = logging.getLogger(__name__)
 
 # Límite de longitud para una respuesta de texto libre: no hay columna que lo
 # imponga (es `jsonb`), así que se acota aquí para no aceptar payloads enormes.
@@ -266,6 +273,59 @@ async def _enviar_email_por_estado(session: AsyncSession, inscripcion: EventRegi
     elif inscripcion.status == "waitlisted":
         await send_registration_waitlisted_email.kiq(
             inscripcion.email, organization_id, token_cancelacion
+        )
+    elif inscripcion.status == "pending_approval":
+        await send_registration_pending_approval_email.kiq(inscripcion.email, organization_id)
+
+
+# Estados con los que una inscripción nueva se avisa al organizador. Los que
+# faltan llegan más tarde a uno de estos: `pending_verification` al verificarse
+# y `pending_payment` al pagarse (un checkout abandonado no es una inscripción).
+_ESTADOS_QUE_AVISAN_AL_ORGANIZADOR = ("confirmed", "waitlisted", "pending_approval")
+
+
+async def avisar_al_organizador(
+    session: AsyncSession, inscripcion: EventRegistration, *, pagada: bool = False
+) -> None:
+    """Avisa por correo a quien gestiona las inscripciones de la organización.
+
+    Solo desde los puntos donde nace una inscripción (alta, reactivación de una
+    compra abandonada, verificación del correo) o se paga: nunca desde
+    `_enviar_email_por_estado`, que también recorren aprobaciones, promociones
+    y reenvíos, y avisaría dos veces de la misma persona. Se encola tras el
+    commit (`core/tras_commit.py`): si la petición acaba revirtiéndose, el
+    aviso no sale.
+    """
+    if inscripcion.status not in _ESTADOS_QUE_AVISAN_AL_ORGANIZADOR:
+        return
+    evento = await session.get(Event, inscripcion.event_id)
+    if evento is None:
+        return
+    destinatarios = await repository.correos_que_gestionan_inscripciones(
+        session, inscripcion.organization_id
+    )
+    if not destinatarios:
+        logger.warning(
+            "Inscripción %s sin nadie a quien avisar: ningún miembro gestiona "
+            "inscripciones y la organización no tiene correo de contacto.",
+            inscripcion.id,
+        )
+        return
+    for correo in destinatarios:
+        encolar_tras_commit(
+            session,
+            partial(
+                send_registration_received_organizer_email.kiq,
+                to_email=correo,
+                organization_id=str(inscripcion.organization_id),
+                event_id=str(evento.id),
+                registration_id=str(inscripcion.id),
+                event_title=evento.title,
+                participant_name=inscripcion.full_name,
+                participant_email=inscripcion.email,
+                status=inscripcion.status,
+                paid=pagada,
+            ),
         )
 
 
@@ -511,6 +571,7 @@ async def submit_registration(
             existente.confirmed_at = ahora if nuevo_estado == "confirmed" else None
             await repository.guardar_aceptacion_de_politicas(session, existente, politicas, ahora)
             await _enviar_email_por_estado(session, existente)
+            await avisar_al_organizador(session, existente)
             return existente
 
         # Reenvía siempre el email que corresponda al estado actual (decisión
@@ -521,14 +582,14 @@ async def submit_registration(
             await send_registration_verification_email.kiq(
                 email_normalizado, token, str(event.organization_id)
             )
-        elif existente.status in ("confirmed", "waitlisted"):
+        elif existente.status in ("confirmed", "waitlisted", "pending_approval"):
             await _enviar_email_por_estado(session, existente)
         elif existente.status == "rejected":
             await send_registration_rejected_email.kiq(existente.email, str(event.organization_id))
         elif existente.status == "cancelled":
             await send_registration_cancelled_email.kiq(existente.email, str(event.organization_id))
-        # `pending_approval`/`pending_payment`: sin plantilla propia, igual
-        # que en el alta normal.
+        # `pending_payment`: sin plantilla propia; el enlace de pago lo
+        # reenvía el propio checkout.
         return None
 
     user_id = await repository.find_user_id_by_email(session, email_normalizado)
@@ -592,6 +653,7 @@ async def submit_registration(
         )
     else:
         await _enviar_email_por_estado(session, inscripcion)
+        await avisar_al_organizador(session, inscripcion)
     return inscripcion
 
 
@@ -638,6 +700,7 @@ async def verify_registration(session: AsyncSession, *, token: str) -> EventRegi
     elif nuevo_estado == "pending_payment":
         await _reservar_ventana_de_pago(session, evento, inscripcion)
     await _enviar_email_por_estado(session, inscripcion)
+    await avisar_al_organizador(session, inscripcion)
     return inscripcion
 
 
