@@ -33,7 +33,13 @@ async function registrarYVerificar(page: Page, correo: string): Promise<void> {
     data: { email: correo, password: PASSWORD, turnstile_token: 'e2e' },
   });
   expect(alta.status(), await alta.text()).toBe(202);
+  // La página verifica al cargar: navegar antes de que responda cancela la
+  // petición y la cuenta se queda sin verificar (y sin ficha que mostrar).
+  const verificacion = page.waitForResponse((respuesta) =>
+    respuesta.url().includes('/api/v1/auth/verify-email'),
+  );
   await page.goto(await enlaceDeVerificacion(page.request, correo));
+  expect((await verificacion).ok()).toBe(true);
 }
 
 async function tokenDe(request: APIRequestContext, correo: string): Promise<string> {
@@ -48,7 +54,8 @@ test.describe('Panel de un ponente', () => {
   test('solo ve su cuenta y no entra en la gestión', async ({ browser }) => {
     test.setTimeout(180_000);
     const sello = Date.now();
-    const correoOrganizador = `org-ponente-${sello}@example.com`;
+    // Mailpit busca `to:` por subcadena: ningún correo puede contener al otro.
+    const correoOrganizador = `organizador-${sello}@example.com`;
     const correoPonente = `ponente-${sello}@example.com`;
 
     // Organizador con su organización.
@@ -99,5 +106,19 @@ test.describe('Panel de un ponente', () => {
 
     await ponente.goto('/dashboard/roles');
     await ponente.waitForURL('**/dashboard/account');
+
+    // Su ficha, adonde lleva el correo que pide la biografía: la escribe y queda.
+    await ponente.goto('/dashboard/account#ficha');
+    const ficha = ponente.locator('#ficha');
+    await expect(ficha).toContainText('Mi ficha de');
+    const bio = ficha.getByLabel('Biografía');
+    await expect(bio).toHaveValue('Ponente de prueba.');
+    await bio.fill('Investiga IA aplicada a la salud.');
+    await ficha.getByRole('button', { name: 'Guardar ficha' }).click();
+    await expect(ficha).toContainText('Ficha guardada');
+    await ponente.reload();
+    await expect(ponente.locator('#ficha').getByLabel('Biografía')).toHaveValue(
+      'Investiga IA aplicada a la salud.',
+    );
   });
 });

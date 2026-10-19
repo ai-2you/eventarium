@@ -26,6 +26,20 @@ const URL_RE = /^https?:\/\/\S+$/;
 const PHONE_RE = /^[+0-9 ().-]{6,30}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Espejo de `_LONGITUD_MAXIMA` en `app/shared/dynamic_fields.py`. */
+const LONGITUD_MAXIMA: Partial<Record<string, number>> = {
+  text: 300,
+  textarea: 5000,
+  url: 500,
+  email: 254,
+};
+
+/** Opciones de validación. `exigirObligatorios: false` es quien completa la
+ * ficha ajena por partes (el organizador): la API solo exige al titular. */
+export interface OpcionesDeValidacion {
+  readonly exigirObligatorios?: boolean;
+}
+
 /**
  * Valida un valor de `profile_data` contra la definición de su campo.
  *
@@ -35,13 +49,21 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function validateDynamicFieldValue(
   field: ProfileField,
   valor: string | boolean,
+  { exigirObligatorios = true }: OpcionesDeValidacion = {},
 ): string | null {
   const vacio = valor === '' || valor === null || valor === undefined;
-  if (field.is_required && vacio) {
+  if (field.is_required && exigirObligatorios && vacio) {
     return `«${field.label}» es obligatorio.`;
   }
   if (vacio) {
     return null;
+  }
+  const maximo = LONGITUD_MAXIMA[field.field_type];
+  // Como la API: sin los espacios de los extremos y por caracteres, no por
+  // unidades UTF-16 (un emoji cuenta uno).
+  const longitud = typeof valor === 'string' ? [...valor.trim()].length : 0;
+  if (maximo !== undefined && longitud > maximo) {
+    return `«${field.label}» admite como máximo ${maximo} caracteres (ahora tiene ${longitud}).`;
   }
 
   switch (field.field_type) {
@@ -72,4 +94,18 @@ export function validateDynamicFieldValue(
     default:
       return null;
   }
+}
+
+/** Error de cada campo (`null` si es válido), por su clave. */
+export function validateDynamicFields(
+  fields: readonly ProfileField[],
+  valores: Partial<Record<string, string | boolean>>,
+  opciones: OpcionesDeValidacion = {},
+): Record<string, string | null> {
+  return Object.fromEntries(
+    fields.map((campo) => [
+      campo.key,
+      validateDynamicFieldValue(campo, valores[campo.key] ?? '', opciones),
+    ]),
+  );
 }

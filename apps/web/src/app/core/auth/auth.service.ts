@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApiError } from '../api/error.interceptor';
 import { ApiService } from '../api/api.service';
+import { ProfileField } from '../../shared/ui/dynamic-field.model';
 
 export interface UsuarioAutenticado {
   readonly id: string;
@@ -88,6 +89,10 @@ export interface MembresiaPublicable {
   readonly organization_member_id: string;
   readonly role_key: string;
   readonly role_name: string;
+  /** Ficha de esa membresía: los campos que pide su rol y lo ya guardado. */
+  readonly profile_fields?: readonly ProfileField[];
+  readonly profile_data?: Record<string, unknown>;
+  readonly updated_at?: string | null;
 }
 
 export interface EstadoDePerfilPublico {

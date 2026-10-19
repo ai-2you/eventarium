@@ -799,6 +799,60 @@
         }
       }
     },
+    "/api/v1/organizations/me/members/{organization_member_id}/profile": {
+      "patch": {
+        "tags": [
+          "organizaciones"
+        ],
+        "summary": "Editar la ficha de un rol de una persona",
+        "description": "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un ponente). Puede hacerlo su titular o quien tenga `members:write` y pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por otra persona entre medias da 409 en vez de pisarse.",
+        "operationId": "update_member_profile_api_v1_organizations_me_members__organization_member_id__profile_patch",
+        "parameters": [
+          {
+            "name": "organization_member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Member Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberRoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/me/members/{organization_member_id}": {
       "delete": {
         "tags": [
@@ -13672,6 +13726,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -13681,7 +13761,7 @@
           "role_name"
         ],
         "title": "EligibleMembershipResponse",
-        "description": "Membresía propia cuyo rol declara al menos un campo publicable."
+        "description": "Membresía propia cuyo rol declara al menos un campo publicable, con su\nficha: es desde donde la persona (p. ej. un ponente) la completa."
       },
       "EmailSettingsIn": {
         "properties": {
@@ -17364,6 +17444,33 @@
         "title": "MemberCreate",
         "description": "Alta de un miembro por correo electrónico."
       },
+      "MemberProfileUpdate": {
+        "properties": {
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data"
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_data"
+        ],
+        "title": "MemberProfileUpdate",
+        "description": "Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de\nlos campos actuales del rol), así se puede vaciar un campo opcional."
+      },
       "MemberResponse": {
         "properties": {
           "user_id": {
@@ -17438,6 +17545,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",

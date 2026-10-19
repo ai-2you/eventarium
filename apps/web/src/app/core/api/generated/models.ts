@@ -128,6 +128,7 @@ export type { MediaResponse } from './models/media-response';
 export type { MediaUpdateRequest } from './models/media-update-request';
 export type { MediaUsageResponse } from './models/media-usage-response';
 export type { MemberCreate } from './models/member-create';
+export type { MemberProfileUpdate } from './models/member-profile-update';
 export type { MemberResponse } from './models/member-response';
 export type { MemberRoleOut } from './models/member-role-out';
 export type { MetricasDelEventoOut } from './models/metricas-del-evento-out';

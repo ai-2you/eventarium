@@ -738,7 +738,8 @@ async def send_speaker_bio_request_email(
     no crea credenciales ni enlaces de acceso, solo recuerda la tarea.
     """
     base = await base_url_de_organizacion(uuid.UUID(organization_id))
-    enlace = f"{base}/dashboard/account"
+    # El ancla lleva directo a la ficha de ponente dentro de la cuenta.
+    enlace = f"{base}/dashboard/account#ficha"
     await get_email_provider().send(
         to=to_email,
         subject=f"Falta tu ficha para «{event_name}»",

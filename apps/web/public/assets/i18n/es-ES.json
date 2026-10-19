@@ -1209,7 +1209,16 @@
       },
       "quitarRol": "Quitar el rol «{{rol}}»",
       "cabeceraInicio": "Las personas de la organización,",
-      "cabeceraMarca": "cada una con su rol"
+      "cabeceraMarca": "cada una con su rol",
+      "ficha": {
+        "editar": "Editar ficha",
+        "editarAria": "Editar la ficha de {{rol}} de {{persona}}",
+        "titulo": "Ficha de {{persona}} ({{rol}})",
+        "sinCampos": "Tu rol no tiene ficha que completar.",
+        "guardar": "Guardar ficha",
+        "exito": "Ficha guardada.",
+        "error": "No se ha podido guardar la ficha."
+      }
     },
     "cuenta": {
       "titulo": "Mi cuenta",
@@ -1258,7 +1267,10 @@
       },
       "rotulo": "Tu cuenta",
       "cabeceraInicio": "Tu perfil y tus credenciales,",
-      "cabeceraMarca": "en una sola página"
+      "cabeceraMarca": "en una sola página",
+      "ficha": {
+        "titulo": "Mi ficha de {{rol}}"
+      }
     },
     "events": {
       "titulo": "Eventos",

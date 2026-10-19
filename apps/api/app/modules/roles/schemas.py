@@ -30,6 +30,20 @@ class ProfileFieldResponse(ProfileFieldInput):
     id: str
     is_locked: bool
 
+    @classmethod
+    def desde_modelo(cls, campo: Any) -> ProfileFieldResponse:
+        """Desde un `RoleProfileField`."""
+        return cls(
+            id=str(campo.id),
+            key=campo.key,
+            label=campo.label,
+            field_type=campo.field_type,
+            options=campo.options,
+            is_required=campo.is_required,
+            is_locked=campo.is_locked,
+            sort_order=campo.sort_order,
+        )
+
 
 class RoleResponse(BaseModel):
     """Rol con sus permisos y campos."""
