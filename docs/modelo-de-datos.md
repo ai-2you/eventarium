@@ -565,7 +565,7 @@ con el mismo patrón que `app_resolve_organization` y las funciones de la fase a
   sesión) y escribe solo la superadministración. No se borra: se desactiva. `events.category_id`
   (una por evento, FK `ON DELETE RESTRICT`) y `events.tags text[]` con índice GIN (`tags @> ...`
   para filtrar). Solo se asignan categorías activas, salvo la que el evento ya tiene; una
-  categoría desactivada deja de mostrarse en público. Etiquetas: minúsculas, máx. 5, 2–30
+  categoría desactivada deja de mostrarse en público. Etiquetas: minúsculas, máx. 10, 2–30
   caracteres, letras (con tildes), números, espacios y guiones.
 - `events.deleted_at` (migración `0060`): eliminación lógica de un evento **ya cancelado**
   (cancelar y eliminar son dos acciones; uno activo no se elimina). No se borra ninguna fila:

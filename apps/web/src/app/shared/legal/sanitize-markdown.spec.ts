@@ -24,9 +24,15 @@ describe('markdownToSafeHtml', () => {
     '[x](data:text/html;base64,PHNjcmlwdD4=)',
     '[x](//malicioso.example)',
     '[x](tel:+34600000000)',
+    '<a href="/\\malicioso.example">x</a>',
   ])('quita el href de un enlace no web: %s', (markdown) => {
     const html = markdownToSafeHtml(markdown);
     expect(html).not.toMatch(/href=/i);
+  });
+
+  it('deja los enlaces dentro del propio sitio', () => {
+    expect(markdownToSafeHtml('[cookies](/legal/cookies)')).toContain('href="/legal/cookies"');
+    expect(markdownToSafeHtml('[arriba](#datos)')).toContain('href="#datos"');
   });
 
   it('deja los enlaces mailto', () => {

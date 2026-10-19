@@ -32,6 +32,11 @@ def encolar_tras_commit(session: AsyncSession, accion: Accion) -> None:
     session.info.setdefault(_CLAVE, []).append(accion)
 
 
+def descartar_tras_commit(session: AsyncSession) -> None:
+    """Olvida lo apuntado: lo que se va a confirmar ya no es lo que lo apuntó."""
+    session.info.pop(_CLAVE, None)
+
+
 async def despachar_tras_commit(session: AsyncSession) -> None:
     """Ejecuta lo apuntado, una sola vez. Un fallo al encolar no convierte en
     error una operación que ya se ha guardado: se registra y se sigue."""

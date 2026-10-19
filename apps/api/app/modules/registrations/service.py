@@ -18,7 +18,6 @@ from app.core.config import get_settings
 from app.core.database import maintenance_session, set_organization_context
 from app.core.tasks import (
     process_refunds_task,
-    send_mis_eventos_access_email,
     send_registration_cancelled_email,
     send_registration_confirmed_email,
     send_registration_pending_approval_email,
@@ -31,15 +30,12 @@ from app.core.tasks import (
 from app.core.tras_commit import encolar_tras_commit
 from app.modules.auth.verification import (
     PROPOSITO_CANCELACION_INSCRIPCION,
-    PROPOSITO_MIS_EVENTOS_ACCESO,
     PROPOSITO_PROMOCION_LISTA_ESPERA,
     PROPOSITO_VERIFICACION_INSCRIPCION,
-    TTL_MIS_EVENTOS_ACCESO,
     consume_token,
     generate_token,
 )
 from app.modules.events.models import Event
-from app.modules.organizations.schemas import PublicOrganizationRef
 from app.modules.payments import refunds_service as payments_refunds_service
 from app.modules.payments import repository as payments_repository
 from app.modules.policies import service as policies_service
@@ -50,7 +46,7 @@ from app.modules.registrations.models import (
     EventRegistrationConsent,
     EventRegistrationQuestion,
 )
-from app.modules.registrations.schemas import MyRegistrationItem, RegistrationAnswerInput
+from app.modules.registrations.schemas import RegistrationAnswerInput
 from app.modules.tickets.service import emitir_entrada, generar_token_qr, revocar_entrada
 from app.shared.errors import ConflictError, NotFoundError, ValidationDomainError
 
@@ -568,6 +564,11 @@ async def submit_registration(
             ahora = datetime.now(UTC)
             existente.status = nuevo_estado
             existente.cancelled_at = None
+            # Un ciclo nuevo: lo de la lista de espera o la aprobación del
+            # anterior no cuenta para decidir si ya se avisó al organizador.
+            existente.waitlist_promoted_at = None
+            existente.waitlist_promotion_expires_at = None
+            existente.approved_at = None
             existente.confirmed_at = ahora if nuevo_estado == "confirmed" else None
             await repository.guardar_aceptacion_de_politicas(session, existente, politicas, ahora)
             await _enviar_email_por_estado(session, existente)
@@ -966,149 +967,3 @@ async def get_registration_stats(
         "verified_conversion_rate": (verificados / iniciados) if iniciados else None,
         "confirmed_conversion_rate": (confirmados / verificados) if verificados else None,
     }
-
-
-# --- Panel de organizador: gestión de preguntas ------------------------------
-
-
-def _validar_options_por_tipo(type_: str, options: list[str] | None) -> list[str] | None:
-    if type_ == "short_text":
-        if options:
-            raise ValidationDomainError("Una pregunta de texto libre no lleva opciones.")
-        return None
-    if not options:
-        raise ValidationDomainError("Una pregunta de opción necesita al menos una opción.")
-    return options
-
-
-async def create_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    type_: str,
-    label: str,
-    required: bool,
-    sort_order: int,
-    options: list[str] | None,
-) -> EventRegistrationQuestion:
-    """Añadir una pregunta nueva siempre está permitido, tenga o no ya
-    inscripciones el evento — la restricción de la decisión #6 solo aplica a
-    editar o borrar una pregunta con respuestas asociadas."""
-    pregunta = EventRegistrationQuestion(
-        event_id=event_id,
-        organization_id=organization_id,
-        type=type_,
-        label=label.strip(),
-        required=required,
-        sort_order=sort_order,
-        options=_validar_options_por_tipo(type_, options),
-    )
-    session.add(pregunta)
-    await session.flush()
-    return pregunta
-
-
-async def update_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    question_id: uuid.UUID,
-    datos: dict[str, Any],
-) -> EventRegistrationQuestion:
-    """`label`/`required`/`sort_order` siempre se pueden editar; `type`/`options`
-    solo si la pregunta no tiene respuestas asociadas (409 si las tiene) —
-    decisión #6 del PRD: no dejar respuestas huérfanas o de un tipo distinto
-    al declarado."""
-    pregunta = await repository.get_question(session, organization_id, event_id, question_id)
-    if pregunta is None:
-        raise NotFoundError("La pregunta no existe.")
-
-    cambia_forma = "type" in datos or "options" in datos
-    if cambia_forma and await repository.question_has_answers(
-        session, organization_id, pregunta.id
-    ):
-        raise ConflictError(
-            "No se puede cambiar el tipo ni las opciones de una pregunta con respuestas guardadas."
-        )
-
-    nuevo_tipo = datos.get("type", pregunta.type)
-    if "type" in datos or "options" in datos:
-        pregunta.options = _validar_options_por_tipo(
-            nuevo_tipo, datos.get("options", pregunta.options)
-        )
-        pregunta.type = nuevo_tipo
-    if "label" in datos:
-        pregunta.label = datos["label"].strip()
-    if "required" in datos:
-        pregunta.required = datos["required"]
-    if "sort_order" in datos:
-        pregunta.sort_order = datos["sort_order"]
-    return pregunta
-
-
-async def delete_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    question_id: uuid.UUID,
-) -> None:
-    pregunta = await repository.get_question(session, organization_id, event_id, question_id)
-    if pregunta is None:
-        raise NotFoundError("La pregunta no existe.")
-    if await repository.question_has_answers(session, organization_id, pregunta.id):
-        raise ConflictError("No se puede borrar una pregunta con respuestas guardadas.")
-    await session.delete(pregunta)
-
-
-# --- Mis eventos (magic-link, sin cuenta) -------------------------------
-
-
-async def request_mis_eventos_access(session: AsyncSession, *, email: str) -> None:
-    """Encola el magic-link de «Mis eventos» solo si el email tiene alguna
-    inscripción. Respuesta anti-enumeración, mismo patrón que `forgot_password`.
-
-    Hallazgo de red-team (Critical) sobre la primera redacción de este plan:
-    mandar el enlace a cualquier email escrito en el formulario, exista o no
-    una inscripción real, lo convertía en una herramienta de acoso por
-    correo. El endpoint que llama a esta función sigue respondiendo 200
-    siempre; el correo real solo sale de aquí.
-    """
-    email_normalizado = email.strip().lower()
-    if await repository.has_registration_by_email(session, email_normalizado):
-        token = await generate_token(
-            PROPOSITO_MIS_EVENTOS_ACCESO, email_normalizado, ttl=TTL_MIS_EVENTOS_ACCESO
-        )
-        await send_mis_eventos_access_email.kiq(email_normalizado, token)
-
-
-async def list_mis_eventos(session: AsyncSession, *, token: str) -> list[MyRegistrationItem]:
-    """Consume el token del magic-link y devuelve las inscripciones del email.
-
-    Token de un solo uso (`consume_token`, no `peek_token`): recargar la
-    página exige pedir un enlace nuevo, trade-off de UX aceptado
-    explícitamente en el plan (alcance ya cerrado a "sin sesión persistente").
-    """
-    email = await consume_token(PROPOSITO_MIS_EVENTOS_ACCESO, token)
-    if email is None:
-        raise ValidationDomainError("El enlace no es válido o ha caducado. Pide uno nuevo.")
-
-    filas = await repository.list_registrations_by_email(session, email)
-    return [
-        MyRegistrationItem(
-            event_slug=fila.event_slug,
-            event_title=fila.event_title,
-            starts_at=fila.starts_at,
-            organization_name=fila.organization_name,
-            organization=PublicOrganizationRef(
-                slug=fila.organization_slug,
-                name=fila.organization_name,
-                page_public=fila.organization_page_public,
-            ),
-            status=fila.status,
-            event_cancelled=fila.event_status == "cancelled",
-        )
-        for fila in filas
-    ]

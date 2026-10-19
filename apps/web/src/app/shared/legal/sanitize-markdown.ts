@@ -24,10 +24,12 @@ const ETIQUETAS_PERMITIDAS = [
 ];
 const ATRIBUTOS_PERMITIDOS = ['href'];
 
-/** Solo enlaces web y de correo: ni `javascript:` ni `data:`, pero tampoco
- * URLs relativas al protocolo (`//dominio`), rutas relativas, `tel:`… que la
- * expresión por defecto de DOMPurify sí deja pasar. */
-const URIS_PERMITIDAS = /^(?:https?:|mailto:)/i;
+/** Enlaces web, de correo y dentro del propio sitio (`/legal/cookies`,
+ * `#apartado`, que los textos legales usan para remitirse entre sí). Ni
+ * `javascript:` ni `data:` ni `tel:`, ni URLs relativas al protocolo (`//dominio`
+ * y `/\dominio`, que el navegador trata igual), que la expresión por defecto de
+ * DOMPurify sí deja pasar. */
+const URIS_PERMITIDAS = /^(?:https?:|mailto:|#|\/(?![/\\]))/i;
 
 marked.setOptions({ async: false, gfm: true, breaks: false });
 

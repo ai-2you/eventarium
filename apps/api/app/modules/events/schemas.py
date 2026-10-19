@@ -118,7 +118,7 @@ class EventCreate(BaseModel):
     description: DescripcionDeEvento | None = None
     # Id de una categoría **activa** del catálogo, o `None` (sin categoría).
     category_id: str | None = None
-    # Minúsculas, máx. 5, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
+    # Minúsculas, máx. 10, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
     tags: list[str] = Field(default_factory=list)
     status: EventStatusInput = "draft"
     visibility: EventVisibility = "public"

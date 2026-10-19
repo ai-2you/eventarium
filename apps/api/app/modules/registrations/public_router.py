@@ -31,7 +31,7 @@ from app.core.turnstile import require_turnstile
 from app.modules.events.models import Event
 from app.modules.events.public_deps import EVENTO_PARA_INSCRIBIR, ruta_de_evento
 from app.modules.policies import service as policies_service
-from app.modules.registrations import repository, service
+from app.modules.registrations import mis_eventos_service, repository, service
 from app.modules.registrations.calendar import calendario_de_inscripcion
 from app.modules.registrations.schemas import (
     CancelRegistrationRequest,
@@ -204,7 +204,7 @@ async def solicitar_mis_eventos(
     datos: MisEventosSolicitarRequest, request: Request, session: SessionDep
 ) -> RegistrationMessageResponse:
     await require_turnstile(request, datos.turnstile_token)
-    await service.request_mis_eventos_access(session, email=str(datos.email))
+    await mis_eventos_service.request_mis_eventos_access(session, email=str(datos.email))
     return RegistrationMessageResponse(
         message="Si ese correo tiene inscripciones, en breve recibirás un enlace."
     )
@@ -225,5 +225,5 @@ async def solicitar_mis_eventos(
 async def ver_mis_eventos(
     datos: MisEventosVerRequest, session: SessionDep
 ) -> MyRegistrationsResponse:
-    registrations = await service.list_mis_eventos(session, token=datos.token)
+    registrations = await mis_eventos_service.list_mis_eventos(session, token=datos.token)
     return MyRegistrationsResponse(registrations=registrations)

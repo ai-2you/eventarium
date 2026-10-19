@@ -20,7 +20,7 @@ from app.modules.events.models import Event
 from app.modules.policies import service as policies_service
 from app.modules.policies.models import OrganizationPolicyVersion
 from app.modules.policies.schemas import AcceptedPolicyOut
-from app.modules.registrations import repository, service
+from app.modules.registrations import questions_service, repository, service
 from app.modules.registrations.models import EventRegistration, EventRegistrationQuestion
 from app.modules.registrations.schemas import (
     RegistrationAnswerOut,
@@ -289,7 +289,7 @@ async def create_registration_question(
     evento: Annotated[Event, Depends(_obtener_evento_o_404)],
     session: DbDep,
 ) -> RegistrationQuestionResponse:
-    pregunta = await service.create_registration_question(
+    pregunta = await questions_service.create_registration_question(
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,
@@ -318,7 +318,7 @@ async def update_registration_question(
     session: DbDep,
     question_id: str,
 ) -> RegistrationQuestionResponse:
-    pregunta = await service.update_registration_question(
+    pregunta = await questions_service.update_registration_question(
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,
@@ -340,7 +340,7 @@ async def delete_registration_question(
     session: DbDep,
     question_id: str,
 ) -> None:
-    await service.delete_registration_question(
+    await questions_service.delete_registration_question(
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,

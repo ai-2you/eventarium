@@ -329,6 +329,47 @@ async def test_reactivar_una_compra_abandonada_guarda_la_aceptacion_nueva(
     assert [str(i) for i in consentimiento.accepted_policy_version_ids] == nuevos
 
 
+async def test_reactivar_una_compra_abandonada_empieza_un_ciclo_nuevo(
+    cliente: AsyncClient,
+    organizacion: OrganizacionDePrueba,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakeStripeClient,
+) -> None:
+    """La lista de espera o la aprobación del intento anterior no cuentan: al
+    pagar este, el organizador recibe su aviso de entrada pagada."""
+    evento, tipo = await _preparar_evento_de_pago(cliente, organizacion, monkeypatch, "ciclo")
+    fake.v1.checkout.sessions.create_async.return_value = _sesion_creada()
+    payload = _payload("ciclo@example.com", ticket_type_id=tipo["id"])
+    vigentes = await _ids_vigentes(cliente, evento["slug"])
+    primera = await cliente.post(
+        _url_checkout(evento["slug"]), json={**payload, "accepted_policy_version_ids": vigentes}
+    )
+    assert primera.status_code == 200, primera.text
+    async with SessionMaintenance() as session:
+        registro = await session.scalar(
+            select(EventRegistration).where(EventRegistration.email == "ciclo@example.com")
+        )
+        assert registro is not None
+        registro.status = "cancelled"
+        registro.waitlist_promoted_at = datetime.now(UTC)
+        registro.approved_at = datetime.now(UTC)
+        await session.commit()
+
+    fake.v1.checkout.sessions.create_async.return_value = _sesion_creada("cs_test_ciclo")
+    reactivada = await cliente.post(
+        _url_checkout(evento["slug"]), json={**payload, "accepted_policy_version_ids": vigentes}
+    )
+
+    assert reactivada.status_code == 200, reactivada.text
+    async with SessionMaintenance() as session:
+        registro = await session.scalar(
+            select(EventRegistration).where(EventRegistration.email == "ciclo@example.com")
+        )
+        assert registro is not None
+        assert registro.waitlist_promoted_at is None
+        assert registro.approved_at is None
+
+
 # --- Panel --------------------------------------------------------------------
 
 
