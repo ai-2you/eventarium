@@ -8,6 +8,8 @@ import es from '../../../../public/assets/i18n/es-ES.json';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../testing/axe';
 import { EventScope } from './event-scope';
 import { EventShell } from './event-shell';
+import { AuthService } from '../../core/auth/auth.service';
+import { authConPermisos } from '../../../testing/auth';
 
 function montar(opciones: {
   readonly nombreEvento?: string | null;
@@ -23,6 +25,7 @@ function montar(opciones: {
     providers: [
       provideZonelessChangeDetection(),
       provideRouter([]),
+      { provide: AuthService, useValue: authConPermisos() },
       {
         provide: EventScope,
         useValue: {

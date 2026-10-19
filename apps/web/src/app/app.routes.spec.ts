@@ -25,6 +25,7 @@ import { EventSponsors } from './features/admin/events/event-sponsors';
 import { EventTicketTypes } from './features/admin/events/event-ticket-types';
 import es from '../../public/assets/i18n/es-ES.json';
 import { themingDePrueba } from '../testing/theming.fixture';
+import { TODOS_LOS_PERMISOS } from '../testing/auth';
 
 /**
  * Recorre las rutas de `app.routes.ts` de verdad, sin espiar el router: cada caso
@@ -70,6 +71,13 @@ function configurar(usuario: { is_superadmin: boolean } | null) {
               : null,
           ),
           refresh: async () => true,
+          // Propietario: todas las pantallas del panel le corresponden.
+          permisos: signal(TODOS_LOS_PERMISOS),
+          roles: signal(['owner']),
+          asegurarUsuarioCompleto: async () => ({
+            permissions: TODOS_LOS_PERMISOS,
+            roles: ['owner'],
+          }),
           loadCurrentUser: async () => {
             throw new Error('no debería necesitarse: currentUser ya está resuelto');
           },
