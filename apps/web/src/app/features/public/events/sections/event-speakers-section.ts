@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
@@ -6,7 +7,9 @@ import { Reveal } from '../../../../shared/ui/reveal.directive';
 import { rolLegible } from '../event-page.types';
 
 export interface Speaker {
-  readonly publicSlug: string;
+  readonly ref: string;
+  /** Sin perfil público no hay página a la que llevar: se pinta sin enlace. */
+  readonly publicSlug: string | null;
   readonly displayName: string;
   readonly roleKey: string;
 }
@@ -25,24 +28,33 @@ export interface Speaker {
 @Component({
   selector: 'app-event-speakers-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslocoDirective, Reveal],
+  imports: [NgTemplateOutlet, RouterLink, TranslocoDirective, Reveal],
   template: `
     <ng-container *transloco="let t">
       <div class="rejilla">
-        @for (ponente of ponentes(); track ponente.publicSlug; let indice = $index) {
-          <a
-            class="ponente"
-            [routerLink]="['/ponentes', ponente.publicSlug]"
-            appReveal
-            [index]="indice"
-          >
-            <span class="marca" aria-hidden="true">{{ iniciales(ponente.displayName) }}</span>
-            <span class="datos">
-              <strong>{{ ponente.displayName }}</strong>
-              <span class="rol">{{ rolLegible(ponente.roleKey, t) }}</span>
-            </span>
-          </a>
+        @for (ponente of ponentes(); track ponente.ref; let indice = $index) {
+          @if (ponente.publicSlug) {
+            <a
+              class="ponente"
+              [routerLink]="['/ponentes', ponente.publicSlug]"
+              appReveal
+              [index]="indice"
+            >
+              <ng-container *ngTemplateOutlet="ficha; context: { $implicit: ponente }" />
+            </a>
+          } @else {
+            <div class="ponente" appReveal [index]="indice">
+              <ng-container *ngTemplateOutlet="ficha; context: { $implicit: ponente }" />
+            </div>
+          }
         }
+        <ng-template #ficha let-ponente>
+          <span class="marca" aria-hidden="true">{{ iniciales(ponente.displayName) }}</span>
+          <span class="datos">
+            <strong>{{ ponente.displayName }}</strong>
+            <span class="rol">{{ rolLegible(ponente.roleKey, t) }}</span>
+          </span>
+        </ng-template>
       </div>
     </ng-container>
   `,
@@ -66,7 +78,7 @@ export interface Speaker {
         border-color 0.15s,
         background-color 0.15s;
     }
-    .ponente:hover {
+    a.ponente:hover {
       border-color: var(--faint);
       background-color: var(--surface-hi);
     }

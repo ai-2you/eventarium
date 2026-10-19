@@ -28,6 +28,7 @@ from fastapi import APIRouter, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import maintenance_session
+from app.core.tras_commit import descartar_tras_commit
 from app.modules.payments import checkout_service, repository
 from app.modules.payments import stripe_client as stripe_gateway
 from app.modules.payments.models import OrganizationStripeAccount, StripeWebhookEvent
@@ -158,6 +159,9 @@ async def procesar_evento(event_id: str) -> None:
             error = exc
             fila.status = "failed"
             fila.error = str(exc)[:2000]
+            # Se confirma la fila `failed`, no lo que el despacho dejó a medias:
+            # sus avisos tras el commit no deben salir.
+            descartar_tras_commit(session)
 
     if error is not None:
         raise error

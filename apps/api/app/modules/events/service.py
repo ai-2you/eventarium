@@ -38,6 +38,9 @@ from app.modules.organizations import service as organizations_service
 from app.modules.organizations.schemas import PublicOrganizationRef
 from app.modules.payments import repository as payments_repository
 from app.modules.payments import service as payments_service
+from app.modules.registrations import modo_y_aforo
+from app.modules.registrations import repository as registrations_repository
+from app.modules.registrations import service as registrations_service
 from app.modules.theme_templates.accent_palette import fusionar_overrides
 from app.modules.theme_templates.models import ThemeTemplate
 from app.modules.theme_templates.schemas import PublicTheme
@@ -287,6 +290,26 @@ async def update_event(
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
 
+    # Se comparan contra el valor actual, no por presencia de la clave: el
+    # formulario del panel los envía siempre, y reenviar el mismo valor no es
+    # un cambio que haya que validar. Con cambio real se toma el mismo
+    # bloqueo de aforo que las altas, verificaciones y aprobaciones, para que
+    # ninguna se cuele entre el recuento y la escritura.
+    if "registration_mode" in datos and datos["registration_mode"] is None:
+        raise ValidationDomainError("Indica el modo de inscripción.")
+    modo_cambia = (
+        "registration_mode" in datos and datos["registration_mode"] != evento.registration_mode
+    )
+    aforo_cambia = "capacity" in datos and datos["capacity"] != evento.capacity
+    if modo_cambia or aforo_cambia:
+        await registrations_repository.lock_event_for_capacity(session, organization_id, evento.id)
+        if modo_cambia:
+            await modo_y_aforo.asegurar_cambio_de_modo_posible(
+                session, evento, datos["registration_mode"]
+            )
+        if aforo_cambia and datos["capacity"] is not None:
+            await modo_y_aforo.asegurar_aforo_posible(session, evento, datos["capacity"])
+
     direccion_anterior = evento.location_address
 
     # La plantilla del evento llega como cadena (o vacía, para volver a heredar)
@@ -324,6 +347,10 @@ async def update_event(
         await session.flush()
     except IntegrityError as exc:
         raise ConflictError(f"Ya existe un evento con el identificador «{nuevo_slug}».") from exc
+    # Solo un evento publicado tiene a quién avisar: en borrador o archivado
+    # la lista de espera no debe recibir ofertas de plaza.
+    if aforo_cambia and evento.status == "published":
+        await registrations_service.promover_lista_de_espera_hasta_llenar(session, evento)
     if categoria_cambiada:
         await session.refresh(evento, ["category"])
     return evento

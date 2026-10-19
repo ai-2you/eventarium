@@ -4,9 +4,11 @@ de espera con promoción automática, emails transaccionales y autocancelación
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -16,25 +18,24 @@ from app.core.config import get_settings
 from app.core.database import maintenance_session, set_organization_context
 from app.core.tasks import (
     process_refunds_task,
-    send_mis_eventos_access_email,
     send_registration_cancelled_email,
     send_registration_confirmed_email,
+    send_registration_pending_approval_email,
+    send_registration_received_organizer_email,
     send_registration_rejected_email,
     send_registration_verification_email,
     send_registration_waitlisted_email,
     send_waitlist_promotion_email,
 )
+from app.core.tras_commit import encolar_tras_commit
 from app.modules.auth.verification import (
     PROPOSITO_CANCELACION_INSCRIPCION,
-    PROPOSITO_MIS_EVENTOS_ACCESO,
     PROPOSITO_PROMOCION_LISTA_ESPERA,
     PROPOSITO_VERIFICACION_INSCRIPCION,
-    TTL_MIS_EVENTOS_ACCESO,
     consume_token,
     generate_token,
 )
 from app.modules.events.models import Event
-from app.modules.organizations.schemas import PublicOrganizationRef
 from app.modules.payments import refunds_service as payments_refunds_service
 from app.modules.payments import repository as payments_repository
 from app.modules.policies import service as policies_service
@@ -45,9 +46,11 @@ from app.modules.registrations.models import (
     EventRegistrationConsent,
     EventRegistrationQuestion,
 )
-from app.modules.registrations.schemas import MyRegistrationItem, RegistrationAnswerInput
+from app.modules.registrations.schemas import RegistrationAnswerInput
 from app.modules.tickets.service import emitir_entrada, generar_token_qr, revocar_entrada
 from app.shared.errors import ConflictError, NotFoundError, ValidationDomainError
+
+logger = logging.getLogger(__name__)
 
 # Límite de longitud para una respuesta de texto libre: no hay columna que lo
 # imponga (es `jsonb`), así que se acota aquí para no aceptar payloads enormes.
@@ -267,6 +270,59 @@ async def _enviar_email_por_estado(session: AsyncSession, inscripcion: EventRegi
         await send_registration_waitlisted_email.kiq(
             inscripcion.email, organization_id, token_cancelacion
         )
+    elif inscripcion.status == "pending_approval":
+        await send_registration_pending_approval_email.kiq(inscripcion.email, organization_id)
+
+
+# Estados con los que una inscripción nueva se avisa al organizador. Los que
+# faltan llegan más tarde a uno de estos: `pending_verification` al verificarse
+# y `pending_payment` al pagarse (un checkout abandonado no es una inscripción).
+_ESTADOS_QUE_AVISAN_AL_ORGANIZADOR = ("confirmed", "waitlisted", "pending_approval")
+
+
+async def avisar_al_organizador(
+    session: AsyncSession, inscripcion: EventRegistration, *, pagada: bool = False
+) -> None:
+    """Avisa por correo a quien gestiona las inscripciones de la organización.
+
+    Solo desde los puntos donde nace una inscripción (alta, reactivación de una
+    compra abandonada, verificación del correo) o se paga: nunca desde
+    `_enviar_email_por_estado`, que también recorren aprobaciones, promociones
+    y reenvíos, y avisaría dos veces de la misma persona. Se encola tras el
+    commit (`core/tras_commit.py`): si la petición acaba revirtiéndose, el
+    aviso no sale.
+    """
+    if inscripcion.status not in _ESTADOS_QUE_AVISAN_AL_ORGANIZADOR:
+        return
+    evento = await session.get(Event, inscripcion.event_id)
+    if evento is None:
+        return
+    destinatarios = await repository.correos_que_gestionan_inscripciones(
+        session, inscripcion.organization_id
+    )
+    if not destinatarios:
+        logger.warning(
+            "Inscripción %s sin nadie a quien avisar: ningún miembro gestiona "
+            "inscripciones y la organización no tiene correo de contacto.",
+            inscripcion.id,
+        )
+        return
+    for correo in destinatarios:
+        encolar_tras_commit(
+            session,
+            partial(
+                send_registration_received_organizer_email.kiq,
+                to_email=correo,
+                organization_id=str(inscripcion.organization_id),
+                event_id=str(evento.id),
+                registration_id=str(inscripcion.id),
+                event_title=evento.title,
+                participant_name=inscripcion.full_name,
+                participant_email=inscripcion.email,
+                status=inscripcion.status,
+                paid=pagada,
+            ),
+        )
 
 
 async def _reservar_ventana_de_pago(
@@ -297,16 +353,17 @@ async def _reservar_ventana_de_pago(
     inscripcion.payment_expires_at = datetime.now(UTC) + ventana
 
 
-async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> None:
+async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool:
     """Promueve a la primera persona en lista de espera, si hay alguna.
 
     Marca la ventana de promoción y encola el email con el enlace de
     confirmación (`waitlist_promotion_confirm`) y el de autocancelación
-    (`registration_cancel`), cada uno con su propio TTL.
+    (`registration_cancel`), cada uno con su propio TTL. Devuelve si había
+    alguien a quien promover.
     """
     siguiente = await repository.get_oldest_waitlisted(session, evento.organization_id, evento.id)
     if siguiente is None:
-        return
+        return False
     ahora = datetime.now(UTC)
     ventana = timedelta(hours=get_settings().waitlist_promotion_window_hours)
     siguiente.waitlist_promoted_at = ahora
@@ -322,6 +379,41 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> None
         cancel_token,
         (ahora + ventana).strftime("%d/%m/%Y %H:%M"),
     )
+    return True
+
+
+async def reencolar_promociones_caducadas(session: AsyncSession, evento: Event) -> None:
+    """Devuelve al final de la cola las promociones caducadas que el cron aún
+    no ha barrido: hasta entonces no ocupan plaza en
+    `count_reserved_registrations`, pero el barrido las sustituiría por una
+    promoción nueva sin mirar el aforo."""
+    caducadas = await repository.get_expired_waitlist_promotions(
+        session, evento.organization_id, evento.id
+    )
+    for inscripcion in caducadas:
+        await repository.requeue_to_back_of_waitlist(
+            session, evento.organization_id, evento.id, inscripcion
+        )
+
+
+async def promover_lista_de_espera_hasta_llenar(session: AsyncSession, evento: Event) -> int:
+    """Ofrece las plazas que haya libres a la lista de espera, por orden. Lo
+    usan el cambio de aforo y el barrido de promociones caducadas; exige el
+    bloqueo de aforo tomado. Devuelve cuántas personas se han promovido."""
+    await reencolar_promociones_caducadas(session, evento)
+    if evento.capacity is None:
+        libres = None
+    else:
+        reservadas = await repository.count_reserved_registrations(
+            session, evento.organization_id, evento.id
+        )
+        libres = evento.capacity - reservadas
+    promovidas = 0
+    while libres is None or promovidas < libres:
+        if not await _promote_next_waitlisted(session, evento):
+            break
+        promovidas += 1
+    return promovidas
 
 
 async def _cancelar_inscripcion(
@@ -472,9 +564,15 @@ async def submit_registration(
             ahora = datetime.now(UTC)
             existente.status = nuevo_estado
             existente.cancelled_at = None
+            # Un ciclo nuevo: lo de la lista de espera o la aprobación del
+            # anterior no cuenta para decidir si ya se avisó al organizador.
+            existente.waitlist_promoted_at = None
+            existente.waitlist_promotion_expires_at = None
+            existente.approved_at = None
             existente.confirmed_at = ahora if nuevo_estado == "confirmed" else None
             await repository.guardar_aceptacion_de_politicas(session, existente, politicas, ahora)
             await _enviar_email_por_estado(session, existente)
+            await avisar_al_organizador(session, existente)
             return existente
 
         # Reenvía siempre el email que corresponda al estado actual (decisión
@@ -485,14 +583,14 @@ async def submit_registration(
             await send_registration_verification_email.kiq(
                 email_normalizado, token, str(event.organization_id)
             )
-        elif existente.status in ("confirmed", "waitlisted"):
+        elif existente.status in ("confirmed", "waitlisted", "pending_approval"):
             await _enviar_email_por_estado(session, existente)
         elif existente.status == "rejected":
             await send_registration_rejected_email.kiq(existente.email, str(event.organization_id))
         elif existente.status == "cancelled":
             await send_registration_cancelled_email.kiq(existente.email, str(event.organization_id))
-        # `pending_approval`/`pending_payment`: sin plantilla propia, igual
-        # que en el alta normal.
+        # `pending_payment`: sin plantilla propia; el enlace de pago lo
+        # reenvía el propio checkout.
         return None
 
     user_id = await repository.find_user_id_by_email(session, email_normalizado)
@@ -556,6 +654,7 @@ async def submit_registration(
         )
     else:
         await _enviar_email_por_estado(session, inscripcion)
+        await avisar_al_organizador(session, inscripcion)
     return inscripcion
 
 
@@ -602,6 +701,7 @@ async def verify_registration(session: AsyncSession, *, token: str) -> EventRegi
     elif nuevo_estado == "pending_payment":
         await _reservar_ventana_de_pago(session, evento, inscripcion)
     await _enviar_email_por_estado(session, inscripcion)
+    await avisar_al_organizador(session, inscripcion)
     return inscripcion
 
 
@@ -802,14 +902,10 @@ async def expire_waitlist_promotions() -> None:
             # cancela el barrido de la cancelación.
             if evento.status == "cancelled":
                 continue
-            caducadas = await repository.get_expired_waitlist_promotions(
-                session, organization_id, event_id
-            )
-            for inscripcion in caducadas:
-                await repository.requeue_to_back_of_waitlist(
-                    session, organization_id, event_id, inscripcion
-                )
-                await _promote_next_waitlisted(session, evento)
+            # Reencola las caducadas y ofrece solo las plazas que de verdad
+            # quedan libres: sustituir 1:1 cada caducada por una promoción
+            # nueva ignoraba el aforo si se había bajado entretanto.
+            await promover_lista_de_espera_hasta_llenar(session, evento)
             await session.commit()
 
 
@@ -871,149 +967,3 @@ async def get_registration_stats(
         "verified_conversion_rate": (verificados / iniciados) if iniciados else None,
         "confirmed_conversion_rate": (confirmados / verificados) if verificados else None,
     }
-
-
-# --- Panel de organizador: gestión de preguntas ------------------------------
-
-
-def _validar_options_por_tipo(type_: str, options: list[str] | None) -> list[str] | None:
-    if type_ == "short_text":
-        if options:
-            raise ValidationDomainError("Una pregunta de texto libre no lleva opciones.")
-        return None
-    if not options:
-        raise ValidationDomainError("Una pregunta de opción necesita al menos una opción.")
-    return options
-
-
-async def create_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    type_: str,
-    label: str,
-    required: bool,
-    sort_order: int,
-    options: list[str] | None,
-) -> EventRegistrationQuestion:
-    """Añadir una pregunta nueva siempre está permitido, tenga o no ya
-    inscripciones el evento — la restricción de la decisión #6 solo aplica a
-    editar o borrar una pregunta con respuestas asociadas."""
-    pregunta = EventRegistrationQuestion(
-        event_id=event_id,
-        organization_id=organization_id,
-        type=type_,
-        label=label.strip(),
-        required=required,
-        sort_order=sort_order,
-        options=_validar_options_por_tipo(type_, options),
-    )
-    session.add(pregunta)
-    await session.flush()
-    return pregunta
-
-
-async def update_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    question_id: uuid.UUID,
-    datos: dict[str, Any],
-) -> EventRegistrationQuestion:
-    """`label`/`required`/`sort_order` siempre se pueden editar; `type`/`options`
-    solo si la pregunta no tiene respuestas asociadas (409 si las tiene) —
-    decisión #6 del PRD: no dejar respuestas huérfanas o de un tipo distinto
-    al declarado."""
-    pregunta = await repository.get_question(session, organization_id, event_id, question_id)
-    if pregunta is None:
-        raise NotFoundError("La pregunta no existe.")
-
-    cambia_forma = "type" in datos or "options" in datos
-    if cambia_forma and await repository.question_has_answers(
-        session, organization_id, pregunta.id
-    ):
-        raise ConflictError(
-            "No se puede cambiar el tipo ni las opciones de una pregunta con respuestas guardadas."
-        )
-
-    nuevo_tipo = datos.get("type", pregunta.type)
-    if "type" in datos or "options" in datos:
-        pregunta.options = _validar_options_por_tipo(
-            nuevo_tipo, datos.get("options", pregunta.options)
-        )
-        pregunta.type = nuevo_tipo
-    if "label" in datos:
-        pregunta.label = datos["label"].strip()
-    if "required" in datos:
-        pregunta.required = datos["required"]
-    if "sort_order" in datos:
-        pregunta.sort_order = datos["sort_order"]
-    return pregunta
-
-
-async def delete_registration_question(
-    session: AsyncSession,
-    *,
-    organization_id: uuid.UUID,
-    event_id: uuid.UUID,
-    question_id: uuid.UUID,
-) -> None:
-    pregunta = await repository.get_question(session, organization_id, event_id, question_id)
-    if pregunta is None:
-        raise NotFoundError("La pregunta no existe.")
-    if await repository.question_has_answers(session, organization_id, pregunta.id):
-        raise ConflictError("No se puede borrar una pregunta con respuestas guardadas.")
-    await session.delete(pregunta)
-
-
-# --- Mis eventos (magic-link, sin cuenta) -------------------------------
-
-
-async def request_mis_eventos_access(session: AsyncSession, *, email: str) -> None:
-    """Encola el magic-link de «Mis eventos» solo si el email tiene alguna
-    inscripción. Respuesta anti-enumeración, mismo patrón que `forgot_password`.
-
-    Hallazgo de red-team (Critical) sobre la primera redacción de este plan:
-    mandar el enlace a cualquier email escrito en el formulario, exista o no
-    una inscripción real, lo convertía en una herramienta de acoso por
-    correo. El endpoint que llama a esta función sigue respondiendo 200
-    siempre; el correo real solo sale de aquí.
-    """
-    email_normalizado = email.strip().lower()
-    if await repository.has_registration_by_email(session, email_normalizado):
-        token = await generate_token(
-            PROPOSITO_MIS_EVENTOS_ACCESO, email_normalizado, ttl=TTL_MIS_EVENTOS_ACCESO
-        )
-        await send_mis_eventos_access_email.kiq(email_normalizado, token)
-
-
-async def list_mis_eventos(session: AsyncSession, *, token: str) -> list[MyRegistrationItem]:
-    """Consume el token del magic-link y devuelve las inscripciones del email.
-
-    Token de un solo uso (`consume_token`, no `peek_token`): recargar la
-    página exige pedir un enlace nuevo, trade-off de UX aceptado
-    explícitamente en el plan (alcance ya cerrado a "sin sesión persistente").
-    """
-    email = await consume_token(PROPOSITO_MIS_EVENTOS_ACCESO, token)
-    if email is None:
-        raise ValidationDomainError("El enlace no es válido o ha caducado. Pide uno nuevo.")
-
-    filas = await repository.list_registrations_by_email(session, email)
-    return [
-        MyRegistrationItem(
-            event_slug=fila.event_slug,
-            event_title=fila.event_title,
-            starts_at=fila.starts_at,
-            organization_name=fila.organization_name,
-            organization=PublicOrganizationRef(
-                slug=fila.organization_slug,
-                name=fila.organization_name,
-                page_public=fila.organization_page_public,
-            ),
-            status=fila.status,
-            event_cancelled=fila.event_status == "cancelled",
-        )
-        for fila in filas
-    ]

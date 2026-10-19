@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -12,8 +13,10 @@ import { Button } from '../../../shared/ui/button';
 import { Chip, ChipTone } from '../../../shared/ui/chip';
 import { DataTable, DataTableColumn } from '../../../shared/ui/data-table';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { formatearPrecio } from '../../../shared/text/formatear-precio';
 
 type EventStatus = 'draft' | 'published' | 'archived' | 'cancelled';
+type RegistrationMode = 'free' | 'approval' | 'paid';
 
 interface EventSummary {
   readonly id: string;
@@ -21,6 +24,13 @@ interface EventSummary {
   readonly title: string;
   readonly status: EventStatus;
   readonly starts_at: string;
+  readonly registration_mode: RegistrationMode;
+  /** `null`: sin límite de plazas. */
+  readonly capacity: number | null;
+  /** Entrada más barata (solo eventos de pago con entradas definidas). */
+  readonly price_from_cents?: number | null;
+  readonly price_currency?: string | null;
+  readonly price_multiple?: boolean;
 }
 
 interface Page<T> {
@@ -31,7 +41,17 @@ interface Page<T> {
 @Component({
   selector: 'app-events-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, RouterLink, DatePipe, Alert, Button, Chip, DataTable, PageHeader],
+  imports: [
+    TranslocoDirective,
+    RouterLink,
+    DatePipe,
+    Alert,
+    Button,
+    Chip,
+    DataTable,
+    PageHeader,
+    Select,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.rotulo')">
@@ -44,16 +64,14 @@ interface Page<T> {
         </div>
       </app-page-header>
 
-      <div class="filtro">
-        <label for="filtro-estado">{{ t('admin.events.filtrarPorEstado') }}</label>
-        <select id="filtro-estado" [value]="estado()" (change)="alCambiarEstado($event)">
-          <option value="">{{ t('admin.events.estadoTodos') }}</option>
-          <option value="draft">{{ t('admin.events.estadoDraft') }}</option>
-          <option value="published">{{ t('admin.events.estadoPublished') }}</option>
-          <option value="archived">{{ t('admin.events.estadoArchived') }}</option>
-          <option value="cancelled">{{ t('admin.events.estadoCancelled') }}</option>
-        </select>
-      </div>
+      <app-select
+        class="filtro"
+        fieldId="filtro-estado"
+        [label]="t('admin.events.filtrarPorEstado')"
+        [options]="opcionesDeEstado()"
+        [value]="estado()"
+        (valueChange)="alCambiarEstado($event)"
+      />
 
       @if (error(); as mensaje) {
         <app-alert tone="error">{{ mensaje }}</app-alert>
@@ -75,6 +93,11 @@ interface Page<T> {
                   t('admin.events.estado' + estadoClave(evento.status))
                 }}</app-chip>
               </td>
+              <td>{{ t(claveDeModo(evento.registration_mode)) }}</td>
+              <td>{{ precioTexto(evento, t) }}</td>
+              <td>
+                {{ evento.capacity === null ? t('admin.events.sinLimite') : evento.capacity }}
+              </td>
               <td>{{ evento.starts_at | date: 'short' }}</td>
             </tr>
           }
@@ -84,14 +107,9 @@ interface Page<T> {
   `,
   styles: `
     .filtro {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
+      display: block;
+      max-width: 18rem;
       margin: var(--space-md) 0;
-    }
-    .filtro select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      min-height: 2.5rem;
     }
   `,
 })
@@ -111,12 +129,38 @@ export class EventsPage {
     return [
       { key: 'titulo', label: t('admin.events.columnaTitulo') },
       { key: 'estado', label: t('admin.events.columnaEstado') },
+      { key: 'inscripcion', label: t('admin.events.columnaInscripcion') },
+      { key: 'precio', label: t('admin.events.columnaPrecio') },
+      { key: 'aforo', label: t('admin.events.columnaAforo') },
       { key: 'fecha', label: t('admin.events.columnaFecha') },
     ];
   });
 
   constructor() {
     void this.cargar();
+  }
+
+  protected claveDeModo(modo: RegistrationMode): string {
+    const claves: Record<RegistrationMode, string> = {
+      free: 'admin.events.modoLibre',
+      approval: 'admin.events.modoAprobacion',
+      paid: 'admin.events.modoPago',
+    };
+    return claves[modo];
+  }
+
+  /** «Gratis» si no es de pago; el precio, o «Desde X» si hay varios; y, si es de
+   * pago pero aún no tiene entradas, que faltan (sin inventar un importe). */
+  protected precioTexto(
+    evento: EventSummary,
+    traducir: (clave: string, params?: Record<string, unknown>) => string,
+  ): string {
+    if (evento.registration_mode !== 'paid') return traducir('admin.events.precioGratis');
+    if (evento.price_from_cents == null || !evento.price_currency) {
+      return traducir('admin.events.precioSinEntradas');
+    }
+    const precio = formatearPrecio(evento.price_from_cents, evento.price_currency);
+    return evento.price_multiple ? traducir('admin.events.precioDesde', { precio }) : precio;
   }
 
   protected estadoClave(estado: EventStatus): string {
@@ -157,8 +201,16 @@ export class EventsPage {
     }
   }
 
-  protected alCambiarEstado(evento: Event): void {
-    this.estado.set((evento.target as HTMLSelectElement).value as EventStatus | '');
+  protected readonly opcionesDeEstado = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('admin.events.estadoTodos') },
+    { value: 'draft', label: this.transloco.translate('admin.events.estadoDraft') },
+    { value: 'published', label: this.transloco.translate('admin.events.estadoPublished') },
+    { value: 'archived', label: this.transloco.translate('admin.events.estadoArchived') },
+    { value: 'cancelled', label: this.transloco.translate('admin.events.estadoCancelled') },
+  ]);
+
+  protected alCambiarEstado(valor: string): void {
+    this.estado.set(valor as EventStatus | '');
     void this.cargar();
   }
 }

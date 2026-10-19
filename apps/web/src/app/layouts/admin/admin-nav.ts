@@ -3,6 +3,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
 import { AuthService } from '../../core/auth/auth.service';
+import {
+  REQUISITOS_DEL_PANEL,
+  type RutaDelPanel,
+  cumpleRequisito,
+} from '../../core/auth/permisos-del-panel';
 
 /**
  * Un enlace de navegación del panel.
@@ -12,23 +17,44 @@ export interface AdminNavLink {
   readonly labelKey: string;
   readonly exact?: boolean;
   readonly soloSuperadmin?: boolean;
+  /** Ruta del panel cuyo requisito (`REQUISITOS_DEL_PANEL`) decide si se ve. */
+  readonly requisito?: RutaDelPanel;
 }
 
 export const ORGANIZATION_NAV_LINKS: readonly AdminNavLink[] = [
-  { path: ['/dashboard'], labelKey: 'admin.escritorio', exact: true },
-  { path: ['/dashboard/organization'], labelKey: 'admin.organizacion.titulo' },
-  { path: ['/dashboard/branding'], labelKey: 'admin.identidadVisual' },
-  { path: ['/dashboard/politicas'], labelKey: 'admin.politicas.nav' },
-  { path: ['/dashboard/roles'], labelKey: 'admin.rolesNav' },
-  { path: ['/dashboard/members'], labelKey: 'admin.miembrosNav' },
-  { path: ['/dashboard/events'], labelKey: 'admin.eventsNav' },
-  { path: ['/dashboard/sponsor-tiers'], labelKey: 'admin.sponsorTiersNav' },
-  { path: ['/dashboard/stripe'], labelKey: 'admin.stripeNav' },
-  // Sin `soloSuperadmin`: es una pantalla del panel de organización, y quien no
-  // sea propietario ve el aviso de solo lectura que devuelve el backend.
-  { path: ['/dashboard/ia'], labelKey: 'admin.ia.organizacion.titulo' },
-  { path: ['/dashboard/mcp'], labelKey: 'admin.mcp.nav' },
+  { path: ['/dashboard'], labelKey: 'admin.escritorio', exact: true, requisito: '' },
+  {
+    path: ['/dashboard/organization'],
+    labelKey: 'admin.organizacion.titulo',
+    requisito: 'organization',
+  },
+  { path: ['/dashboard/branding'], labelKey: 'admin.identidadVisual', requisito: 'branding' },
+  { path: ['/dashboard/politicas'], labelKey: 'admin.politicas.nav', requisito: 'politicas' },
+  { path: ['/dashboard/roles'], labelKey: 'admin.rolesNav', requisito: 'roles' },
+  { path: ['/dashboard/members'], labelKey: 'admin.miembrosNav', requisito: 'members' },
+  { path: ['/dashboard/events'], labelKey: 'admin.eventsNav', requisito: 'events' },
+  {
+    path: ['/dashboard/sponsor-tiers'],
+    labelKey: 'admin.sponsorTiersNav',
+    requisito: 'sponsor-tiers',
+  },
+  { path: ['/dashboard/stripe'], labelKey: 'admin.stripeNav', requisito: 'stripe' },
+  { path: ['/dashboard/ia'], labelKey: 'admin.ia.organizacion.titulo', requisito: 'ia' },
+  { path: ['/dashboard/mcp'], labelKey: 'admin.mcp.nav', requisito: 'mcp' },
 ];
+
+/** Los enlaces que el usuario puede usar, según los requisitos de cada ruta. */
+export function enlacesPermitidos(
+  enlaces: readonly AdminNavLink[],
+  permisos: readonly string[],
+  roles: readonly string[],
+): readonly AdminNavLink[] {
+  return enlaces.filter(
+    (enlace) =>
+      enlace.requisito === undefined ||
+      cumpleRequisito(REQUISITOS_DEL_PANEL[enlace.requisito], permisos, roles),
+  );
+}
 
 export const PLATFORM_NAV_LINKS: readonly AdminNavLink[] = [
   { path: ['/admin'], labelKey: 'admin.superadminNav', exact: true, soloSuperadmin: true },
@@ -76,55 +102,74 @@ export const PLATFORM_NAV_LINKS: readonly AdminNavLink[] = [
  * aparte, porque no son «una pestaña más» sino la entrada y la salida del
  * ámbito.
  *
- * Las secciones de pago solo aparecen si `aceptaPagos`, con el mismo criterio que ya
- * aplicaba `event-form.ts` antes de esta fase: `registrationMode() === 'paid'`.
+ * «Descuentos» y «Pagos» solo aparecen si `aceptaPagos` (`registrationMode() ===
+ * 'paid'`); «Entradas», siempre.
  */
 export function enlacesDeEvento(eventId: string, aceptaPagos: boolean): readonly AdminNavLink[] {
   const enlaces: AdminNavLink[] = [
-    { path: ['/dashboard/events', eventId, 'agenda'], labelKey: 'admin.events.agenda.titulo' },
-    { path: ['/dashboard/events', eventId, 'diseno'], labelKey: 'admin.events.design.titulo' },
+    {
+      path: ['/dashboard/events', eventId, 'agenda'],
+      labelKey: 'admin.events.agenda.titulo',
+      requisito: 'events/:eventId/agenda',
+    },
+    {
+      path: ['/dashboard/events', eventId, 'diseno'],
+      labelKey: 'admin.events.design.titulo',
+      requisito: 'events/:eventId/diseno',
+    },
     {
       path: ['/dashboard/events', eventId, 'patrocinadores'],
       labelKey: 'admin.events.sponsors.titulo',
+      requisito: 'events/:eventId/patrocinadores',
     },
   ];
+  // «Entradas» siempre: los precios se preparan antes de pasar el evento a
+  // «de pago» — publicar un evento de pago exige tener ya algún tipo de
+  // entrada, así que ocultarla en modo gratuito dejaba sin salida a un
+  // evento ya publicado.
+  enlaces.push({
+    path: ['/dashboard/events', eventId, 'entradas'],
+    labelKey: 'admin.events.ticketTypes.titulo',
+    requisito: 'events/:eventId/entradas',
+  });
   if (aceptaPagos) {
-    enlaces.push(
-      {
-        path: ['/dashboard/events', eventId, 'entradas'],
-        labelKey: 'admin.events.ticketTypes.titulo',
-      },
-      {
-        path: ['/dashboard/events', eventId, 'descuentos'],
-        labelKey: 'admin.events.discountCodes.titulo',
-      },
-    );
+    enlaces.push({
+      path: ['/dashboard/events', eventId, 'descuentos'],
+      labelKey: 'admin.events.discountCodes.titulo',
+      requisito: 'events/:eventId/descuentos',
+    });
   }
   enlaces.push({
     path: ['/dashboard/events', eventId, 'ponentes'],
     labelKey: 'admin.events.speakers.rotulo',
+    requisito: 'events/:eventId/ponentes',
   });
   enlaces.push({
     path: ['/dashboard/events', eventId, 'politicas'],
     labelKey: 'admin.politicas.nav',
+    requisito: 'events/:eventId/politicas',
   });
   enlaces.push({
     path: ['/dashboard/events', eventId, 'inscripciones'],
     labelKey: 'admin.events.registrations.titulo',
+    requisito: 'events/:eventId/inscripciones',
   });
   enlaces.push({
     path: ['/dashboard/events', eventId, 'check-in'],
     labelKey: 'admin.events.checkIn.titulo',
+    requisito: 'events/:eventId/check-in',
   });
   if (aceptaPagos) {
     enlaces.push({
       path: ['/dashboard/events', eventId, 'payments'],
       labelKey: 'admin.events.payments.titulo',
+      requisito: 'events/:eventId/payments',
     });
   }
   enlaces.push({
     path: ['/dashboard/events', eventId, 'contabilidad'],
     labelKey: 'admin.events.accounting.titulo',
+    requisito: 'events/:eventId/contabilidad',
   });
   return enlaces;
 }
@@ -166,13 +211,13 @@ export function enlacesDeEvento(eventId: string, aceptaPagos: boolean): readonly
             }
           </ul>
         </nav>
-      } @else {
+      } @else if (enlacesDeOrganizacion().length > 0) {
         <h2 id="admin-nav-organizacion-titulo" class="grupo-titulo">
           {{ t('admin.nav.grupoOrganizacion') }}
         </h2>
         <nav [attr.aria-labelledby]="'admin-nav-organizacion-titulo'">
           <ul>
-            @for (enlace of ORGANIZATION_NAV_LINKS; track enlace.path.join('/')) {
+            @for (enlace of enlacesDeOrganizacion(); track enlace.path.join('/')) {
               <li>
                 <a
                   [routerLink]="enlace.path"
@@ -248,7 +293,14 @@ export class AdminNav {
   /** `true` cuando el panel pintado es el de la plataforma (`/admin`). */
   readonly plataforma = input<boolean>(false);
 
-  protected readonly ORGANIZATION_NAV_LINKS = ORGANIZATION_NAV_LINKS;
+  /** Solo los enlaces que la persona puede usar. Mientras sus permisos no han
+   * llegado no se pinta ninguno: un menú recortado que luego crece (o al revés)
+   * confunde más que un instante en blanco. */
+  protected readonly enlacesDeOrganizacion = computed(() => {
+    const permisos = this.auth.permisos();
+    if (permisos === null) return [];
+    return enlacesPermitidos(ORGANIZATION_NAV_LINKS, permisos, this.auth.roles() ?? []);
+  });
 
   /** `PLATFORM_NAV_LINKS` sin los enlaces `soloSuperadmin` para quien no lo
    * es — hoy el guard del panel ya exige superadmin para entrar aquí

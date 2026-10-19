@@ -29,6 +29,8 @@ patrón que ya usa el registro para no filtrar si un correo existe.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import uuid
 from collections import defaultdict
 from typing import Annotated
@@ -37,6 +39,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import set_organization_context
 from app.core.deps import SessionDep
 from app.core.ratelimit import PUBLICO_POR_IP, limit_per_ip
@@ -65,6 +68,7 @@ from app.modules.organizations.models import OrganizationMember
 from app.modules.organizations.schemas import SLUG_PATTERN
 from app.modules.payments import service as payments_service
 from app.modules.registrations import repository as registrations_repository
+from app.modules.roles.system_roles import SPEAKER_KEY
 from app.modules.sponsors import repository as sponsors_repository
 from app.modules.sponsors.models import Sponsor
 from app.modules.sponsors.schemas import (
@@ -88,6 +92,37 @@ router = APIRouter(prefix="/public", tags=["público"])
 def _display_name(persona: User) -> str:
     nombre = " ".join(parte for parte in (persona.first_name, persona.last_name) if parte)
     return nombre or "Persona"
+
+
+def _ref_publico(organization_id: uuid.UUID, user_id: uuid.UUID) -> str:
+    """Identificador opaco de una persona en las páginas públicas: estable para
+    poder deduplicar, pero sin exponer su UUID ni permitir enlazarla entre
+    organizaciones. Clave derivada de `jwt_secret`, que firma más cosas."""
+    clave = hmac.new(
+        get_settings().jwt_secret.encode(), b"eventarium:ref-publico:v1", hashlib.sha256
+    ).digest()
+    mensaje = f"{organization_id}:{user_id}".encode()
+    return hmac.new(clave, mensaje, hashlib.sha256).hexdigest()[:16]
+
+
+async def _ponentes_publicos(
+    session: AsyncSession, organization_id: uuid.UUID, event_id: uuid.UUID
+) -> list[PublicParticipant]:
+    personas = await speakers_repository.ponentes_publicos_del_evento(
+        session, organization_id, event_id
+    )
+    slugs = await speakers_repository.get_public_slugs_by_user_ids(
+        session, organization_id, {persona.id for persona in personas}
+    )
+    return [
+        PublicParticipant(
+            display_name=_display_name(persona),
+            role_key=SPEAKER_KEY,
+            public_slug=slugs.get(persona.id),
+            ref=_ref_publico(organization_id, persona.id),
+        )
+        for persona in personas
+    ]
 
 
 async def _cover_url(session: AsyncSession, evento: Event) -> str | None:
@@ -135,6 +170,8 @@ async def _sesiones_publicas(
         .where(
             EventSessionParticipant.organization_id == organization_id,
             EventSessionParticipant.session_id.in_(ids_sesion),
+            # Una cuenta dada de baja no se sigue anunciando (como en `speakers`).
+            User.is_active.is_(True),
         )
         .order_by(EventSessionParticipant.sort_order)
     )
@@ -152,6 +189,7 @@ async def _sesiones_publicas(
                 display_name=_display_name(persona),
                 role_key=participante.role_key,
                 public_slug=slugs.get(persona.id),
+                ref=_ref_publico(organization_id, persona.id),
             )
         )
 
@@ -329,6 +367,7 @@ async def get_public_event(
         longitude=float(evento.longitude) if evento.longitude is not None else None,
         theme=tema,
         sessions=sesiones,
+        speakers=await _ponentes_publicos(session, evento.organization_id, evento.id),
         venues=sedes,
         sponsor_tiers=niveles_con_patrocinadores,
     )
@@ -436,7 +475,10 @@ async def get_public_session(
     if sesion is None:
         raise NotFoundError("La sesión no existe.")
 
-    consulta = repository.session_participants_query(evento.organization_id, sesion.id)
+    # El panel usa la misma consulta sin filtrar; aquí, solo cuentas activas.
+    consulta = repository.session_participants_query(evento.organization_id, sesion.id).where(
+        User.is_active.is_(True)
+    )
     filas = (await session.execute(consulta)).all()
     user_ids = {persona.id for _, _, _, persona in filas}
     slugs = await speakers_repository.get_public_slugs_by_user_ids(
@@ -447,6 +489,7 @@ async def get_public_session(
             display_name=_display_name(persona),
             role_key=participante.role_key,
             public_slug=slugs.get(persona.id),
+            ref=_ref_publico(evento.organization_id, persona.id),
         )
         for participante, _, _, persona in filas
     ]
@@ -499,7 +542,8 @@ async def get_public_speaker(public_slug: str, session: SessionDep) -> PublicSpe
 
     miembro = await session.get(OrganizationMember, perfil.source_organization_member_id)
     persona = await session.get(User, perfil.user_id)
-    if miembro is None or persona is None:
+    # Una cuenta dada de baja deja de tener página pública, como en la ficha del evento.
+    if miembro is None or persona is None or not persona.is_active:
         raise NotFoundError("El ponente no existe.")
 
     enlaces = (

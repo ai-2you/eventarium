@@ -799,6 +799,60 @@
         }
       }
     },
+    "/api/v1/organizations/me/members/{organization_member_id}/profile": {
+      "patch": {
+        "tags": [
+          "organizaciones"
+        ],
+        "summary": "Editar la ficha de un rol de una persona",
+        "description": "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un ponente). Puede hacerlo su titular o quien tenga `members:write` y pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por otra persona entre medias da 409 en vez de pisarse.",
+        "operationId": "update_member_profile_api_v1_organizations_me_members__organization_member_id__profile_patch",
+        "parameters": [
+          {
+            "name": "organization_member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Member Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberRoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/me/members/{organization_member_id}": {
       "delete": {
         "tags": [
@@ -4142,7 +4196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EventResponse_"
+                  "$ref": "#/components/schemas/Page_EventListItem_"
                 }
               }
             }
@@ -4182,6 +4236,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/tags": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Sugerir etiquetas ya usadas",
+        "description": "Etiquetas de los eventos de la organización que contienen `q` (primero las que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta el autocompletado del campo de etiquetas.",
+        "operationId": "suggest_event_tags_api_v1_events_tags_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Suggest Event Tags Api V1 Events Tags Get"
                 }
               }
             }
@@ -13623,6 +13726,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -13632,7 +13761,7 @@
           "role_name"
         ],
         "title": "EligibleMembershipResponse",
-        "description": "Membresía propia cuyo rol declara al menos un campo publicable."
+        "description": "Membresía propia cuyo rol declara al menos un campo publicable, con su\nficha: es desde donde la persona (p. ej. un ponente) la completa."
       },
       "EmailSettingsIn": {
         "properties": {
@@ -14222,7 +14351,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -14425,6 +14555,359 @@
         ],
         "title": "EventInvitationCreate",
         "description": "Invitación de ponente desde el evento (fase 3 del plan de invitaciones).\n\nSin `role_id`, el rol es `speaker` — el flujo por defecto. Se puede\nindicar otro (p. ej. un moderador) si el organizador lo necesita."
+      },
+      "EventListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCategoryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "in_person",
+              "online",
+              "hybrid"
+            ],
+            "title": "Location Mode"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "location_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "online_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Url"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "registration_mode": {
+            "type": "string",
+            "enum": [
+              "free",
+              "approval",
+              "paid"
+            ],
+            "title": "Registration Mode"
+          },
+          "registration_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Opens At"
+          },
+          "email_verification_required": {
+            "type": "boolean",
+            "title": "Email Verification Required"
+          },
+          "payment_checkout_window_minutes": {
+            "type": "integer",
+            "title": "Payment Checkout Window Minutes"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "contingency_fund_percent": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Contingency Fund Percent"
+          },
+          "budget_approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Approved At"
+          },
+          "contingency_fund_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contingency Fund Cents"
+          },
+          "accounting_currency": {
+            "type": "string",
+            "title": "Accounting Currency"
+          },
+          "theme_template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Template Id"
+          },
+          "theme_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Overrides"
+          },
+          "price_from_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price From Cents"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_multiple": {
+            "type": "boolean",
+            "title": "Price Multiple",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "description",
+          "cover_url",
+          "status",
+          "visibility",
+          "timezone",
+          "starts_at",
+          "ends_at",
+          "location_mode",
+          "location_name",
+          "location_address",
+          "city",
+          "online_url",
+          "capacity",
+          "registration_mode",
+          "registration_opens_at",
+          "email_verification_required",
+          "payment_checkout_window_minutes",
+          "latitude",
+          "longitude",
+          "contingency_fund_percent",
+          "budget_approved_at",
+          "contingency_fund_cents",
+          "accounting_currency",
+          "theme_template_id",
+          "theme_overrides"
+        ],
+        "title": "EventListItem",
+        "description": "Evento en el listado del panel: lo de `EventResponse` más su precio, que\nel organizador quiere ver en la tabla sin abrir cada evento."
       },
       "EventMemberCreate": {
         "properties": {
@@ -15342,7 +15825,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -17313,6 +17797,33 @@
         "title": "MemberCreate",
         "description": "Alta de un miembro por correo electrónico."
       },
+      "MemberProfileUpdate": {
+        "properties": {
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data"
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_data"
+        ],
+        "title": "MemberProfileUpdate",
+        "description": "Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de\nlos campos actuales del rol), así se puede vaciar un campo opcional."
+      },
       "MemberResponse": {
         "properties": {
           "user_id": {
@@ -17387,6 +17898,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -18404,11 +18941,11 @@
         ],
         "title": "Page[AuditLogEntry]"
       },
-      "Page_EventResponse_": {
+      "Page_EventListItem_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/EventResponse"
+              "$ref": "#/components/schemas/EventListItem"
             },
             "type": "array",
             "title": "Items"
@@ -18433,7 +18970,7 @@
           "limit",
           "offset"
         ],
-        "title": "Page[EventResponse]"
+        "title": "Page[EventListItem]"
       },
       "Page_MediaResponse_": {
         "properties": {
@@ -20490,6 +21027,13 @@
             "type": "array",
             "title": "Sessions"
           },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicParticipant"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
           "venues": {
             "items": {
               "$ref": "#/components/schemas/PublicVenue"
@@ -20999,13 +21543,18 @@
               }
             ],
             "title": "Public Slug"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
           }
         },
         "type": "object",
         "required": [
           "display_name",
           "role_key",
-          "public_slug"
+          "public_slug",
+          "ref"
         ],
         "title": "PublicParticipant",
         "description": "Participante tal y como se muestra en las páginas públicas.\n\nNunca lleva el correo — a diferencia de `SessionParticipantResponse`, que es\npara el panel de administración. `public_slug` solo está presente si esa\npersona activó su perfil público; si no, es `None` y la página no enlaza a\nningún sitio."

@@ -22,6 +22,12 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
+
+# Markdown del editor del panel (o de la API/MCP). El tope protege la ficha
+# pública, que lo convierte y sanea en el navegador de cada visitante, y el
+# propio editor, que lo carga entero.
+LONGITUD_MAXIMA_DESCRIPCION = 20000
+DescripcionDeEvento = Annotated[str, Field(max_length=LONGITUD_MAXIMA_DESCRIPCION)]
 SessionType = Literal["talk", "break", "service", "other"]
 VideoPlatform = Literal["youtube", "vimeo", "twitch", "other"]
 
@@ -109,10 +115,10 @@ class EventCreate(BaseModel):
     slug: Annotated[str, Field(min_length=2, max_length=160, pattern=SLUG_PATTERN)]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # Id de una categoría **activa** del catálogo, o `None` (sin categoría).
     category_id: str | None = None
-    # Minúsculas, máx. 5, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
+    # Minúsculas, máx. 10, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
     tags: list[str] = Field(default_factory=list)
     status: EventStatusInput = "draft"
     visibility: EventVisibility = "public"
@@ -152,7 +158,7 @@ class EventUpdate(BaseModel):
 
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # `null` explícito **quita** la categoría; si el campo no viene, no cambia.
     category_id: str | None = None
     # Si no viene, no cambia; `[]` quita todas. `null` no es válido.
@@ -269,6 +275,18 @@ class EventResponse(BaseModel):
     theme_template_id: str | None
     # `None` significa sin personalización propia (usa la plantilla resuelta tal cual).
     theme_overrides: dict[str, Any] | None
+
+
+class EventListItem(EventResponse):
+    """Evento en el listado del panel: lo de `EventResponse` más su precio, que
+    el organizador quiere ver en la tabla sin abrir cada evento."""
+
+    # Entrada más barata entre los tipos activos, estén o no a la venta ahora
+    # (al organizador le importa el precio aunque la venta no haya abierto).
+    # `None` en un evento que no es de pago o que aún no tiene entradas.
+    price_from_cents: int | None = None
+    price_currency: str | None = None
+    price_multiple: bool = False
 
 
 class EventVenueCreate(BaseModel):
@@ -444,6 +462,9 @@ class PublicParticipant(BaseModel):
     display_name: str
     role_key: str
     public_slug: str | None
+    # Identificador opaco y estable de la persona en esta organización (nunca su
+    # UUID): deja a la página juntar ponentes de la agenda y del roster sin duplicar.
+    ref: str
 
 
 class PublicEventSummary(BaseModel):
@@ -576,6 +597,8 @@ class PublicEventDetail(BaseModel):
     # el catálogo estuviera vacío, que no es un estado posible hoy.
     theme: PublicTheme | None = None
     sessions: list[PublicEventSession]
+    # Ponentes enlazados al evento, tengan o no sesión en la agenda.
+    speakers: list[PublicParticipant] = Field(default_factory=list)
     # Ordenadas por `display_order`. El frontend decide, a partir de su
     # longitud, si activa la vista de "programa por sede" (2 sedes o más) —
     # decisión de tanda 3, aquí solo se exponen los datos.

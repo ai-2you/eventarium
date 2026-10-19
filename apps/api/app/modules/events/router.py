@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated, Any
 
@@ -15,11 +16,13 @@ from app.core.ratelimit import PEDIR_BIO_POR_IP, limit_per_ip
 from app.core.storage import build_object_key, get_storage, public_url_versionada, validate_upload
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
 from app.modules.events import repository, service, speakers_repository
+from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
 from app.modules.events.models import Event, EventMember, EventSession, EventVenue
 from app.modules.events.schemas import (
     EventCategoryOut,
     EventCreate,
     EventInvitationCreate,
+    EventListItem,
     EventMemberCreate,
     EventMemberResponse,
     EventResponse,
@@ -50,6 +53,7 @@ from app.modules.organizations.schemas import (
     MemberResponse,
     MemberRoleOut,
 )
+from app.modules.payments import repository as payments_repository
 from app.modules.roles.models import Role
 from app.modules.roles.system_roles import SPEAKER_KEY
 from app.modules.users.models import User
@@ -190,7 +194,7 @@ def _media_id_o_422(valor: str) -> uuid.UUID:
 @router.get(
     "",
     summary="Listar eventos",
-    response_model=Page[EventResponse],
+    response_model=Page[EventListItem],
     dependencies=[require_permission(Permission.EVENTS_READ)],
 )
 async def list_events(
@@ -198,14 +202,37 @@ async def list_events(
     session: DbDep,
     paginacion: Annotated[PageParams, Depends(page_params)],
     estado: Annotated[EventStatus | None, Query(alias="status")] = None,
-) -> Page[EventResponse]:
+) -> Page[EventListItem]:
     consulta = repository.events_query(usuario.organization_id, status=estado)
     total = len((await session.execute(consulta)).all())
-    filas = (
-        await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
-    ).scalars()
-    return Page[EventResponse](
-        items=[await _event_response(session, evento) for evento in filas],
+    eventos = list(
+        (
+            await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
+        ).scalars()
+    )
+    # Una sola consulta de tipos de entrada para toda la página (sin N+1).
+    precios: dict[uuid.UUID, list[tuple[int, str]]] = {}
+    for tipo in await payments_repository.get_ticket_types_for_events(
+        session,
+        usuario.organization_id,
+        [evento.id for evento in eventos if evento.registration_mode == "paid"],
+    ):
+        if tipo.is_active:
+            precios.setdefault(tipo.event_id, []).append((tipo.price_cents, tipo.currency))
+
+    async def _item(evento: Event) -> EventListItem:
+        base = await _event_response(session, evento)
+        del_evento = precios.get(evento.id, [])
+        mas_barato = min(del_evento, default=None)
+        return EventListItem(
+            **base.model_dump(),
+            price_from_cents=mas_barato[0] if mas_barato else None,
+            price_currency=mas_barato[1] if mas_barato else None,
+            price_multiple=len({precio for precio, _ in del_evento}) > 1,
+        )
+
+    return Page[EventListItem](
+        items=[await _item(evento) for evento in eventos],
         total=total,
         limit=paginacion.limit,
         offset=paginacion.offset,
@@ -226,6 +253,26 @@ async def create_event(
         session, organization_id=usuario.organization_id, datos=datos.model_dump()
     )
     return await _event_response(session, evento)
+
+
+@router.get(
+    "/tags",
+    summary="Sugerir etiquetas ya usadas",
+    description=(
+        "Etiquetas de los eventos de la organización que contienen `q` (primero las "
+        "que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta "
+        "el autocompletado del campo de etiquetas."
+    ),
+    response_model=list[str],
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def suggest_event_tags(
+    usuario: CurrentUserDep,
+    session: DbDep,
+    q: Annotated[str, Query(max_length=LONGITUD_MAX_ETIQUETA)] = "",
+) -> list[str]:
+    texto = re.sub(r"\s+", " ", q.strip().lower())
+    return await repository.sugerir_etiquetas(session, usuario.organization_id, texto)
 
 
 @router.get(

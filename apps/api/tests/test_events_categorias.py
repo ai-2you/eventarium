@@ -257,7 +257,7 @@ async def test_etiquetas_invalidas_dan_422(
         ["a"],
         ["x" * 31],
         ["#ia"],
-        ["uno", "dos", "tres", "cuatro", "cinco", "seis"],
+        ["uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez", "once"],
     ):
         respuesta = await cliente.patch(
             f"{EVENTS}/{evento['id']}", headers=cabeceras, json={"tags": etiquetas}

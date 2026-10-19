@@ -47,6 +47,8 @@ export type { ListMembersApiV1OrganizationsMeMembersGet$Params as ListMembersApi
 export { listMembersApiV1OrganizationsMeMembersGet as listMembersApiV1OrganizationsMeMembersGet } from './fn/organizaciones/list-members-api-v-1-organizations-me-members-get';
 export type { CreateMemberApiV1OrganizationsMeMembersPost$Params as CreateMemberApiV1OrganizationsMeMembersPost$Params } from './fn/organizaciones/create-member-api-v-1-organizations-me-members-post';
 export { createMemberApiV1OrganizationsMeMembersPost as createMemberApiV1OrganizationsMeMembersPost } from './fn/organizaciones/create-member-api-v-1-organizations-me-members-post';
+export type { UpdateMemberProfileApiV1OrganizationsMeMembersOrganizationMemberIdProfilePatch$Params as UpdateMemberProfileApiV1OrganizationsMeMembersOrganizationMemberIdProfilePatch$Params } from './fn/organizaciones/update-member-profile-api-v-1-organizations-me-members-organization-member-id-profile-patch';
+export { updateMemberProfileApiV1OrganizationsMeMembersOrganizationMemberIdProfilePatch as updateMemberProfileApiV1OrganizationsMeMembersOrganizationMemberIdProfilePatch } from './fn/organizaciones/update-member-profile-api-v-1-organizations-me-members-organization-member-id-profile-patch';
 export type { RemoveMemberRoleApiV1OrganizationsMeMembersOrganizationMemberIdDelete$Params as RemoveMemberRoleApiV1OrganizationsMeMembersOrganizationMemberIdDelete$Params } from './fn/organizaciones/remove-member-role-api-v-1-organizations-me-members-organization-member-id-delete';
 export { removeMemberRoleApiV1OrganizationsMeMembersOrganizationMemberIdDelete as removeMemberRoleApiV1OrganizationsMeMembersOrganizationMemberIdDelete } from './fn/organizaciones/remove-member-role-api-v-1-organizations-me-members-organization-member-id-delete';
 export type { ListInvitationsApiV1OrganizationsMeInvitationsGet$Params as ListInvitationsApiV1OrganizationsMeInvitationsGet$Params } from './fn/organizaciones/list-invitations-api-v-1-organizations-me-invitations-get';
@@ -265,6 +267,8 @@ export type { ListEventsApiV1EventsGet$Params as ListEventsApiV1EventsGet$Params
 export { listEventsApiV1EventsGet as listEventsApiV1EventsGet } from './fn/eventos/list-events-api-v-1-events-get';
 export type { CreateEventApiV1EventsPost$Params as CreateEventApiV1EventsPost$Params } from './fn/eventos/create-event-api-v-1-events-post';
 export { createEventApiV1EventsPost as createEventApiV1EventsPost } from './fn/eventos/create-event-api-v-1-events-post';
+export type { SuggestEventTagsApiV1EventsTagsGet$Params as SuggestEventTagsApiV1EventsTagsGet$Params } from './fn/eventos/suggest-event-tags-api-v-1-events-tags-get';
+export { suggestEventTagsApiV1EventsTagsGet as suggestEventTagsApiV1EventsTagsGet } from './fn/eventos/suggest-event-tags-api-v-1-events-tags-get';
 export type { GetEventApiV1EventsEventIdGet$Params as GetEventApiV1EventsEventIdGet$Params } from './fn/eventos/get-event-api-v-1-events-event-id-get';
 export { getEventApiV1EventsEventIdGet as getEventApiV1EventsEventIdGet } from './fn/eventos/get-event-api-v-1-events-event-id-get';
 export type { DeleteEventApiV1EventsEventIdDelete$Params as DeleteEventApiV1EventsEventIdDelete$Params } from './fn/eventos/delete-event-api-v-1-events-event-id-delete';

@@ -1,7 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { esperarSinViolacionesDeAccesibilidad } from '../../../testing/axe';
 import es from '../../../../public/assets/i18n/es-ES.json';
@@ -67,13 +67,14 @@ describe('DatetimePicker', () => {
 
   afterEach(() => {
     document.documentElement.removeAttribute('data-theme');
+    vi.useRealTimers();
   });
 
   beforeEach(async () => {
     await montar({ fieldId: 'evento-inicio' });
   });
 
-  it('sin valor: la etiqueta queda dentro del campo de fecha y la caja de hora vacía', () => {
+  it('sin valor: rótulo enlazado al botón de fecha y la caja de hora vacía', () => {
     const etiqueta = fixture.nativeElement.querySelector('label') as HTMLLabelElement;
     expect(etiqueta.getAttribute('for')).toBe('evento-inicio');
     expect(botonFecha.textContent?.trim()).toBe('');
@@ -87,12 +88,20 @@ describe('DatetimePicker', () => {
     expect(nativo.value).toBe('2026-10-01T09:30');
     expect(botonFecha.textContent).toContain('oct');
     expect(cajaHora.value).toBe('09:30');
-    // Con valor, la etiqueta flota (patrón de Input).
-    const campo = fixture.nativeElement.querySelector('.campo') as HTMLElement;
-    expect(campo.className).toContain('flotando');
+    // Cada mitad tiene su rótulo fijo, enlazado a su control.
+    const rotulos = Array.from(
+      fixture.nativeElement.querySelectorAll('.dt__rotulo'),
+    ) as HTMLLabelElement[];
+    expect(rotulos.map((r) => [r.htmlFor, r.textContent?.trim()])).toEqual([
+      ['evento-inicio', 'Fecha y hora de inicio'],
+      ['evento-inicio-hora', 'Hora'],
+    ]);
   });
 
-  it('elegir un día fija la fecha (hora por defecto 09:00) y cierra el calendario', async () => {
+  it('elegir un día sin hora no la inventa: queda pendiente hasta escribirla', async () => {
+    // Fecha fija: el calendario abre en el mes en curso y el test busca octubre de 2026.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 10));
     const calendario = await abrir('fecha');
 
     // El panel abre en el mes en curso: se navega hasta octubre de 2026 con
@@ -109,10 +118,20 @@ describe('DatetimePicker', () => {
     dia.click();
     await fixture.whenStable();
 
-    expect(fixture.componentInstance.value()).toBe('2026-10-01T09:00');
-    expect(nativo.value).toBe('2026-10-01T09:00');
+    expect(fixture.componentInstance.value()).toBe('');
+    expect(fixture.componentInstance.horaPendiente()).toBe(true);
+    expect(botonFecha.textContent).toContain('oct');
+    // Sin error de fuera, el propio componente pide la hora.
+    expect(fixture.nativeElement.textContent).toContain('Indica la hora.');
     expect(panel('fecha')).toBeNull();
     expect(document.activeElement).toBe(botonFecha);
+
+    cajaHora.value = '1030';
+    cajaHora.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.value()).toBe('2026-10-01T10:30');
+    expect(fixture.componentInstance.horaPendiente()).toBe(false);
   });
 
   it('escribir «935» en la caja fija la 09:35 de hoy sin abrir nada', async () => {
@@ -203,4 +222,38 @@ describe('DatetimePicker', () => {
     await abrir('hora');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   }, 20_000);
+
+  it('en modo solo fecha no hay caja de hora y el valor es YYYY-MM-DD', async () => {
+    await montar({ fieldId: 'evento-inicio', soloFecha: true, value: '2026-10-01' });
+
+    expect(fixture.nativeElement.querySelector('.dt__hora')).toBeNull();
+    expect(nativo.type).toBe('date');
+    expect(botonFecha.textContent).toContain('oct');
+
+    const calendario = await abrir('fecha');
+    const dia = Array.from(calendario.querySelectorAll('.dt__dia')).find(
+      (celda) => celda.getAttribute('aria-label')?.includes('15 de octubre') ?? false,
+    ) as HTMLButtonElement;
+    dia.click();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.value()).toBe('2026-10-15');
+    expect(fixture.componentInstance.horaPendiente()).toBe(false);
+  });
+
+  it('una fecha opcional se puede borrar; una obligatoria no ofrece el botón', async () => {
+    await montar({ fieldId: 'evento-inicio', value: '2026-10-01T09:30' });
+    const borrar = fixture.nativeElement.querySelector('.dt__borrar') as HTMLButtonElement;
+    expect(borrar.getAttribute('aria-label')).toBe('Borrar Fecha y hora de inicio');
+
+    borrar.click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.value()).toBe('');
+    expect(fixture.nativeElement.querySelector('.dt__borrar')).toBeNull();
+
+    fixture.componentRef.setInput('required', true);
+    fixture.componentInstance.value.set('2026-10-01T09:30');
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.dt__borrar')).toBeNull();
+  });
 });

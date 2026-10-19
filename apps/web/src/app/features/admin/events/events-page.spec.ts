@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { EventsPage } from './events-page';
+import { elegirEnSelect } from '../../../../testing/select';
 
 function pagina() {
   return {
@@ -19,6 +20,8 @@ function pagina() {
         title: 'IA Week in Cascais 2026',
         status: 'draft',
         starts_at: '2026-10-01T09:00:00Z',
+        registration_mode: 'free',
+        capacity: null,
       },
     ],
   };
@@ -64,6 +67,45 @@ describe('EventsPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('muestra el modo de inscripción, el precio y el aforo de cada evento', async () => {
+    const fixture = TestBed.createComponent(EventsPage);
+    await avanzar(fixture);
+    const base = pagina().items[0]!;
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/events')
+      .flush({
+        items: [
+          { ...base, id: 'libre' },
+          { ...base, id: 'aprob', registration_mode: 'approval', capacity: 80 },
+          {
+            ...base,
+            id: 'pago',
+            registration_mode: 'paid',
+            capacity: 120,
+            price_from_cents: 1250,
+            price_currency: 'eur',
+            price_multiple: true,
+          },
+          { ...base, id: 'sin', registration_mode: 'paid', capacity: 10, price_from_cents: null },
+        ],
+      });
+    await avanzar(fixture);
+
+    const filas = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+    ).map((fila) =>
+      Array.from(fila.querySelectorAll('td'))
+        .slice(2, 5)
+        .map((celda) => celda.textContent?.replace(/\s+/g, ' ').trim()),
+    );
+    expect(filas).toEqual([
+      ['Acceso libre', 'Gratis', 'Sin límite'],
+      ['Con aprobación', 'Gratis', '80'],
+      ['De pago', 'Desde 12,50 €', '120'],
+      ['De pago', 'Sin entradas', '10'],
+    ]);
+  });
+
   it('la tabla usa app-data-table con caption, y el estado va en un chip con texto', async () => {
     const fixture = TestBed.createComponent(EventsPage);
     await avanzar(fixture);
@@ -74,7 +116,7 @@ describe('EventsPage', () => {
     expect(contenedor).not.toBeNull();
     const tabla = contenedor!.querySelector('table') as HTMLTableElement;
     expect(tabla.querySelector('caption')?.textContent?.trim()).toBeTruthy();
-    expect(tabla.querySelectorAll('th[scope="col"]').length).toBe(3);
+    expect(tabla.querySelectorAll('th[scope="col"]').length).toBe(6);
 
     const ranura = contenedor!.querySelector('.ranura-scroll') as HTMLElement;
     expect(ranura.getAttribute('tabindex')).toBe('0');
@@ -93,9 +135,7 @@ describe('EventsPage', () => {
     http.expectOne((peticion) => peticion.url === '/api/v1/events').flush(pagina());
     await avanzar(fixture);
 
-    const select = fixture.nativeElement.querySelector('#filtro-estado') as HTMLSelectElement;
-    select.value = 'published';
-    select.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'filtro-estado', 'published');
     await avanzar(fixture);
 
     const peticion = http.expectOne((peticion) => peticion.url === '/api/v1/events');

@@ -8,6 +8,8 @@ import es from '../../../../public/assets/i18n/es-ES.json';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../testing/axe';
 import { EventScope } from './event-scope';
 import { EventShell } from './event-shell';
+import { AuthService } from '../../core/auth/auth.service';
+import { authConPermisos } from '../../../testing/auth';
 
 function montar(opciones: {
   readonly nombreEvento?: string | null;
@@ -23,6 +25,7 @@ function montar(opciones: {
     providers: [
       provideZonelessChangeDetection(),
       provideRouter([]),
+      { provide: AuthService, useValue: authConPermisos() },
       {
         provide: EventScope,
         useValue: {
@@ -64,7 +67,7 @@ describe('EventShell', () => {
     expect(volver?.getAttribute('aria-label')).toBeTruthy();
   });
 
-  it('sin pagos: no ofrece las pestañas de entradas, descuentos ni pagos', async () => {
+  it('sin pagos: ofrece entradas, pero no descuentos ni pagos', async () => {
     const fixture = montar({ registrationMode: 'free' });
     await fixture.whenStable();
     const raiz = fixture.nativeElement as HTMLElement;
@@ -76,7 +79,8 @@ describe('EventShell', () => {
     expect(enlaces).toContain('/dashboard/events/e1/editar');
     expect(enlaces).toContain('/dashboard/events/e1/agenda');
     expect(enlaces).toContain('/dashboard/events/e1/contabilidad');
-    expect(enlaces).not.toContain('/dashboard/events/e1/entradas');
+    expect(enlaces).toContain('/dashboard/events/e1/entradas');
+    expect(enlaces).not.toContain('/dashboard/events/e1/descuentos');
     expect(enlaces).not.toContain('/dashboard/events/e1/payments');
   });
 

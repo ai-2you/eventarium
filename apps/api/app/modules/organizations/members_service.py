@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.core.audit import registrar_auditoria
+from app.core.database import maintenance_session
 from app.core.permissions import Permission
 from app.modules.organizations.models import OrganizationMember
-from app.modules.organizations.repository import user_role_keys
+from app.modules.organizations.repository import get_member, user_role_keys
 from app.modules.roles.authorization import (
     ensure_can_grant,
     ensure_can_manage_role,
@@ -19,7 +23,7 @@ from app.modules.roles.authorization import (
 from app.modules.roles.models import Role, RolePermission
 from app.modules.users.models import User
 from app.shared.dynamic_fields import validate_profile_data
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, NotFoundError, PermissionDeniedError
 
 
 async def _role_permissions(session: AsyncSession, role: Role) -> set[Permission]:
@@ -238,3 +242,82 @@ async def remove_member_role(
 
     await session.delete(miembro)
     await session.flush()
+
+
+async def update_member_profile(
+    session: AsyncSession,
+    *,
+    organization_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    actor_permissions: set[Permission],
+    organization_member_id: uuid.UUID,
+    profile_data: dict[str, Any],
+    expected_updated_at: datetime | None,
+) -> OrganizationMember:
+    """Sustituye los datos de perfil de **una** membresía (la ficha de ese rol).
+
+    Puede hacerlo su titular (un ponente completa su biografía) o quien tenga
+    `members:write` y, además, pudiera conceder ese rol: las mismas reglas
+    anti-escalada que quitarlo (`remove_member_role`), así que nadie reescribe
+    la ficha del propietario si no lo es.
+
+    Se valida contra los campos **actuales** del rol: una clave que el rol ya
+    no define se descarta al guardar en vez de bloquear la ficha para siempre.
+    El titular tiene que cumplir los obligatorios; el organizador puede
+    completarla por partes. `expected_updated_at` evita pisar sin aviso lo que
+    otra persona guardó entre medias.
+    """
+    # `FOR UPDATE`: dos guardados a la vez con la misma versión no pueden pasar
+    # los dos la comprobación de `expected_updated_at`; el segundo espera y da 409.
+    miembro = await get_member(session, organization_id, organization_member_id, for_update=True)
+    if miembro is None:
+        raise NotFoundError("Esa membresía no existe.")
+    rol = await session.scalar(
+        select(Role).options(selectinload(Role.profile_fields)).where(Role.id == miembro.role_id)
+    )
+    if rol is None:  # pragma: no cover - garantizado por la FK
+        raise NotFoundError("El rol de esa membresía no existe.")
+
+    es_titular = miembro.user_id == actor_id
+    if not es_titular:
+        if Permission.MEMBERS_WRITE not in actor_permissions:
+            raise PermissionDeniedError("No puedes editar la ficha de otra persona.")
+        claves_actor = await user_role_keys(session, organization_id, actor_id)
+        ensure_can_manage_role(
+            actor_role_keys=claves_actor, role_key=rol.key, es_rol_de_sistema=rol.is_system
+        )
+        ensure_can_grant(actor_permissions, await _role_permissions(session, rol))
+
+    if expected_updated_at is not None and miembro.updated_at != expected_updated_at:
+        raise ConflictError(
+            "La ficha ha cambiado mientras la editabas. Recárgala y vuelve a guardar."
+        )
+
+    datos = validate_profile_data(
+        list(rol.profile_fields), profile_data, enforce_required=es_titular
+    )
+    anteriores = dict(miembro.profile_data or {})
+    miembro.profile_data = datos
+    await session.flush()
+    await session.refresh(miembro)
+
+    if not es_titular:
+        # Una ficha pública reescrita por otra persona queda registrada (solo
+        # qué campos cambiaron, nunca su contenido).
+        cambiados = sorted(
+            clave
+            for clave in set(anteriores) | set(datos)
+            if anteriores.get(clave) != datos.get(clave)
+        )
+        async with maintenance_session() as mantenimiento:
+            await registrar_auditoria(
+                mantenimiento,
+                actor_user_id=actor_id,
+                organization_id=organization_id,
+                action="member.profile_updated",
+                entity_type="organization_member",
+                entity_id=str(miembro.id),
+                detail={"campos": cambiados, "rol": rol.key},
+                subject_user_id=miembro.user_id,
+            )
+    return miembro

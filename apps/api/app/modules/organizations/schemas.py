@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.security import password_meets_complexity
+from app.modules.roles.schemas import ProfileFieldResponse
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
@@ -171,6 +172,20 @@ class MemberRoleOut(BaseModel):
     role_id: str
     role_key: str
     role_name: str
+    # La ficha de **este** rol (cada membresía tiene la suya) y los campos que
+    # pide, para editarla sin mezclarla con la de otro rol de la misma persona.
+    profile_fields: list[ProfileFieldResponse] = []
+    profile_data: dict[str, Any] = {}
+    # Para no pisar sin aviso lo que otra persona guardó entre medias.
+    updated_at: datetime | None = None
+
+
+class MemberProfileUpdate(BaseModel):
+    """Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de
+    los campos actuales del rol), así se puede vaciar un campo opcional."""
+
+    profile_data: dict[str, Any]
+    expected_updated_at: datetime | None = None
 
 
 class MemberResponse(BaseModel):

@@ -31,6 +31,82 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
+    version: '0.27.10',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Modo, precio y aforo en el listado de eventos',
+            descripcion:
+              'La tabla de eventos del panel muestra si la inscripción es de acceso libre, con aprobación o de pago, cuánto cuesta (o «Desde» si hay varios precios) y el aforo.',
+          },
+          {
+            titulo: 'Aviso al organizador por cada inscripción',
+            descripcion:
+              'Quien gestiona las inscripciones recibe un correo con cada inscripción nueva (confirmada, en lista de espera, pendiente de aprobación o pagada), con enlace a su ficha en el panel. Si nadie del equipo puede recibirlo, va al correo de contacto de la organización.',
+          },
+          {
+            titulo: 'Correo de «pendiente de aprobación» al participante',
+            descripcion:
+              'En los eventos con aprobación, quien se inscribe recibe un correo que le confirma que su solicitud está pendiente, y otro cuando se acepta o se rechaza.',
+          },
+          {
+            titulo: 'Ficha de ponente editable',
+            descripcion:
+              'El ponente completa su biografía y el resto de su ficha desde «Mi cuenta», adonde lleva el correo que se la pide. El organizador también puede completarla desde Miembros.',
+          },
+          {
+            titulo: 'Ponentes enlazados en la ficha pública del evento',
+            descripcion:
+              'Enlazar un ponente al evento basta para que salga en la sección de ponentes, aunque aún no tenga sesión en la agenda. Sin perfil público sale con su nombre y sin enlace.',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Formulario del evento completo',
+            descripcion:
+              'Se pueden poner el resumen, la descripción (con editor de texto enriquecido), el modo de inscripción con sus precios y el aforo. El identificador se genera desde el título, las etiquetas se escriben como píldoras con sugerencias (hasta 10) y la fecha y la hora se piden por separado.',
+          },
+          {
+            titulo: 'Desplegables y avisos modernos en toda la aplicación',
+            descripcion:
+              'Fuera los desplegables nativos y las ventanas del navegador: todo usa los desplegables y los diálogos de la propia aplicación.',
+          },
+          {
+            titulo: 'El panel solo muestra lo que cada rol puede usar',
+            descripcion:
+              'El menú y las pantallas del panel se ajustan a los permisos de cada persona: un ponente solo ve su cuenta y su ficha.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Sin aviso doble al pagar desde la lista de espera',
+            descripcion:
+              'Quien paga su entrada tras salir de la lista de espera o tras ser aprobado ya no genera un segundo aviso al organizador.',
+          },
+          {
+            titulo: 'Las cuentas dadas de baja dejan de anunciarse',
+            descripcion:
+              'Un ponente con la cuenta dada de baja ya no sale en la ficha del evento, ni en la agenda, ni conserva su perfil público.',
+          },
+          {
+            titulo: 'Enlaces internos en los textos legales',
+            descripcion:
+              'Los textos legales y las políticas pueden enlazar a otras páginas del sitio (por ejemplo «/legal/cookies») o a un apartado del propio texto.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.27.0',
     fecha: '2026-10-02',
     secciones: [

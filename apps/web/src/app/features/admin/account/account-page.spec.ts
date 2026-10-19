@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -46,7 +48,12 @@ describe('AccountPage', () => {
           translocoConfig: { availableLangs: ['es-ES'], defaultLang: 'es-ES' },
         }),
       ],
-      providers: [provideZonelessChangeDetection(), { provide: AuthService, useValue: auth }],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: auth },
+      ],
     }).compileComponents();
   }
 
@@ -179,6 +186,41 @@ describe('AccountPage', () => {
 
     expect(auth.updatePublicProfile).toHaveBeenCalledWith('mi-slug', 'm1');
     expect(fixture.nativeElement.textContent).toContain('Perfil público actualizado');
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('el ponente ve su ficha, rotulada con su rol y con lo ya guardado', async () => {
+    configurar(
+      authFalso({
+        getPublicProfile: vi.fn().mockResolvedValue({
+          profile: { active: false, public_slug: null, source_organization_member_id: null },
+          eligible_memberships: [
+            {
+              organization_member_id: 'm1',
+              role_key: 'speaker',
+              role_name: 'Ponente',
+              profile_fields: [
+                {
+                  key: 'bio',
+                  label: 'Biografía',
+                  field_type: 'textarea',
+                  options: null,
+                  is_required: true,
+                },
+              ],
+              profile_data: { bio: 'Investigadora.' },
+              updated_at: '2026-10-19T10:00:00Z',
+            },
+          ],
+        }),
+      }),
+    );
+    const fixture = TestBed.createComponent(AccountPage);
+    await fixture.whenStable();
+
+    const ficha = fixture.nativeElement.querySelector('#ficha') as HTMLElement;
+    expect(ficha.textContent).toContain('Mi ficha de Ponente');
+    expect((ficha.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Investigadora.');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 });

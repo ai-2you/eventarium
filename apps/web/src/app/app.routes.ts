@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { guardDe } from './core/auth/permisos-del-panel';
 import { authGuard } from './core/auth/auth.guard';
 import { guestGuard } from './core/auth/guest.guard';
 import { personalPlataformaGuard } from './core/auth/personal-plataforma.guard';
@@ -186,21 +187,25 @@ export const routes: Routes = [
     children: [
       {
         path: '',
+        canActivate: [guardDe('')],
         loadComponent: () =>
           import('./features/admin/dashboard/dashboard-page').then((m) => m.DashboardPage),
       },
       {
         path: 'organization',
+        canActivate: [guardDe('organization')],
         loadComponent: () =>
           import('./features/admin/organization/organization-page').then((m) => m.OrganizationPage),
       },
       {
         path: 'branding',
+        canActivate: [guardDe('branding')],
         loadComponent: () =>
           import('./features/admin/branding/branding-page').then((m) => m.BrandingPage),
       },
       {
         path: 'politicas',
+        canActivate: [guardDe('politicas')],
         loadComponent: () =>
           import('./features/admin/policies/organization-policies-page').then(
             (m) => m.OrganizationPoliciesPage,
@@ -208,29 +213,35 @@ export const routes: Routes = [
       },
       {
         path: 'roles',
+        canActivate: [guardDe('roles')],
         loadComponent: () => import('./features/admin/roles/roles-page').then((m) => m.RolesPage),
       },
       {
         path: 'roles/:id',
+        canActivate: [guardDe('roles/:id')],
         loadComponent: () => import('./features/admin/roles/role-form').then((m) => m.RoleForm),
       },
       {
         path: 'members',
+        canActivate: [guardDe('members')],
         loadComponent: () =>
           import('./features/admin/members/members-page').then((m) => m.MembersPage),
       },
       {
         path: 'members/nuevo',
+        canActivate: [guardDe('members/nuevo')],
         loadComponent: () =>
           import('./features/admin/members/member-form').then((m) => m.MemberForm),
       },
       {
         path: 'events',
+        canActivate: [guardDe('events')],
         loadComponent: () =>
           import('./features/admin/events/events-page').then((m) => m.EventsPage),
       },
       {
         path: 'events/nuevo',
+        canActivate: [guardDe('events/nuevo')],
         loadComponent: () => import('./features/admin/events/event-form').then((m) => m.EventForm),
       },
       {
@@ -243,6 +254,7 @@ export const routes: Routes = [
         // que ese único parámetro del padre llegue a cada hijo sin que cada ruta
         // tenga que repetirlo.
         path: 'events/:eventId',
+        canActivate: [guardDe('events/:eventId')],
         loadComponent: () => import('./layouts/admin/event-shell').then((m) => m.EventShell),
         children: [
           {
@@ -254,11 +266,13 @@ export const routes: Routes = [
             // El formulario vive en una ruta hermana, no en la raíz: a quien entra a
             // un evento le interesa cómo va (el escritorio), no los campos.
             path: 'editar',
+            canActivate: [guardDe('events/:eventId/editar')],
             loadComponent: () =>
               import('./features/admin/events/event-form').then((m) => m.EventForm),
           },
           {
             path: 'registrations/:registrationId',
+            canActivate: [guardDe('events/:eventId/registrations/:registrationId')],
             loadComponent: () =>
               import('./features/admin/events/registration-detail-page').then(
                 (m) => m.RegistrationDetailPage,
@@ -266,36 +280,43 @@ export const routes: Routes = [
           },
           {
             path: 'check-in',
+            canActivate: [guardDe('events/:eventId/check-in')],
             loadComponent: () =>
               import('./features/admin/events/event-check-in').then((m) => m.EventCheckIn),
           },
           {
             path: 'payments',
+            canActivate: [guardDe('events/:eventId/payments')],
             loadComponent: () =>
               import('./features/admin/events/event-payments').then((m) => m.EventPayments),
           },
           {
             path: 'contabilidad',
+            canActivate: [guardDe('events/:eventId/contabilidad')],
             loadComponent: () =>
               import('./features/admin/events/event-accounting').then((m) => m.EventAccounting),
           },
           {
             path: 'agenda',
+            canActivate: [guardDe('events/:eventId/agenda')],
             loadComponent: () =>
               import('./features/admin/events/event-agenda').then((m) => m.EventAgenda),
           },
           {
             path: 'diseno',
+            canActivate: [guardDe('events/:eventId/diseno')],
             loadComponent: () =>
               import('./features/admin/events/event-design').then((m) => m.EventDesign),
           },
           {
             path: 'entradas',
+            canActivate: [guardDe('events/:eventId/entradas')],
             loadComponent: () =>
               import('./features/admin/events/event-ticket-types').then((m) => m.EventTicketTypes),
           },
           {
             path: 'descuentos',
+            canActivate: [guardDe('events/:eventId/descuentos')],
             loadComponent: () =>
               import('./features/admin/events/event-discount-codes').then(
                 (m) => m.EventDiscountCodes,
@@ -303,16 +324,19 @@ export const routes: Routes = [
           },
           {
             path: 'patrocinadores',
+            canActivate: [guardDe('events/:eventId/patrocinadores')],
             loadComponent: () =>
               import('./features/admin/events/event-sponsors').then((m) => m.EventSponsors),
           },
           {
             path: 'ponentes',
+            canActivate: [guardDe('events/:eventId/ponentes')],
             loadComponent: () =>
               import('./features/admin/events/event-speakers').then((m) => m.EventSpeakers),
           },
           {
             path: 'politicas',
+            canActivate: [guardDe('events/:eventId/politicas')],
             loadComponent: () =>
               import('./features/admin/policies/event-policies-page').then(
                 (m) => m.EventPoliciesPage,
@@ -320,6 +344,7 @@ export const routes: Routes = [
           },
           {
             path: 'inscripciones',
+            canActivate: [guardDe('events/:eventId/inscripciones')],
             loadComponent: () =>
               import('./features/admin/events/event-registrations').then(
                 (m) => m.EventRegistrations,
@@ -329,31 +354,36 @@ export const routes: Routes = [
       },
       {
         path: 'sponsor-tiers',
+        canActivate: [guardDe('sponsor-tiers')],
         loadComponent: () =>
           import('./features/admin/sponsors/sponsor-tiers-page').then((m) => m.SponsorTiersPage),
       },
       {
         path: 'stripe',
+        canActivate: [guardDe('stripe')],
         loadComponent: () =>
           import('./features/admin/organization/stripe-connection').then((m) => m.StripeConnection),
       },
       {
-        // Configuración de IA de la organización: sin guard propio a
-        // propósito. Quien no sea propietario recibe el 403 del backend y ve
-        // el aviso de solo lectura — una sola fuente de verdad de permisos.
+        // Configuración de IA: solo el propietario (`OrgOwnerDep`). Antes se
+        // dejaba entrar a cualquiera para que viera el aviso de solo lectura;
+        // el dueño decidió (19-oct) cerrar en el panel toda pantalla sin
+        // permiso, con la misma tabla que el menú (`REQUISITOS_DEL_PANEL`).
         path: 'ia',
+        canActivate: [guardDe('ia')],
         loadComponent: () =>
           import('./features/admin/organization/ai-settings').then((m) => m.OrganizationAiSettings),
       },
       {
         path: 'account',
+        canActivate: [guardDe('account')],
         loadComponent: () =>
           import('./features/admin/account/account-page').then((m) => m.AccountPage),
       },
       {
-        // Asistentes por MCP: sin guard propio, como `ia`. Sin `mcp:connect`
-        // la API responde 403 y la página explica cómo pedirlo.
+        // Asistentes por MCP: con `mcp:connect`, el mismo criterio que `ia`.
         path: 'mcp',
+        canActivate: [guardDe('mcp')],
         loadComponent: () =>
           import('./features/admin/mcp/mcp-connections-page').then((m) => m.McpConnectionsPage),
       },

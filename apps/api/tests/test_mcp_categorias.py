@@ -98,7 +98,11 @@ async def test_rechaza_categoria_inactiva_inexistente_y_etiquetas_invalidas(
                 cliente_mcp, clave, "editar_evento", event_id=evento["id"], categoria=categoria
             )
         )["isError"] is True
-    for etiquetas in (["#ia"], ["a"], ["uno", "dos", "tres", "cuatro", "cinco", "seis"]):
+    for etiquetas in (
+        ["#ia"],
+        ["a"],
+        ["uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez", "once"],
+    ):
         assert (
             await _herramienta(
                 cliente_mcp, clave, "editar_evento", event_id=evento["id"], etiquetas=etiquetas

@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
+  computed,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -11,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from './select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api/api.service';
@@ -60,7 +62,7 @@ import { MediaFolder, MediaItem, MediaKind, baseDeMedia } from './media-types';
 @Component({
   selector: 'app-media-edit-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslocoDirective, Button, Dialog, Input, MediaCropEditor],
+  imports: [DatePipe, TranslocoDirective, Button, Dialog, Input, MediaCropEditor, Select],
   template: `
     <ng-container *transloco="let t">
       <app-dialog #dialogo tamano="ancho">
@@ -93,19 +95,13 @@ import { MediaFolder, MediaItem, MediaKind, baseDeMedia } from './media-types';
                 (valueChange)="alt.set($event)"
               />
               @if (carpetas().length > 0) {
-                <label class="carpeta-campo">
-                  {{ t('ui.media.carpetaEtiqueta') }}
-                  <select [value]="carpetaId() ?? ''" (change)="alCambiarCarpeta($event)">
-                    <option value="" [selected]="carpetaId() === null">
-                      {{ t('ui.media.todasLasCarpetas') }}
-                    </option>
-                    @for (carpeta of carpetas(); track carpeta.id) {
-                      <option [value]="carpeta.id" [selected]="carpeta.id === carpetaId()">
-                        {{ carpeta.name }}
-                      </option>
-                    }
-                  </select>
-                </label>
+                <app-select
+                  class="carpeta-campo"
+                  [label]="t('ui.media.carpetaEtiqueta')"
+                  [options]="opcionesDeCarpeta()"
+                  [value]="carpetaId() ?? ''"
+                  (valueChange)="carpetaId.set($event || null)"
+                />
               }
               <app-button
                 type="button"
@@ -195,18 +191,7 @@ import { MediaFolder, MediaItem, MediaKind, baseDeMedia } from './media-types';
       align-content: start;
     }
     .carpeta-campo {
-      display: grid;
-      gap: var(--space-xs);
-      font-size: var(--fs-sm);
-      color: var(--muted);
-    }
-    .carpeta-campo select {
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      font: inherit;
-      background: var(--surface);
-      color: var(--fg);
+      display: block;
     }
     .datos-imagen {
       display: grid;
@@ -287,9 +272,10 @@ export class MediaEditDialog {
     this.dialogo().abrir();
   }
 
-  protected alCambiarCarpeta(evento: Event): void {
-    this.carpetaId.set((evento.target as HTMLSelectElement).value || null);
-  }
+  protected readonly opcionesDeCarpeta = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('ui.media.todasLasCarpetas') },
+    ...this.carpetas().map((carpeta) => ({ value: carpeta.id, label: carpeta.name })),
+  ]);
 
   /** Solo lectura, sin llamada al backend: formatea el tamaño en bytes que
    * ya viene en `MediaItem.size` (mismo criterio que la referencia del

@@ -99,10 +99,10 @@ describe('EventAgenda', () => {
     const titulo = fixture.nativeElement.querySelector('#sesion-titulo') as HTMLInputElement;
     titulo.value = 'Nueva sesión';
     titulo.dispatchEvent(new Event('input'));
-    const inicio = fixture.nativeElement.querySelector('#sesion-inicio') as HTMLInputElement;
+    const inicio = fixture.nativeElement.querySelector('#sesion-inicio-nativo') as HTMLInputElement;
     inicio.value = '2026-10-01T11:00';
     inicio.dispatchEvent(new Event('input'));
-    const fin = fixture.nativeElement.querySelector('#sesion-fin') as HTMLInputElement;
+    const fin = fixture.nativeElement.querySelector('#sesion-fin-nativo') as HTMLInputElement;
     fin.value = '2026-10-01T12:00';
     fin.dispatchEvent(new Event('input'));
     await avanzar(fixture);

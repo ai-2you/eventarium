@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -9,8 +10,12 @@ import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { Card } from '../../../shared/ui/card';
-import { DynamicField } from '../../../shared/ui/dynamic-field';
-import { ProfileField, validateDynamicFieldValue } from '../../../shared/ui/dynamic-field.model';
+import { ProfileField, validateDynamicFields } from '../../../shared/ui/dynamic-field.model';
+import {
+  DynamicFieldsList,
+  type ErroresDePerfil,
+  type ValoresDePerfil,
+} from '../../../shared/ui/dynamic-fields-list';
 import { ErrorSummary, ResumenDeError } from '../../../shared/ui/error-summary';
 import { Input } from '../../../shared/ui/input';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -40,10 +45,11 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
     Alert,
     Button,
     Card,
-    DynamicField,
+    DynamicFieldsList,
     ErrorSummary,
     Input,
     PageHeader,
+    Select,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -87,33 +93,27 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
               (blurred)="validarBase('lastName')"
             />
 
-            <div class="campo-select">
-              <label for="miembro-rol">{{ t('admin.members.formulario.rol') }}</label>
-              <select id="miembro-rol" [value]="roleId()" (change)="alElegirRol($event)">
-                <option value="" disabled>{{ t('admin.members.formulario.rolRequerido') }}</option>
-                @for (rol of roles(); track rol.id) {
-                  <option [value]="rol.id">{{ rol.name }}</option>
-                }
-              </select>
-              @if (erroresBase().roleId) {
-                <p class="error">{{ erroresBase().roleId }}</p>
-              }
-            </div>
+            <app-select
+              fieldId="miembro-rol"
+              [label]="t('admin.members.formulario.rol')"
+              [placeholder]="t('admin.members.formulario.rolRequerido')"
+              [required]="true"
+              [options]="opcionesDeRol()"
+              [error]="erroresBase().roleId"
+              [value]="roleId()"
+              (valueChange)="alElegirRol($event)"
+            />
           </app-card>
 
           @if (rolElegido(); as rol) {
             @if (rol.profile_fields.length > 0) {
               <app-card [heading]="rol.name">
-                @for (campo of rol.profile_fields; track campo.key) {
-                  <app-dynamic-field
-                    [fieldId]="'perfil-' + campo.key"
-                    [field]="campo"
-                    [error]="erroresDePerfil()[campo.key] ?? null"
-                    [value]="valoresDePerfil()[campo.key] ?? ''"
-                    (valueChange)="actualizarValorDePerfil(campo.key, $event)"
-                    (blurred)="validarCampoDePerfil(campo)"
-                  />
-                }
+                <app-dynamic-fields-list
+                  prefijo="perfil"
+                  [campos]="rol.profile_fields"
+                  [(valores)]="valoresDePerfil"
+                  [(errores)]="erroresDePerfil"
+                />
               </app-card>
             }
           }
@@ -150,19 +150,6 @@ type CampoBase = 'email' | 'firstName' | 'lastName' | 'roleId';
       margin-top: var(--space-md);
       max-width: 34rem;
     }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
-    }
-    .error {
-      margin: 0;
-      color: var(--danger);
-      font-size: 0.875rem;
-    }
     .acciones-finales {
       display: flex;
       gap: var(--space-md);
@@ -185,7 +172,7 @@ export class MemberForm {
   protected readonly lastName = signal('');
   protected readonly roleId = signal('');
   protected readonly roles = signal<RoleOption[]>([]);
-  protected readonly valoresDePerfil = signal<Partial<Record<string, string | boolean>>>({});
+  protected readonly valoresDePerfil = signal<ValoresDePerfil>({});
 
   protected readonly rolElegido = computed(() =>
     this.roles().find((rol) => rol.id === this.roleId()),
@@ -197,7 +184,7 @@ export class MemberForm {
     lastName: null,
     roleId: null,
   });
-  protected readonly erroresDePerfil = signal<Partial<Record<string, string | null>>>({});
+  protected readonly erroresDePerfil = signal<ErroresDePerfil>({});
 
   protected readonly resumenDeErrores = computed<ResumenDeError[]>(() => {
     const base = this.erroresBase();
@@ -229,14 +216,14 @@ export class MemberForm {
     }
   }
 
-  protected alElegirRol(evento: Event): void {
-    this.roleId.set((evento.target as HTMLSelectElement).value);
+  protected readonly opcionesDeRol = computed<SelectOption[]>(() =>
+    this.roles().map((rol) => ({ value: rol.id, label: rol.name })),
+  );
+
+  protected alElegirRol(valor: string): void {
+    this.roleId.set(valor);
     this.valoresDePerfil.set({});
     this.erroresDePerfil.set({});
-  }
-
-  protected actualizarValorDePerfil(clave: string, valor: string | boolean): void {
-    this.valoresDePerfil.update((actuales) => ({ ...actuales, [clave]: valor }));
   }
 
   private errorDeBase(campo: CampoBase): string | null {
@@ -267,14 +254,6 @@ export class MemberForm {
     this.erroresBase.update((actuales) => ({ ...actuales, [campo]: this.errorDeBase(campo) }));
   }
 
-  protected validarCampoDePerfil(campo: ProfileField): void {
-    const valor = this.valoresDePerfil()[campo.key] ?? '';
-    this.erroresDePerfil.update((actuales) => ({
-      ...actuales,
-      [campo.key]: validateDynamicFieldValue(campo, valor),
-    }));
-  }
-
   private validarTodo(): boolean {
     const base: Record<CampoBase, string | null> = {
       email: this.errorDeBase('email'),
@@ -284,11 +263,10 @@ export class MemberForm {
     };
     this.erroresBase.set(base);
 
-    const campos = this.rolElegido()?.profile_fields ?? [];
-    const perfil: Record<string, string | null> = {};
-    for (const campo of campos) {
-      perfil[campo.key] = validateDynamicFieldValue(campo, this.valoresDePerfil()[campo.key] ?? '');
-    }
+    const perfil = validateDynamicFields(
+      this.rolElegido()?.profile_fields ?? [],
+      this.valoresDePerfil(),
+    );
     this.erroresDePerfil.set(perfil);
 
     return (

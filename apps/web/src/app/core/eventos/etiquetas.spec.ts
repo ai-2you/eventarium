@@ -25,9 +25,11 @@ describe('analizarEtiquetas', () => {
     expect(analizarEtiquetas(t).error?.tipo).toBe('caracteres');
   });
 
-  it('admite como máximo cinco distintas; repetir no cuenta dos veces', () => {
-    expect(analizarEtiquetas('aa,bb,cc,dd,ee').error).toBeNull();
-    expect(analizarEtiquetas('aa,bb,cc,dd,ee,ff').error).toEqual({ tipo: 'demasiadas' });
+  it('admite como máximo diez distintas; repetir no cuenta dos veces', () => {
+    expect(analizarEtiquetas('aa,bb,cc,dd,ee,ff,gg,hh,ii,jj').error).toBeNull();
+    expect(analizarEtiquetas('aa,bb,cc,dd,ee,ff,gg,hh,ii,jj,kk').error).toEqual({
+      tipo: 'demasiadas',
+    });
     expect(analizarEtiquetas('aa,aa,aa,aa,aa,aa,bb').etiquetas).toEqual(['aa', 'bb']);
   });
 });

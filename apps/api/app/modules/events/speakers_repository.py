@@ -107,6 +107,35 @@ async def get_public_slugs_by_user_ids(
     return {user_id: slug for user_id, slug in filas}
 
 
+async def ponentes_publicos_del_evento(
+    session: AsyncSession, organization_id: uuid.UUID, event_id: uuid.UUID
+) -> Sequence[User]:
+    """Personas del roster del evento con rol de ponente, para la ficha pública.
+
+    Solo cuentas activas: alguien dado de baja no debe seguir anunciado. Sin
+    sesiones ni historial (eso es `listar_ponentes_del_evento`, del panel).
+    """
+    return (
+        (
+            await session.execute(
+                select(User)
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .join(EventMember, EventMember.organization_member_id == OrganizationMember.id)
+                .join(Role, Role.id == OrganizationMember.role_id)
+                .where(
+                    EventMember.event_id == event_id,
+                    EventMember.organization_id == organization_id,
+                    Role.key == SPEAKER_KEY,
+                    User.is_active.is_(True),
+                )
+                .order_by(User.first_name.asc().nulls_last(), User.last_name.asc().nulls_last())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
 async def listar_ponentes_del_evento(
     session: AsyncSession, organization_id: uuid.UUID, event_id: uuid.UUID
 ) -> tuple[

@@ -103,7 +103,7 @@ class Event(Base, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("event_categories.id", ondelete="RESTRICT"), nullable=True
     )
     category: Mapped[EventCategory | None] = relationship(lazy="selectin")
-    # Etiquetas libres, normalizadas en minúsculas (máx. 5; ver `normalizar_etiquetas`).
+    # Etiquetas libres, normalizadas en minúsculas (máx. 10; ver `normalizar_etiquetas`).
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, default=list, server_default=text("'{}'")
     )

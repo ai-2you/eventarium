@@ -17,6 +17,7 @@ from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 from app.core.cleanup import sweep_unverified_accounts
 from app.core.config import get_settings
 from app.core.email import EmailAttachment, get_email_provider
+from app.core.email_template import neutralizar_texto_de_usuario
 from app.core.tenant import base_url_de_organizacion
 
 # Registro de todas las tablas en `Base.metadata` antes de que cualquier tarea
@@ -377,6 +378,78 @@ async def send_registration_rejected_email(
 
 
 @broker.task(retry_on_error=True, max_retries=5)
+async def send_registration_pending_approval_email(to_email: str, organization_id: str) -> None:
+    """Inscripción recibida en un evento con aprobación: queda a la espera de
+    que el organizador la acepte o la rechace (ambos casos tienen su correo)."""
+    await get_email_provider().send(
+        to=to_email,
+        subject="Hemos recibido tu inscripción",
+        body=(
+            "Hola,\n\n"
+            "Hemos recibido tu inscripción. El organizador del evento la revisará y te "
+            "avisaremos por correo en cuanto la apruebe o la rechace."
+        ),
+    )
+
+
+_ESTADO_PARA_EL_ORGANIZADOR = {
+    "confirmed": "confirmada",
+    "waitlisted": "en lista de espera (el aforo está completo)",
+    "pending_approval": "pendiente de tu aprobación",
+}
+
+
+@broker.task(retry_on_error=True, max_retries=5)
+async def send_registration_received_organizer_email(
+    to_email: str,
+    organization_id: str,
+    event_id: str,
+    registration_id: str,
+    event_title: str,
+    participant_name: str,
+    participant_email: str,
+    status: str,
+    paid: bool = False,
+) -> None:
+    """Aviso a quien gestiona las inscripciones de una organización: alguien
+    se ha inscrito (o ha pagado su entrada). Un destinatario por tarea, para
+    que un reintento no reenvíe a quien ya lo recibió.
+
+    El enlace al panel va en la **primera** línea: es la URL que la plantilla
+    convierte en botón (`detectar_accion`), y el nombre del participante lo
+    escribe un anónimo — se neutraliza para que no pueda ocupar ese lugar.
+    """
+    base = await base_url_de_organizacion(uuid.UUID(organization_id))
+    enlace = f"{base}/dashboard/events/{event_id}/registrations/{registration_id}"
+    titulo = neutralizar_texto_de_usuario(event_title)
+    pendiente = status == "pending_approval"
+    if pendiente:
+        asunto = f"Inscripción pendiente de aprobar en {titulo}"
+        entrada = f"Alguien quiere inscribirse en «{titulo}» y necesita tu aprobación."
+    elif paid:
+        asunto = f"Entrada pagada en {titulo}"
+        entrada = f"Se ha pagado una entrada de «{titulo}»."
+    else:
+        asunto = f"Nueva inscripción en {titulo}"
+        entrada = f"Hay una inscripción nueva en «{titulo}»."
+    estado = _ESTADO_PARA_EL_ORGANIZADOR.get(status, status)
+    await get_email_provider().send(
+        to=to_email,
+        subject=asunto,
+        body=(
+            f"{enlace}\n\n"
+            f"{entrada}\n\n"
+            f"Nombre: {neutralizar_texto_de_usuario(participant_name)}\n"
+            # El correo llega validado como dirección (sin espacios ni esquema):
+            # se deja tal cual para que se pueda copiar o pulsar.
+            f"Correo: {participant_email}\n"
+            f"Estado: {estado}"
+            + ("\n\nAbre la inscripción para aprobarla o rechazarla." if pendiente else "")
+        ),
+    )
+
+
+@broker.task(retry_on_error=True, max_retries=5)
 async def send_registration_cancelled_email(
     to_email: str, organization_id: str, reembolso: str | None = None
 ) -> None:
@@ -665,7 +738,8 @@ async def send_speaker_bio_request_email(
     no crea credenciales ni enlaces de acceso, solo recuerda la tarea.
     """
     base = await base_url_de_organizacion(uuid.UUID(organization_id))
-    enlace = f"{base}/dashboard/account"
+    # El ancla lleva directo a la ficha de ponente dentro de la cuenta.
+    enlace = f"{base}/dashboard/account#ficha"
     await get_email_provider().send(
         to=to_email,
         subject=f"Falta tu ficha para «{event_name}»",

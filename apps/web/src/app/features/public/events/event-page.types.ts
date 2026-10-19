@@ -17,6 +17,8 @@ export interface PublicParticipant {
   readonly display_name: string;
   readonly role_key: string;
   readonly public_slug: string | null;
+  /** Identificador opaco de la persona: el mismo en `speakers` y en la agenda. */
+  readonly ref: string;
 }
 
 export interface PublicEventSession {
@@ -100,6 +102,8 @@ export interface PublicEventDetail {
   readonly latitude: number | null;
   readonly longitude: number | null;
   readonly sessions: readonly PublicEventSession[];
+  /** Ponentes enlazados al evento, tengan o no sesión. */
+  readonly speakers?: readonly PublicParticipant[];
   /** Con 2 o más, el evento tiene programa multisede. */
   readonly venues: readonly PublicVenue[];
   readonly sponsor_tiers: readonly PublicSponsorTier[];
