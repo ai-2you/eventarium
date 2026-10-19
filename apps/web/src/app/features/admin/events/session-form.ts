@@ -16,6 +16,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Input } from '../../../shared/ui/input';
 import { Select, type SelectOption } from '../../../shared/ui/select';
 import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
@@ -78,7 +79,7 @@ function vacio(): {
 @Component({
   selector: 'app-session-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Input, Select],
+  imports: [TranslocoDirective, Alert, Button, DatetimePicker, Input, Select],
   template: `
     <ng-container *transloco="let t">
       <form (submit)="guardar($event)" novalidate class="formulario">
@@ -103,16 +104,14 @@ function vacio(): {
           [required]="true"
           [(value)]="titulo"
         />
-        <app-input
+        <app-datetime-picker
           fieldId="sesion-inicio"
-          type="datetime-local"
           [label]="t('admin.events.agenda.inicio')"
           [required]="true"
           [(value)]="inicio"
         />
-        <app-input
+        <app-datetime-picker
           fieldId="sesion-fin"
-          type="datetime-local"
           [label]="t('admin.events.agenda.fin')"
           [required]="true"
           [(value)]="fin"

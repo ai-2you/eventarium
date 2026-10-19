@@ -346,3 +346,18 @@ class TestBloqueoDeAforo:
 
         assert bloqueado is cargado
         assert bloqueado.capacity == 5
+
+
+class TestDescripcion:
+    async def test_una_descripcion_de_mas_de_20000_caracteres_se_rechaza(
+        self, cliente: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        evento = await _crear_evento(cliente, cabeceras, "descripcion-larga")
+
+        codigo, _ = await _patch(cliente, cabeceras, evento, description="a" * 20001)
+        assert codigo == 422
+
+        codigo, cuerpo = await _patch(cliente, cabeceras, evento, description="**Hola**")
+        assert codigo == 200
+        assert cuerpo["description"] == "**Hola**"

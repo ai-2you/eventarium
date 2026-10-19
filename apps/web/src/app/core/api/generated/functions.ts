@@ -265,6 +265,8 @@ export type { ListEventsApiV1EventsGet$Params as ListEventsApiV1EventsGet$Params
 export { listEventsApiV1EventsGet as listEventsApiV1EventsGet } from './fn/eventos/list-events-api-v-1-events-get';
 export type { CreateEventApiV1EventsPost$Params as CreateEventApiV1EventsPost$Params } from './fn/eventos/create-event-api-v-1-events-post';
 export { createEventApiV1EventsPost as createEventApiV1EventsPost } from './fn/eventos/create-event-api-v-1-events-post';
+export type { SuggestEventTagsApiV1EventsTagsGet$Params as SuggestEventTagsApiV1EventsTagsGet$Params } from './fn/eventos/suggest-event-tags-api-v-1-events-tags-get';
+export { suggestEventTagsApiV1EventsTagsGet as suggestEventTagsApiV1EventsTagsGet } from './fn/eventos/suggest-event-tags-api-v-1-events-tags-get';
 export type { GetEventApiV1EventsEventIdGet$Params as GetEventApiV1EventsEventIdGet$Params } from './fn/eventos/get-event-api-v-1-events-event-id-get';
 export { getEventApiV1EventsEventIdGet as getEventApiV1EventsEventIdGet } from './fn/eventos/get-event-api-v-1-events-event-id-get';
 export type { DeleteEventApiV1EventsEventIdDelete$Params as DeleteEventApiV1EventsEventIdDelete$Params } from './fn/eventos/delete-event-api-v-1-events-event-id-delete';

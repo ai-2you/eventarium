@@ -16,6 +16,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Card } from '../../../shared/ui/card';
 import { Chip, ChipTone } from '../../../shared/ui/chip';
 import { DataTable, DataTableColumn } from '../../../shared/ui/data-table';
@@ -72,6 +73,7 @@ const AUDIT_LOG_URL = '/admin/audit-log';
     ChangelogPanel,
     Chip,
     DataTable,
+    DatetimePicker,
     Dialog,
     Input,
     KpiCard,
@@ -153,24 +155,16 @@ const AUDIT_LOG_URL = '/admin/audit-log';
             [label]="t('admin.superadmin.auditoria.accion')"
             [(value)]="filtroAccion"
           />
-          <div class="campo-fecha">
-            <label for="auditoria-desde">{{ t('admin.superadmin.auditoria.desde') }}</label>
-            <input
-              id="auditoria-desde"
-              type="datetime-local"
-              [value]="filtroDesde()"
-              (change)="filtroDesde.set(alValorDe($event))"
-            />
-          </div>
-          <div class="campo-fecha">
-            <label for="auditoria-hasta">{{ t('admin.superadmin.auditoria.hasta') }}</label>
-            <input
-              id="auditoria-hasta"
-              type="datetime-local"
-              [value]="filtroHasta()"
-              (change)="filtroHasta.set(alValorDe($event))"
-            />
-          </div>
+          <app-datetime-picker
+            fieldId="auditoria-desde"
+            [label]="t('admin.superadmin.auditoria.desde')"
+            [(value)]="filtroDesde"
+          />
+          <app-datetime-picker
+            fieldId="auditoria-hasta"
+            [label]="t('admin.superadmin.auditoria.hasta')"
+            [(value)]="filtroHasta"
+          />
           <app-button type="submit" [loading]="cargandoAuditoria()">
             {{ t('admin.superadmin.auditoria.filtrar') }}
           </app-button>
@@ -335,19 +329,6 @@ const AUDIT_LOG_URL = '/admin/audit-log';
       align-items: end;
       gap: var(--space-md);
       margin-bottom: var(--space-md);
-    }
-    .campo-fecha {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-fecha input {
-      padding: 0.625rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background-color: var(--surface);
-      color: var(--fg);
-      font: inherit;
-      min-height: 2.75rem;
     }
     .formulario {
       display: grid;
@@ -576,10 +557,6 @@ export class SuperadminPage {
       return tipo;
     }
     return `${tipo} · ${id.slice(0, 8)}…`;
-  }
-
-  protected alValorDe(evento: Event): string {
-    return (evento.target as HTMLInputElement).value;
   }
 
   /** El detalle como pares «clave: valor» sin llaves ni comillas: sigue siendo

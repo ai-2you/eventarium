@@ -50,7 +50,7 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
 
 **Categoría y etiquetas.** `crear_evento` y `editar_evento` aceptan
 `categoria` (el `slug` de una categoría activa, tal como lo devuelve
-`listar_categorias`) y `etiquetas` (hasta 5, de 2 a 30 caracteres, en
+`listar_categorias`) y `etiquetas` (hasta 10, de 2 a 30 caracteres, en
 minúsculas; solo letras, números, espacios y guiones). Una categoría
 inexistente o desactivada se rechaza. En `editar_evento`, omitir el campo no
 cambia nada; `categoria=""` quita la categoría y `etiquetas=[]` las quita todas.

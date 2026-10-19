@@ -201,7 +201,7 @@ def registrar(mcp: MCPServer) -> None:
         desde Eventarium (o con `publicar_evento`, si la conexión lo permite).
         `formato`: in_person, online o hybrid. `modo_inscripcion`: free,
         approval o paid. `categoria`: slug de una categoría activa (ver
-        `listar_categorias`). `etiquetas`: hasta 5, de 2 a 30 caracteres."""
+        `listar_categorias`). `etiquetas`: hasta 10, de 2 a 30 caracteres."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         if contexto.event_ids is not None:

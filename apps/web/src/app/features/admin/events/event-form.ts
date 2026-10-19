@@ -15,9 +15,11 @@ import { Input } from '../../../shared/ui/input';
 import { AddressMap } from '../../../shared/ui/address-map';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Select, type SelectOption } from '../../../shared/ui/select';
-import { Textarea } from '../../../shared/ui/textarea';
+import { RichTextEditor } from '../../../shared/ui/rich-text-editor';
+import { TagsInput } from '../../../shared/ui/tags-input';
 import { EventScope } from '../../../layouts/admin/event-scope';
 import { isoAValorLocal } from './datetime-local';
+import { slugify } from '../../../core/texto/slug';
 import { EventDetails } from './event-details';
 import {
   LONGITUD_MAX_ETIQUETA,
@@ -30,6 +32,10 @@ type LocationMode = 'in_person' | 'online' | 'hybrid';
 type RegistrationMode = 'free' | 'approval' | 'paid';
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** `EventCreate.slug` (`apps/api/app/modules/events/schemas.py`). */
+const LONGITUD_MAXIMA_SLUG = 160;
+/** `EventCreate.description`, mismo tope que la API. */
+const LONGITUD_MAXIMA_DESCRIPCION = 20000;
 
 interface EventoBase {
   readonly id: string;
@@ -59,7 +65,8 @@ interface CategoriaDelCatalogo {
   readonly is_active: boolean;
 }
 
-type CampoBase = 'slug' | 'title' | 'startsAt' | 'endsAt' | 'paymentWindow' | 'capacity';
+type CampoBase =
+  'slug' | 'title' | 'startsAt' | 'endsAt' | 'paymentWindow' | 'capacity' | 'description';
 
 // Rango de `events.payment_checkout_window_minutes` (fase 6 del PRD, fase 2
 // de trabajo): espejo del `CHECK` de base de datos y del schema del
@@ -116,7 +123,8 @@ function zonasHorariasDisponibles(): readonly string[] {
     EventDetails,
     PageHeader,
     Select,
-    Textarea,
+    RichTextEditor,
+    TagsInput,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -142,7 +150,8 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [label]="t('admin.events.formulario.titulo')"
                 [required]="true"
                 [error]="errores().title"
-                [(value)]="title"
+                [value]="title()"
+                (valueChange)="alCambiarTitulo($event)"
                 (blurred)="validar('title')"
               />
               <app-input
@@ -150,8 +159,10 @@ function zonasHorariasDisponibles(): readonly string[] {
                 fieldId="evento-slug"
                 [label]="t('admin.events.formulario.slug')"
                 [required]="true"
+                [hint]="t('admin.events.formulario.slugAyuda')"
                 [error]="errores().slug"
-                [(value)]="slug"
+                [value]="slug()"
+                (valueChange)="alCambiarSlug($event)"
                 (blurred)="validar('slug')"
               />
 
@@ -161,6 +172,7 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [required]="true"
                 [error]="errores().startsAt"
                 [(value)]="startsAt"
+                [(horaPendiente)]="horaInicioPendiente"
                 (blurred)="validar('startsAt')"
               />
               <app-datetime-picker
@@ -169,6 +181,7 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [required]="true"
                 [error]="errores().endsAt"
                 [(value)]="endsAt"
+                [(horaPendiente)]="horaFinPendiente"
                 (blurred)="validar('endsAt')"
               />
               <app-input
@@ -183,13 +196,19 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [options]="opcionesDeCategoria()"
                 [(value)]="categoria"
               />
-              <app-input
+              <app-tags-input
                 class="campo-ancho"
                 fieldId="evento-etiquetas"
                 [label]="t('admin.events.formulario.etiquetas')"
                 [hint]="t('admin.events.formulario.etiquetasAyuda')"
-                [error]="errorDeEtiquetas()"
-                [(value)]="etiquetasTexto"
+                [placeholder]="t('admin.events.formulario.etiquetasPlaceholder')"
+                [textoQuitar]="t('admin.events.formulario.quitarEtiqueta')"
+                [maximo]="maximoEtiquetas"
+                [normalizar]="normalizarEtiqueta"
+                [validar]="validarEtiqueta"
+                [sugerencias]="sugerenciasDeEtiquetas()"
+                [(value)]="etiquetas"
+                (buscar)="buscarEtiquetas($event)"
               />
               <app-input
                 class="campo-ancho"
@@ -198,11 +217,12 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [hint]="t('admin.events.formulario.resumenAyuda')"
                 [(value)]="summary"
               />
-              <app-textarea
+              <app-rich-text-editor
                 class="campo-ancho"
                 fieldId="evento-descripcion"
                 [label]="t('admin.events.formulario.descripcion')"
-                [rows]="6"
+                [longitudMaxima]="longitudMaximaDescripcion"
+                [error]="errores().description"
                 [(value)]="description"
               />
 
@@ -424,14 +444,22 @@ export class EventForm {
   protected readonly error = signal<string | null>(null);
 
   protected readonly slug = signal('');
+  /** El slug sigue al título mientras nadie lo toca. Al editar un evento
+   * existente arranca a `true`: cambiarlo solo rompería su URL pública. */
+  private readonly slugManual = signal(false);
   protected readonly title = signal('');
   protected readonly summary = signal('');
   protected readonly description = signal('');
+  protected readonly longitudMaximaDescripcion = LONGITUD_MAXIMA_DESCRIPCION;
   protected readonly registrationMode = signal<RegistrationMode>('free');
   /** `null` = sin límite de aforo; `NaN` = lo escrito no es un número. */
   protected readonly capacity = signal<number | null>(null);
   protected readonly startsAt = signal('');
   protected readonly endsAt = signal('');
+  /** Día elegido sin hora todavía en cada selector: el error pide la hora, no
+   * la fecha. */
+  protected readonly horaInicioPendiente = signal(false);
+  protected readonly horaFinPendiente = signal(false);
   protected readonly locationMode = signal<LocationMode>('in_person');
   protected readonly city = signal('');
   protected readonly locationAddress = signal('');
@@ -448,27 +476,19 @@ export class EventForm {
   /** La categoría que el evento ya tiene, aunque se haya desactivado: se sigue
    * mostrando para no borrarla al guardar otros cambios. */
   private readonly categoriaActual = signal<CategoriaDelCatalogo | null>(null);
-  protected readonly etiquetasTexto = signal('');
-
-  protected readonly opcionesDeCategoria = computed<SelectOption[]>(() => {
-    const opciones: SelectOption[] = [
-      { value: '', label: this.transloco.translate('admin.events.formulario.sinCategoria') },
-      ...this.categoriasActivas().map((c) => ({ value: c.id, label: c.name })),
-    ];
-    const actual = this.categoriaActual();
-    if (actual && !opciones.some((o) => o.value === actual.id)) {
-      opciones.push({
-        value: actual.id,
-        label: this.transloco.translate('admin.events.formulario.categoriaDesactivada', {
-          nombre: actual.name,
-        }),
-      });
-    }
-    return opciones;
-  });
-
-  protected readonly errorDeEtiquetas = computed<string | null>(() => {
-    const { error } = analizarEtiquetas(this.etiquetasTexto());
+  protected readonly etiquetas = signal<string[]>([]);
+  protected readonly sugerenciasDeEtiquetas = signal<readonly string[]>([]);
+  private ultimaBusquedaDeEtiquetas = '';
+  protected readonly maximoEtiquetas = MAX_ETIQUETAS;
+  protected readonly normalizarEtiqueta = (texto: string): string =>
+    texto.trim().toLowerCase().replace(/\s+/g, ' ');
+  /** Mismas reglas que `analizarEtiquetas` (y que la API), aplicadas a la
+   * etiqueta que se intenta añadir junto a las que ya hay. */
+  protected readonly validarEtiqueta = (
+    etiqueta: string,
+    actuales: readonly string[],
+  ): string | null => {
+    const { error } = analizarEtiquetas([...actuales, etiqueta].join(','));
     if (!error) return null;
     switch (error.tipo) {
       case 'longitud':
@@ -486,6 +506,23 @@ export class EventForm {
           max: MAX_ETIQUETAS,
         });
     }
+  };
+
+  protected readonly opcionesDeCategoria = computed<SelectOption[]>(() => {
+    const opciones: SelectOption[] = [
+      { value: '', label: this.transloco.translate('admin.events.formulario.sinCategoria') },
+      ...this.categoriasActivas().map((c) => ({ value: c.id, label: c.name })),
+    ];
+    const actual = this.categoriaActual();
+    if (actual && !opciones.some((o) => o.value === actual.id)) {
+      opciones.push({
+        value: actual.id,
+        label: this.transloco.translate('admin.events.formulario.categoriaDesactivada', {
+          nombre: actual.name,
+        }),
+      });
+    }
+    return opciones;
   });
 
   protected readonly opcionesDeModalidad = computed<SelectOption[]>(() => [
@@ -514,6 +551,7 @@ export class EventForm {
     endsAt: null,
     paymentWindow: null,
     capacity: null,
+    description: null,
   });
 
   protected readonly resumenDeErrores = computed<ResumenDeError[]>(() => {
@@ -527,6 +565,9 @@ export class EventForm {
       resumen.push({ campoId: 'evento-ventana-pago', mensaje: actuales.paymentWindow });
     }
     if (actuales.capacity) resumen.push({ campoId: 'evento-aforo', mensaje: actuales.capacity });
+    if (actuales.description) {
+      resumen.push({ campoId: 'evento-descripcion', mensaje: actuales.description });
+    }
     return resumen;
   });
 
@@ -558,6 +599,7 @@ export class EventForm {
     try {
       const evento = await firstValueFrom(this.http.get<EventoBase>(this.api.url(`/events/${id}`)));
       this.slug.set(evento.slug);
+      this.slugManual.set(true);
       this.title.set(evento.title);
       this.summary.set(evento.summary ?? '');
       this.description.set(evento.description ?? '');
@@ -574,7 +616,7 @@ export class EventForm {
       this.paymentWindow.set(evento.payment_checkout_window_minutes);
       this.categoria.set(evento.category?.id ?? '');
       this.categoriaActual.set(evento.category);
-      this.etiquetasTexto.set(evento.tags.join(', '));
+      this.etiquetas.set([...evento.tags]);
     } catch (error) {
       this.error.set(
         error instanceof ApiError
@@ -584,6 +626,38 @@ export class EventForm {
     } finally {
       this.cargando.set(false);
     }
+  }
+
+  /** Sugerencias de etiquetas ya usadas en la organización; si falla, el campo
+   * sigue funcionando sin ellas. */
+  protected async buscarEtiquetas(texto: string): Promise<void> {
+    // Una respuesta lenta de «da» no debe pisar la de «dat», que llegó antes.
+    this.ultimaBusquedaDeEtiquetas = texto;
+    let sugerencias: readonly string[] = [];
+    try {
+      sugerencias = await firstValueFrom(
+        this.http.get<string[]>(this.api.url('/events/tags'), { params: { q: texto } }),
+      );
+    } catch {
+      // Sin sugerencias el campo sigue funcionando.
+    }
+    if (texto === this.ultimaBusquedaDeEtiquetas) {
+      this.sugerenciasDeEtiquetas.set(sugerencias);
+    }
+  }
+
+  protected alCambiarTitulo(valor: string): void {
+    this.title.set(valor);
+    if (!this.slugManual()) {
+      this.slug.set(slugify(valor, LONGITUD_MAXIMA_SLUG));
+    }
+  }
+
+  protected alCambiarSlug(valor: string): void {
+    this.slug.set(valor);
+    // Al crear, vaciarlo devuelve el control al título; en un evento existente
+    // nunca, porque cambiaría su URL pública.
+    this.slugManual.set(valor.trim() !== '' || this.esEdicion());
   }
 
   protected alCambiarAforo(evento: Event): void {
@@ -617,10 +691,16 @@ export class EventForm {
           : this.transloco.translate('admin.events.formulario.slugInvalido');
       }
       case 'startsAt':
+        if (this.horaInicioPendiente()) {
+          return this.transloco.translate('admin.events.formulario.horaInicioRequerida');
+        }
         return this.startsAt()
           ? null
           : this.transloco.translate('admin.events.formulario.inicioRequerido');
       case 'endsAt':
+        if (this.horaFinPendiente()) {
+          return this.transloco.translate('admin.events.formulario.horaFinRequerida');
+        }
         if (!this.endsAt()) {
           return this.transloco.translate('admin.events.formulario.finRequerido');
         }
@@ -636,6 +716,12 @@ export class EventForm {
           ? null
           : this.transloco.translate('admin.events.formulario.ventanaDePagoFueraDeRango');
       }
+      case 'description':
+        return this.description().length > LONGITUD_MAXIMA_DESCRIPCION
+          ? this.transloco.translate('admin.events.formulario.descripcionLarga', {
+              max: LONGITUD_MAXIMA_DESCRIPCION,
+            })
+          : null;
       case 'capacity': {
         const valor = this.capacity();
         return valor === null || (Number.isInteger(valor) && valor >= 1)
@@ -657,6 +743,7 @@ export class EventForm {
       endsAt: this.errorDe('endsAt'),
       paymentWindow: this.errorDe('paymentWindow'),
       capacity: this.errorDe('capacity'),
+      description: this.errorDe('description'),
     };
     this.errores.set(actuales);
     return Object.values(actuales).every((mensaje) => !mensaje);
@@ -666,7 +753,7 @@ export class EventForm {
     evento.preventDefault();
     this.error.set(null);
     this.exito.set(false);
-    if (!this.validarTodo() || this.errorDeEtiquetas()) {
+    if (!this.validarTodo()) {
       return;
     }
 
@@ -689,7 +776,7 @@ export class EventForm {
       payment_checkout_window_minutes: this.paymentWindow(),
       // Siempre explícitos: `null` quita la categoría, `[]` las etiquetas.
       category_id: this.categoria() || null,
-      tags: [...analizarEtiquetas(this.etiquetasTexto()).etiquetas],
+      tags: [...this.etiquetas()],
     };
 
     this.guardando.set(true);
@@ -709,6 +796,13 @@ export class EventForm {
           ? error.message
           : this.transloco.translate('admin.events.formulario.error'),
       );
+      // Slug ocupado: la API propone uno libre; se deja puesto para guardar a la
+      // primera, con el mensaje explicando por qué ha cambiado.
+      const sugerido = error instanceof ApiError ? error.problem?.['suggested_slug'] : null;
+      if (typeof sugerido === 'string') {
+        this.slug.set(sugerido);
+        this.slugManual.set(true);
+      }
     } finally {
       this.guardando.set(false);
     }

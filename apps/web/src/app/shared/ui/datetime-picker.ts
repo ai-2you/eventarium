@@ -12,99 +12,21 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoService } from '@jsverse/transloco';
 
-/** Hora que se aplica al elegir un día cuando el valor todavía no traía hora:
- * un evento no suele empezar de madrugada, así que el punto de partida amable
- * es media mañana y no `00:00` — quien necesite otra la cambia en el mismo
- * panel, sin desplazarse por celdas oscuras. */
-const HORA_POR_DEFECTO = '09:00';
-
-/** Lo que muestra el campo de hora mientras no hay valor. */
-const HORA_VACIA = '--:--';
-
-/** Una celda del calendario: la fecha real y los estados que la pintan. */
-interface CeldaDia {
-  readonly fecha: Date;
-  readonly fueraDeMes: boolean;
-  readonly esHoy: boolean;
-  readonly esSeleccionado: boolean;
-  readonly etiqueta: string;
-}
-
-interface PartesValor {
-  readonly anio: number;
-  readonly mes: number;
-  readonly dia: number;
-  readonly hora: number;
-  readonly minuto: number;
-}
-
-function dosCifras(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-/** `YYYY-MM-DDTHH:mm`, el formato de `<input type="datetime-local">` que este
- * componente usa como valor de verdad. */
-function aValorLocal(partes: {
-  anio: number;
-  mes: number;
-  dia: number;
-  hora: number;
-  minuto: number;
-}): string {
-  return (
-    `${partes.anio}-${dosCifras(partes.mes + 1)}-${dosCifras(partes.dia)}` +
-    `T${dosCifras(partes.hora)}:${dosCifras(partes.minuto)}`
-  );
-}
-
-function partirValor(valor: string): PartesValor | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(valor);
-  if (!m) return null;
-  return {
-    anio: Number(m[1]),
-    mes: Number(m[2]) - 1,
-    dia: Number(m[3]),
-    hora: Number(m[4]),
-    minuto: Number(m[5]),
-  };
-}
-
-function hoy(): PartesValor {
-  const ahora = new Date();
-  return {
-    anio: ahora.getFullYear(),
-    mes: ahora.getMonth(),
-    dia: ahora.getDate(),
-    hora: ahora.getHours(),
-    minuto: ahora.getMinutes(),
-  };
-}
-
-/** Entiende lo que cabe esperar que teclee una persona en la caja de hora:
- * «9» (09:00), «935» (09:35), «9:35» o «09:35». Devuelve null mientras lo
- * tecleado todavía no forma una hora válida. */
-function parseHoraTexto(texto: string): { hora: number; minuto: number } | null {
-  const digitos = texto.replace(/\D/g, '');
-  if (digitos.length === 0 || digitos.length > 4) return null;
-  const hora = digitos.length <= 2 ? Number(digitos) : Number(digitos.slice(0, digitos.length - 2));
-  const minuto = digitos.length <= 2 ? 0 : Number(digitos.slice(-2));
-  if (Number.isNaN(hora) || Number.isNaN(minuto)) return null;
-  if (hora > 23 || minuto > 59) return null;
-  return { hora, minuto };
-}
-
-/** Texto reactivo de Transloco: `translate()` a secas no es reactivo y, si la
- * primera pintura ocurre antes de que el idioma esté cargado, dejaría la clave
- * cruda congelada en la plantilla. `selectTranslate` emite cuando la
- * traducción está lista y `toSignal` obliga a repintar. */
-function texto(transloco: TranslocoService, clave: string) {
-  return toSignal(transloco.selectTranslate(clave).pipe(takeUntilDestroyed()), {
-    initialValue: '',
-  });
-}
+import {
+  type CeldaDia,
+  HORA_VACIA,
+  aValorFecha,
+  aValorLocal,
+  dosCifras,
+  hoy,
+  parseHoraTexto,
+  partirFecha,
+  partirValor,
+  primerDiaDeMes,
+  texto,
+} from './datetime-picker.utils';
 
 /**
  * Selector de fecha y hora en dos campos (fecha y hora) bajo una misma
@@ -127,14 +49,14 @@ function texto(transloco: TranslocoService, clave: string) {
   selector: 'app-datetime-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <!-- Etiqueta flotante como Input: dentro del campo cuando está vacío y
-         en reposo, arriba al ganar foco o haber valor. Cubre el par fecha+hora
-         pero está enlazada (for/id) al botón de fecha, el campo principal. -->
-    <div class="campo" [class.flotando]="flotando()">
+    <!-- Cada mitad lleva su propia etiqueta, siempre visible en lo alto de su
+         caja: «Fecha de inicio» sobre el botón de fecha y «Hora» sobre la caja
+         de hora. -->
+    <div class="campo">
       <div class="dt" [class.dt--up]="haciaArriba()">
         <input
           class="dt__native"
-          type="datetime-local"
+          [type]="soloFecha() ? 'date' : 'datetime-local'"
           tabindex="-1"
           aria-hidden="true"
           [id]="idNativo()"
@@ -144,65 +66,85 @@ function texto(transloco: TranslocoService, clave: string) {
           (input)="alEscribirEnNativo($event)"
         />
         <div class="dt__controles">
-          <button
-            #botonFecha
-            type="button"
-            class="dt__btn"
-            [id]="idCampo()"
-            aria-haspopup="dialog"
-            [attr.aria-expanded]="panelAbierto() === 'fecha'"
-            [attr.aria-controls]="idPanelFecha()"
-            [attr.aria-invalid]="error() ? 'true' : null"
-            [attr.aria-describedby]="descripcionId()"
-            [disabled]="disabled()"
-            (click)="alternar('fecha')"
-          >
-            <span>{{ etiquetaFecha() }}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-              <rect x="3" y="5" width="18" height="16" rx="2" />
-              <path d="M8 3v4M16 3v4M3 10h18" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </button>
-          <!-- Campo de hora editable a mano: se puede escribir «9», «935» o
+          <div class="dt__parte">
+            <button
+              #botonFecha
+              type="button"
+              class="dt__btn"
+              [id]="idCampo()"
+              aria-haspopup="dialog"
+              [attr.aria-expanded]="panelAbierto() === 'fecha'"
+              [attr.aria-controls]="idPanelFecha()"
+              [attr.aria-invalid]="mensajeError() ? 'true' : null"
+              [attr.aria-describedby]="descripcionId()"
+              [disabled]="disabled()"
+              (click)="alternar('fecha')"
+            >
+              <span>{{ etiquetaFecha() }}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M8 3v4M16 3v4M3 10h18" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <label class="dt__rotulo" [for]="idCampo()" [class.sr-only]="etiquetaOculta()">{{
+              label()
+            }}</label>
+          </div>
+          @if (!soloFecha()) {
+            <!-- Campo de hora editable a mano: se puede escribir «9», «935» o
                «9:35» y se aplica en cuanto forma una hora válida; las flechas
                del teclado suman o restan de 5 en 5 minutos (PágArriba/PágAbajo,
                de hora en hora). El botón del reloj despliega los saltos. -->
-          <div class="dt__hora" [class.abierto]="panelAbierto() === 'hora'">
-            <input
-              #cajaHora
-              type="text"
-              inputmode="numeric"
-              maxlength="5"
-              autocomplete="off"
-              placeholder="--:--"
-              [id]="idCampoHora()"
-              [attr.aria-label]="tHora()"
-              [attr.aria-invalid]="error() ? 'true' : null"
-              [attr.aria-describedby]="descripcionId()"
-              [disabled]="disabled()"
-              [value]="horaEnCaja()"
-              (input)="alEscribirHora($event)"
-              (keydown)="alPulsarTeclaEnHora($event)"
-              (blur)="alDesenfocarHora()"
-            />
+            <div class="dt__hora" [class.abierto]="panelAbierto() === 'hora'">
+              <input
+                #cajaHora
+                type="text"
+                inputmode="numeric"
+                maxlength="5"
+                autocomplete="off"
+                placeholder="--:--"
+                [id]="idCampoHora()"
+                [attr.aria-invalid]="mensajeError() ? 'true' : null"
+                [attr.aria-describedby]="descripcionId()"
+                [disabled]="disabled()"
+                [value]="horaEnCaja()"
+                (input)="alEscribirHora($event)"
+                (keydown)="alPulsarTeclaEnHora($event)"
+                (blur)="alDesenfocarHora()"
+              />
+              <button
+                type="button"
+                class="dt__hora-saltos"
+                aria-haspopup="dialog"
+                [attr.aria-expanded]="panelAbierto() === 'hora'"
+                [attr.aria-controls]="idPanelHora()"
+                [attr.aria-label]="tElegirHora()"
+                [disabled]="disabled()"
+                (click)="alternar('hora')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+              <label class="dt__rotulo" [for]="idCampoHora()" [class.sr-only]="etiquetaOculta()">{{
+                rotuloHora() ?? tHora()
+              }}</label>
+            </div>
+          }
+          @if (!required() && !disabled() && (value() || hayFechaAMedias())) {
             <button
               type="button"
-              class="dt__hora-saltos"
-              aria-haspopup="dialog"
-              [attr.aria-expanded]="panelAbierto() === 'hora'"
-              [attr.aria-controls]="idPanelHora()"
-              [attr.aria-label]="tElegirHora()"
-              [disabled]="disabled()"
-              (click)="alternar('hora')"
+              class="dt__borrar"
+              [attr.aria-label]="tBorrar() + ' ' + label()"
+              (click)="borrar()"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" />
               </svg>
             </button>
-          </div>
+          }
         </div>
-        <label [for]="idCampo()" [class.sr-only]="etiquetaOculta()">{{ label() }}</label>
 
         @if (panelAbierto() === 'fecha') {
           <div
@@ -324,8 +266,8 @@ function texto(transloco: TranslocoService, clave: string) {
           </div>
         }
       </div>
-      @if (error()) {
-        <p [id]="idError()" class="error">{{ error() }}</p>
+      @if (mensajeError(); as mensaje) {
+        <p [id]="idError()" class="error">{{ mensaje }}</p>
       } @else if (hint()) {
         <p [id]="idAyuda()" class="ayuda">{{ hint() }}</p>
       }
@@ -354,7 +296,7 @@ function texto(transloco: TranslocoService, clave: string) {
       display: grid;
       /* min-width 0: sin él, la fecha («jue, 29 oct 2026», sin saltos de
        * línea) impide que la columna encoja y el par desborda su hueco. */
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       gap: var(--space-xs);
     }
     /* Mismas medidas que el input de Input (3.25rem, superficie 2, radio
@@ -472,40 +414,56 @@ function texto(transloco: TranslocoService, clave: string) {
     .dt__hora-saltos[aria-expanded='true'] {
       color: var(--accent);
     }
+    .dt__borrar {
+      display: grid;
+      place-items: center;
+      width: 2.25rem;
+      align-self: center;
+      height: 2.25rem;
+      border: none;
+      border-radius: var(--radius-md);
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .dt__borrar:hover {
+      background: var(--surface-hi);
+      color: var(--fg);
+    }
+    .dt__borrar svg {
+      width: 16px;
+      height: 16px;
+    }
     .dt__hora-saltos svg {
       width: 18px;
       height: 18px;
     }
-    /* Etiqueta flotante, calco de la de Input: dentro del campo en reposo,
-       arriba (y en color acento) con foco o valor. Va sobre el botón de
-       fecha, que es el ancho flexible del par. */
-    .campo > .dt > label {
+    /* Etiquetas fijas, en la posición «flotada» de Input (arriba y pequeñas),
+       para que nunca desaparezcan ni se recorten al haber valor; acento con
+       foco dentro de su caja. */
+    .dt__parte {
+      position: relative;
+      min-width: 0;
+    }
+    .dt__hora {
+      position: relative;
+    }
+    .dt__rotulo {
       position: absolute;
       left: 0.8rem;
-      top: 50%;
-      transform: translateY(-50%);
-      transform-origin: left top;
+      top: 0.45rem;
+      font-size: 0.78em;
       font-weight: 500;
       color: var(--muted);
       pointer-events: none;
-      transition:
-        transform 0.15s ease,
-        top 0.15s ease,
-        color 0.15s ease;
-      max-width: calc(100% - 3.5rem);
+      max-width: calc(100% - 3rem);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .campo.flotando > .dt > label {
-      top: 0.6rem;
-      transform: translateY(0) scale(0.78);
+    .dt__parte:focus-within .dt__rotulo,
+    .dt__hora:focus-within .dt__rotulo {
       color: var(--accent);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .campo > .dt > label {
-        transition: none;
-      }
     }
     .dt__panel {
       position: absolute;
@@ -686,6 +644,15 @@ export class DatetimePicker {
   readonly error = input<string | null>(null);
   readonly hint = input<string | null>(null);
   readonly fieldId = input<string | null>(null);
+  /** Rótulo de la caja de hora; por defecto, «Hora». */
+  readonly rotuloHora = input<string | null>(null);
+  /** Solo el día, sin caja de hora: `value` pasa a ser `YYYY-MM-DD`, lo mismo
+   * que el `<input type="date">` al que sustituye. */
+  readonly soloFecha = input(false);
+  /** `true` mientras hay un día elegido pero todavía no la hora: `value` sigue
+   * vacío (un `YYYY-MM-DDTHH:mm` sin hora no existe) y quien usa el componente
+   * puede pedir la hora en vez de la fecha. */
+  readonly horaPendiente = model(false);
   /** `YYYY-MM-DDTHH:mm`, lo mismo que entendía el `<input datetime-local>` que
    * sustituye: quien consuma el componente no cambia ni una línea de su lógica
    * de fechas (parsear, validar, convertir a ISO…). */
@@ -705,7 +672,7 @@ export class DatetimePicker {
   protected readonly idError = computed(() => `${this.idCampo()}-error`);
   protected readonly idAyuda = computed(() => `${this.idCampo()}-ayuda`);
   protected readonly descripcionId = computed(() => {
-    if (this.error()) return this.idError();
+    if (this.mensajeError()) return this.idError();
     if (this.hint()) return this.idAyuda();
     return null;
   });
@@ -726,6 +693,8 @@ export class DatetimePicker {
 
   // Textos reactivos: ver `texto()` para por qué no basta con `translate()`.
   protected readonly tElegirFecha = texto(this.transloco, 'comun.datetime.elegirFecha');
+  protected readonly tIndicaHora = texto(this.transloco, 'comun.datetime.indicaHora');
+  protected readonly tBorrar = texto(this.transloco, 'comun.datetime.borrar');
   protected readonly tElegirHora = texto(this.transloco, 'comun.datetime.elegirHora');
   protected readonly tMesAnterior = texto(this.transloco, 'comun.datetime.mesAnterior');
   protected readonly tMesSiguiente = texto(this.transloco, 'comun.datetime.mesSiguiente');
@@ -738,18 +707,25 @@ export class DatetimePicker {
   protected readonly tAhora = texto(this.transloco, 'comun.datetime.ahora');
   protected readonly tListo = texto(this.transloco, 'comun.datetime.listo');
 
-  protected readonly partes = computed(() => partirValor(this.value()));
+  protected readonly partes = computed(() =>
+    this.soloFecha() ? partirFecha(this.value()) : partirValor(this.value()),
+  );
 
-  /** La etiqueta flota mientras el foco ande por cualquier parte del campo
-   * (botones o paneles) o haya valor — de ahí el focusin/focusout del host en
-   * vez de un blur suelto por botón. */
-  protected readonly enFoco = signal(false);
-  protected readonly flotando = computed(
-    () => this.enFoco() || this.panelAbierto() !== null || this.value().length > 0,
+  /** Día elegido sin hora todavía: elegir un día no inventa la hora. */
+  private readonly fechaSinHora = signal<{ anio: number; mes: number; dia: number } | null>(null);
+  /** El día que se muestra y marca el calendario: el del valor o, si aún no hay
+   * hora, el elegido a medias. */
+  private readonly fechaVisible = computed(() => this.partes() ?? this.fechaSinHora());
+  protected readonly hayFechaAMedias = computed(() => this.fechaSinHora() !== null);
+  /** El error de fuera manda; si no hay, el propio componente avisa de que
+   * falta la hora de un día ya elegido, para que no se pierda en ningún
+   * formulario que no la valide. */
+  protected readonly mensajeError = computed(
+    () => this.error() ?? (this.horaPendiente() ? this.tIndicaHora() : null),
   );
 
   protected readonly etiquetaFecha = computed(() => {
-    const partes = this.partes();
+    const partes = this.fechaVisible();
     if (!partes) return '';
     return new Intl.DateTimeFormat(this.locale(), {
       weekday: 'short',
@@ -796,7 +772,7 @@ export class DatetimePicker {
     // getDay() cuenta desde el domingo (0); el offset lleva el lunes a la primera columna.
     const offset = (primero.getDay() + 6) % 7;
     const inicio = new Date(primero.getFullYear(), primero.getMonth(), 1 - offset);
-    const elegido = this.partes();
+    const elegido = this.fechaVisible();
     const actual = new Date();
     const formatoEtiqueta = new Intl.DateTimeFormat(this.locale(), {
       weekday: 'long',
@@ -825,6 +801,16 @@ export class DatetimePicker {
   });
 
   constructor() {
+    // Un valor completo que llega de fuera (cargar un evento, escribir en el
+    // nativo) sustituye a cualquier día elegido a medias.
+    effect(() => {
+      if (this.value()) {
+        untracked(() => {
+          this.fechaSinHora.set(null);
+          this.horaPendiente.set(false);
+        });
+      }
+    });
     // Al abrir cada panel, lo elegido (u hoy) entra en el foco y en la vista:
     // es donde sigue la conversación después de pulsar el botón. Solo se
     // dispara con el cambio de panel: los días se leen con `untracked` para
@@ -856,15 +842,9 @@ export class DatetimePicker {
     }
   }
 
-  @HostListener('focusin')
-  protected alGanarFoco(): void {
-    this.enFoco.set(true);
-  }
-
   @HostListener('focusout', ['$event'])
   protected alPerderFoco(evento: FocusEvent): void {
     const hacia = evento.relatedTarget as Node | null;
-    this.enFoco.set(hacia !== null && this.elementoAnfitrion.nativeElement.contains(hacia));
     if (hacia === null || !this.elementoAnfitrion.nativeElement.contains(hacia)) {
       this.blurred.emit();
     }
@@ -890,7 +870,7 @@ export class DatetimePicker {
     if (panel === 'fecha') {
       // Resincroniza el mes con el valor vigente al abrir, no con el último
       // que se hojeó: cerrar sin elegir no debe dejar un mes huérfano recordado.
-      const partes = this.partes();
+      const partes = this.fechaVisible();
       this.mesVisible.set(
         partes ? new Date(partes.anio, partes.mes, 1) : primerDiaDeMes(new Date()),
       );
@@ -916,49 +896,42 @@ export class DatetimePicker {
     this.mesVisible.set(new Date(actual.getFullYear(), actual.getMonth() + direccion, 1));
   }
 
-  /** Elegir día fija la fecha conservando la hora (o la convención de media
-   * mañana si aún no había) y cierra el panel: seguir con la hora, si hace
-   * falta, es el paso natural siguiente. */
+  /** Elegir día fija la fecha conservando la hora y cierra el panel. Si aún no
+   * había hora, no se inventa: el día queda elegido a medias
+   * (`horaPendiente`) hasta que se escriba o elija la hora. */
   protected elegirDia(celda: CeldaDia): void {
-    const existentes = this.partes();
-    const [hora, minuto] = existentes
-      ? [existentes.hora, existentes.minuto]
-      : HORA_POR_DEFECTO.split(':').map(Number);
-    this.value.set(
-      aValorLocal({
-        anio: celda.fecha.getFullYear(),
-        mes: celda.fecha.getMonth(),
-        dia: celda.fecha.getDate(),
-        hora,
-        minuto,
-      }),
-    );
+    this.fijarFecha(celda.fecha);
     this.cerrar('fecha', true);
   }
 
   /** «Hoy» fija la fecha de hoy conservando la hora elegida. */
   protected elegirHoy(): void {
-    const existentes = this.partes();
-    const [hora, minuto] = existentes
-      ? [existentes.hora, existentes.minuto]
-      : HORA_POR_DEFECTO.split(':').map(Number);
-    const actual = new Date();
-    this.value.set(
-      aValorLocal({
-        anio: actual.getFullYear(),
-        mes: actual.getMonth(),
-        dia: actual.getDate(),
-        hora,
-        minuto,
-      }),
-    );
+    this.fijarFecha(new Date());
     this.cerrar('fecha', true);
   }
 
-  /** Fija la hora sobre la fecha vigente (o hoy, si todavía no hay). */
+  private fijarFecha(fecha: Date): void {
+    const dia = { anio: fecha.getFullYear(), mes: fecha.getMonth(), dia: fecha.getDate() };
+    if (this.soloFecha()) {
+      this.value.set(aValorFecha(dia));
+      return;
+    }
+    const existentes = this.partes();
+    if (existentes) {
+      this.value.set(aValorLocal({ ...dia, hora: existentes.hora, minuto: existentes.minuto }));
+      return;
+    }
+    this.fechaSinHora.set(dia);
+    this.horaPendiente.set(true);
+  }
+
+  /** Fija la hora sobre la fecha vigente: la del valor, la elegida a medias o,
+   * si todavía no hay ninguna, hoy. */
   private aplicarHora(hora: number, minuto: number): void {
-    const base = this.partes() ?? { ...hoy(), hora: 0, minuto: 0 };
+    const base = this.fechaVisible() ?? hoy();
     this.value.set(aValorLocal({ ...base, hora, minuto }));
+    this.fechaSinHora.set(null);
+    this.horaPendiente.set(false);
   }
 
   /** Lo tecleado en la caja («9», «935», «9:35») se aplica en cuanto forma
@@ -1015,7 +988,7 @@ export class DatetimePicker {
   /** Salto de hora en minutos (negativo o positivo), con vuelta al día: las
    * 23:55 + 10 min son las 00:05 del mismo valor de fecha. */
   protected ajustarHora(saltoMinutos: number): void {
-    const partes = this.partes() ?? { ...hoy(), hora: 0, minuto: 0 };
+    const partes = this.partes() ?? { hora: 0, minuto: 0 };
     const total = (((partes.hora * 60 + partes.minuto + saltoMinutos) % 1440) + 1440) % 1440;
     this.aplicarHora(Math.floor(total / 60), total % 60);
     this.horaCaja.set(null);
@@ -1044,6 +1017,17 @@ export class DatetimePicker {
     }
   }
 
+  /** Vacía el campo (fecha opcional): sin esto no había forma de quitar, por
+   * ejemplo, la caducidad de un código de descuento. */
+  protected borrar(): void {
+    this.value.set('');
+    this.fechaSinHora.set(null);
+    this.horaPendiente.set(false);
+    this.horaCaja.set(null);
+    this.cerrar('fecha', false);
+    this.cerrar('hora', false);
+  }
+
   protected alEscribirEnNativo(evento: Event): void {
     this.value.set((evento.target as HTMLInputElement).value);
   }
@@ -1058,8 +1042,4 @@ export class DatetimePicker {
   private enfocar(elemento: Element | null): void {
     (elemento as HTMLElement | null)?.focus?.();
   }
-}
-
-function primerDiaDeMes(fecha: Date): Date {
-  return new Date(fecha.getFullYear(), fecha.getMonth(), 1);
 }

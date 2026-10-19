@@ -4199,6 +4199,55 @@
         }
       }
     },
+    "/api/v1/events/tags": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Sugerir etiquetas ya usadas",
+        "description": "Etiquetas de los eventos de la organización que contienen `q` (primero las que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta el autocompletado del campo de etiquetas.",
+        "operationId": "suggest_event_tags_api_v1_events_tags_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Suggest Event Tags Api V1 Events Tags Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}": {
       "get": {
         "tags": [
@@ -14222,7 +14271,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -15342,7 +15392,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"

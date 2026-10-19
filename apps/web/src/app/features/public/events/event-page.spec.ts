@@ -111,6 +111,29 @@ describe('EventPage', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Cargando');
   });
 
+  it('pinta la descripción como Markdown saneado, sin el HTML hostil que pudiera traer', async () => {
+    const clave = makeStateKey<PublicEventDetail>('public-event:acme:iawic-2026');
+    TestBed.inject(TransferState).set(clave, {
+      ...eventoDetalle(),
+      description:
+        '**Programa** completo\nsegunda línea\n\n<img src="x" onerror="alert(1)"> [web](javascript:alert(1))',
+    } as PublicEventDetail);
+
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    await avanzar(fixture);
+    await avanzar(fixture);
+
+    const descripcion = fixture.nativeElement.querySelector('.hero__descripcion') as HTMLElement;
+    expect(descripcion.querySelector('strong')?.textContent).toBe('Programa');
+    expect(descripcion.querySelector('br')).not.toBeNull();
+    expect(descripcion.innerHTML).not.toContain('<img');
+    expect(descripcion.innerHTML).not.toContain('onerror');
+    expect(descripcion.innerHTML).not.toMatch(/javascript:/i);
+  });
+
   it('muestra el evento en tema claro sin violaciones de accesibilidad', async () => {
     document.documentElement.setAttribute('data-theme', 'light');
     const fixture = TestBed.createComponent(EventPage);

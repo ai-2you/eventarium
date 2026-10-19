@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated, Any
 
@@ -15,6 +16,7 @@ from app.core.ratelimit import PEDIR_BIO_POR_IP, limit_per_ip
 from app.core.storage import build_object_key, get_storage, public_url_versionada, validate_upload
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
 from app.modules.events import repository, service, speakers_repository
+from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
 from app.modules.events.models import Event, EventMember, EventSession, EventVenue
 from app.modules.events.schemas import (
     EventCategoryOut,
@@ -226,6 +228,26 @@ async def create_event(
         session, organization_id=usuario.organization_id, datos=datos.model_dump()
     )
     return await _event_response(session, evento)
+
+
+@router.get(
+    "/tags",
+    summary="Sugerir etiquetas ya usadas",
+    description=(
+        "Etiquetas de los eventos de la organización que contienen `q` (primero las "
+        "que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta "
+        "el autocompletado del campo de etiquetas."
+    ),
+    response_model=list[str],
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def suggest_event_tags(
+    usuario: CurrentUserDep,
+    session: DbDep,
+    q: Annotated[str, Query(max_length=LONGITUD_MAX_ETIQUETA)] = "",
+) -> list[str]:
+    texto = re.sub(r"\s+", " ", q.strip().lower())
+    return await repository.sugerir_etiquetas(session, usuario.organization_id, texto)
 
 
 @router.get(

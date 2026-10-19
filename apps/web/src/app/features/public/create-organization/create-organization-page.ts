@@ -10,26 +10,12 @@ import { Card } from '../../../shared/ui/card';
 import { Input } from '../../../shared/ui/input';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { TurnstileWidget } from '../../../shared/ui/turnstile-widget';
+import { slugify } from '../../../core/texto/slug';
 
 type Campo = 'name' | 'firstName' | 'lastName';
 
 /** Intentos de identificador antes de rendirse: el base más sufijos -2, -3… */
 const INTENTOS_DE_SLUG = 5;
-
-// Marcas diacríticas combinantes (U+0300-U+036F) que deja `normalize('NFD')` separadas
-// de la letra base: quitarlas es lo que convierte "Á" en "a" en vez de en "á".
-const MARCAS_DIACRITICAS = /[̀-ͯ]/g;
-
-/** Quita acentos y pasa a minúsculas con guiones, para generar el identificador
- * interno de la organización a partir de su nombre. */
-function slugify(texto: string): string {
-  return texto
-    .normalize('NFD')
-    .replace(MARCAS_DIACRITICAS, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 /**
  * Última pantalla del alta libre: de cuenta verificada a organización operativa.

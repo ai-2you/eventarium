@@ -31,6 +31,7 @@ import { migasDeEvento } from '../../../shared/ui/migas-de-evento';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { ShareLinks } from '../../../shared/ui/share-links';
 import { VenueMap } from '../../../shared/ui/venue-map';
+import { MarkdownSeguro } from '../../../shared/legal/markdown-seguro';
 import type { LocationMode, PublicEventDetail, RegistrationMode } from './event-page.types';
 import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-section';
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
@@ -91,6 +92,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     ShareLinks,
     EventAgendaSection,
     EventSpeakersSection,
+    MarkdownSeguro,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -158,7 +160,14 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
                   <p class="hero__lede">{{ evento.summary }}</p>
                 }
                 @if (evento.description) {
-                  <p class="hero__descripcion">{{ evento.description }}</p>
+                  <!-- Markdown del editor del panel, saneado: nunca [innerHTML]
+                       directo con texto de la organización. Los saltos simples
+                       se respetan por las descripciones escritas en texto plano. -->
+                  <app-markdown-seguro
+                    class="hero__descripcion"
+                    [texto]="evento.description"
+                    [saltosDeLinea]="true"
+                  />
                 }
                 @if (!evento.cancelled) {
                   <app-share-links
@@ -439,9 +448,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
       margin-top: var(--sp-5);
     }
     .hero__descripcion {
+      display: block;
       max-width: 64ch;
       margin-top: var(--sp-5);
-      white-space: pre-line;
     }
     .hero__compartir {
       display: block;

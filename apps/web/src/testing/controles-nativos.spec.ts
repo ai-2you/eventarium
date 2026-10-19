@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
  */
 const RAIZ = join(import.meta.dirname, '../app');
 const PERMITIDOS = new Set(['shared/ui/select.ts']);
+/** El espejo oculto del propio `app-datetime-picker`. */
+const FECHA_PERMITIDOS = new Set(['shared/ui/datetime-picker.ts']);
 
 function ficherosFuente(directorio: string): string[] {
   return readdirSync(directorio).flatMap((nombre) => {
@@ -44,6 +46,14 @@ describe('controles nativos', () => {
       .filter(({ codigo }) => /<select[\s>]/.test(codigo))
       .map((f) => f.ruta);
     expect(conSelect).toEqual([]);
+  });
+
+  it('no hay selectores de fecha u hora nativos fuera de app-datetime-picker', () => {
+    const conFechaNativa = fuentes
+      .filter(({ ruta }) => !FECHA_PERMITIDOS.has(ruta))
+      .filter(({ codigo }) => /type="(date|time|datetime-local|month|week)"/.test(codigo))
+      .map((f) => f.ruta);
+    expect(conFechaNativa).toEqual([]);
   });
 
   it('no se usan alert, confirm ni prompt del navegador', () => {

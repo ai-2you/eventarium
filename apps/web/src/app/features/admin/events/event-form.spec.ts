@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -11,6 +11,9 @@ import es from '../../../../../public/assets/i18n/es-ES.json';
 import { By } from '@angular/platform-browser';
 import { Select } from '../../../shared/ui/select';
 import { EventScope } from '../../../layouts/admin/event-scope';
+import { errorInterceptor } from '../../../core/api/error.interceptor';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
+import { RichTextEditor } from '../../../shared/ui/rich-text-editor';
 import { EventForm } from './event-form';
 
 function eventoDetalle(overrides: Record<string, unknown> = {}) {
@@ -48,7 +51,7 @@ function configurar(id: string | null) {
     ],
     providers: [
       provideZonelessChangeDetection(),
-      provideHttpClient(),
+      provideHttpClient(withInterceptors([errorInterceptor])),
       provideHttpClientTesting(),
       provideRouter([]),
       {
@@ -209,12 +212,17 @@ describe('EventForm', () => {
 
     it('carga las etiquetas y envía categoría y etiquetas normalizadas al guardar', async () => {
       const fixture = await abrirEdicion({ category: CATEGORIAS[0], tags: ['ia', 'datos'] });
-      const campo = fixture.nativeElement.querySelector('#evento-etiquetas') as HTMLInputElement;
-      expect(campo.value).toBe('ia, datos');
+      const pildoras = () =>
+        Array.from(fixture.nativeElement.querySelectorAll('.pildora span')).map((s) =>
+          (s as HTMLElement).textContent?.trim(),
+        );
+      expect(pildoras()).toEqual(['ia', 'datos']);
 
-      campo.value = ' IA , Machine   Learning,ia ';
+      const campo = fixture.nativeElement.querySelector('#evento-etiquetas') as HTMLInputElement;
+      campo.value = ' IA , Machine   Learning,';
       campo.dispatchEvent(new Event('input'));
       await avanzar(fixture);
+      expect(pildoras()).toEqual(['ia', 'datos', 'machine learning']);
       (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
         new Event('submit'),
       );
@@ -222,7 +230,7 @@ describe('EventForm', () => {
 
       const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
       expect(peticion.request.body.category_id).toBe('c-taller');
-      expect(peticion.request.body.tags).toEqual(['ia', 'machine learning']);
+      expect(peticion.request.body.tags).toEqual(['ia', 'datos', 'machine learning']);
       peticion.flush(eventoDetalle());
     });
 
@@ -245,19 +253,25 @@ describe('EventForm', () => {
       peticion.flush(eventoDetalle());
     });
 
-    it('unas etiquetas inválidas se avisan y bloquean el guardado', async () => {
+    it('una etiqueta inválida no se añade y se explica por qué', async () => {
       const fixture = await abrirEdicion();
       const campo = fixture.nativeElement.querySelector('#evento-etiquetas') as HTMLInputElement;
-      campo.value = 'uno, dos, tres, cuatro, cinco, seis';
+      campo.value = 'c++,';
       campo.dispatchEvent(new Event('input'));
       await avanzar(fixture);
-      expect(fixture.nativeElement.textContent).toContain('como máximo 5 etiquetas');
 
-      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
-        new Event('submit'),
+      expect(fixture.nativeElement.textContent).toContain(
+        'solo letras, números, espacios y guiones',
       );
-      await avanzar(fixture);
-      http.expectNone((p) => p.method === 'PATCH');
+      expect(fixture.nativeElement.querySelectorAll('.pildora').length).toBe(0);
+    });
+
+    it('con diez etiquetas el campo no admite más', async () => {
+      const fixture = await abrirEdicion({
+        tags: ['uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'],
+      });
+      const campo = fixture.nativeElement.querySelector('#evento-etiquetas') as HTMLInputElement;
+      expect(campo.readOnly).toBe(true);
     });
   });
 
@@ -289,6 +303,13 @@ describe('EventForm', () => {
         ?.componentInstance.value.set(valor);
     }
 
+    /** El editor de la descripción (Tiptap) no se monta en jsdom sin stubs: se
+     * lee y escribe por su `model`, que es lo que ve el formulario. */
+    function editorDeDescripcion(fixture: ComponentFixture<unknown>): RichTextEditor {
+      return fixture.debugElement.query(By.directive(RichTextEditor))
+        .componentInstance as RichTextEditor;
+    }
+
     async function enviar(fixture: ComponentFixture<unknown>): Promise<void> {
       campo<HTMLFormElement>(fixture, 'form').dispatchEvent(new Event('submit'));
       await avanzar(fixture);
@@ -303,9 +324,7 @@ describe('EventForm', () => {
       });
 
       expect(campo<HTMLInputElement>(fixture, '#evento-resumen').value).toBe('Una semana de IA');
-      expect(campo<HTMLTextAreaElement>(fixture, '#evento-descripcion').value).toBe(
-        'Charlas y talleres.',
-      );
+      expect(editorDeDescripcion(fixture).value()).toBe('Charlas y talleres.');
       expect(campo<HTMLSelectElement>(fixture, '#evento-modo-inscripcion-nativo').value).toBe(
         'approval',
       );
@@ -316,9 +335,7 @@ describe('EventForm', () => {
     it('envía los cambios y vacía con null lo que se borra', async () => {
       const fixture = await abrirEdicion({ description: 'Texto viejo', capacity: 50 });
 
-      const descripcion = campo<HTMLTextAreaElement>(fixture, '#evento-descripcion');
-      descripcion.value = '   ';
-      descripcion.dispatchEvent(new Event('input'));
+      editorDeDescripcion(fixture).value.set('   ');
       const resumen = campo<HTMLInputElement>(fixture, '#evento-resumen');
       resumen.value = ' Resumen nuevo ';
       resumen.dispatchEvent(new Event('input'));
@@ -403,5 +420,120 @@ describe('EventForm', () => {
 
       expect(fixture.nativeElement.querySelector('app-alert')).not.toBeNull();
     });
+  });
+
+  describe('slug automático', () => {
+    function escribir(fixture: ComponentFixture<unknown>, id: string, valor: string): void {
+      const campo = fixture.nativeElement.querySelector(`#${id}`) as HTMLInputElement;
+      campo.value = valor;
+      campo.dispatchEvent(new Event('input'));
+    }
+
+    function slug(fixture: ComponentFixture<unknown>): string {
+      return (fixture.nativeElement.querySelector('#evento-slug') as HTMLInputElement).value;
+    }
+
+    async function abrirAlta() {
+      configurar(null);
+      http = TestBed.inject(HttpTestingController);
+      const fixture = TestBed.createComponent(EventForm);
+      await avanzar(fixture);
+      await flushCategorias(http, fixture);
+      return fixture;
+    }
+
+    it('al crear, el slug sigue al título', async () => {
+      const fixture = await abrirAlta();
+
+      escribir(fixture, 'evento-titulo', 'Semana de la IA en Cáceres');
+      await avanzar(fixture);
+
+      expect(slug(fixture)).toBe('semana-de-la-ia-en-caceres');
+    });
+
+    it('si se edita el slug deja de seguir al título, y vaciarlo lo reengancha', async () => {
+      const fixture = await abrirAlta();
+
+      escribir(fixture, 'evento-titulo', 'Primer título');
+      escribir(fixture, 'evento-slug', 'mi-slug');
+      escribir(fixture, 'evento-titulo', 'Otro título');
+      await avanzar(fixture);
+      expect(slug(fixture)).toBe('mi-slug');
+
+      escribir(fixture, 'evento-slug', '');
+      escribir(fixture, 'evento-titulo', 'Título final');
+      await avanzar(fixture);
+      expect(slug(fixture)).toBe('titulo-final');
+    });
+
+    it('al editar un evento existente el slug no cambia solo', async () => {
+      configurar('e1');
+      http = TestBed.inject(HttpTestingController);
+      const fixture = TestBed.createComponent(EventForm);
+      await avanzar(fixture);
+      await flushCategorias(http, fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'GET')
+        .flush(eventoDetalle());
+      await avanzar(fixture);
+      await flushEventDetails(http, fixture);
+
+      escribir(fixture, 'evento-titulo', 'Título cambiado');
+      await avanzar(fixture);
+
+      expect(slug(fixture)).toBe('iawic-2026');
+    });
+
+    it('si el slug está ocupado, deja puesto el que propone la API', async () => {
+      const fixture = await abrirAlta();
+      escribir(fixture, 'evento-titulo', 'Evento repetido');
+      await avanzar(fixture);
+      const formulario = fixture.componentInstance as unknown as {
+        startsAt: { set(v: string): void };
+        endsAt: { set(v: string): void };
+      };
+      formulario.startsAt.set('2026-10-01T09:00');
+      formulario.endsAt.set('2026-10-01T18:00');
+      await avanzar(fixture);
+
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events' && p.method === 'POST')
+        .flush(
+          {
+            detail: 'Ya existe un evento con ese identificador.',
+            suggested_slug: 'evento-repetido-2',
+          },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await avanzar(fixture);
+
+      expect(slug(fixture)).toBe('evento-repetido-2');
+    });
+  });
+
+  it('con el día elegido pero sin hora, pide la hora en vez de la fecha', async () => {
+    configurar(null);
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(EventForm);
+    await avanzar(fixture);
+    await flushCategorias(http, fixture);
+
+    const selector = fixture.debugElement
+      .queryAll(By.directive(DatetimePicker))
+      .find((d) => d.nativeElement.querySelector('#evento-inicio'));
+    (selector?.componentInstance as DatetimePicker).horaPendiente.set(true);
+    await avanzar(fixture);
+    (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+      new Event('submit'),
+    );
+    await avanzar(fixture);
+
+    expect(fixture.nativeElement.textContent).toContain('Indica la hora de inicio.');
+    expect(fixture.nativeElement.textContent).not.toContain('Indica la fecha de inicio.');
+    http.expectNone((p) => p.method === 'POST');
   });
 });

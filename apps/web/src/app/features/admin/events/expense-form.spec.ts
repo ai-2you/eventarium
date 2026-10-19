@@ -87,7 +87,7 @@ describe('ExpenseForm', () => {
     // que no cuadra con sus sumandos.
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Catering SL');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '100');
     escribir(fixture, 'gasto-iva', '21');
     await enviar(fixture);
@@ -102,7 +102,7 @@ describe('ExpenseForm', () => {
   it('sin IVA el total es la base, no nulo', async () => {
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Transporte');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '50');
     await enviar(fixture);
 
@@ -115,7 +115,7 @@ describe('ExpenseForm', () => {
   it('acepta la coma como separador decimal', async () => {
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Catering SL');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '12,50');
     await enviar(fixture);
 
@@ -130,7 +130,7 @@ describe('ExpenseForm', () => {
     // este es el comportamiento que había antes de moverla.
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Catering SL');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '0,015');
     await enviar(fixture);
 
@@ -142,7 +142,7 @@ describe('ExpenseForm', () => {
   it('un importe que no es un número se rechaza sin llamar al API', async () => {
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Catering SL');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', 'mil euros');
     await enviar(fixture);
 
@@ -153,7 +153,7 @@ describe('ExpenseForm', () => {
   it('la partida es opcional y va nula si no se elige', async () => {
     const fixture = await montar(http);
     escribir(fixture, 'gasto-proveedor', 'Varios');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '10');
     await enviar(fixture);
 
@@ -168,7 +168,7 @@ describe('ExpenseForm', () => {
     fixture.componentInstance.creado.subscribe((mensaje) => (aviso = mensaje));
 
     escribir(fixture, 'gasto-proveedor', 'Catering SL');
-    escribir(fixture, 'gasto-fecha', '2026-09-05');
+    escribir(fixture, 'gasto-fecha-nativo', '2026-09-05');
     escribir(fixture, 'gasto-base', '100');
     await enviar(fixture);
     http.expectOne((p) => p.url === `${BASE}/expenses` && p.method === 'POST').flush({});

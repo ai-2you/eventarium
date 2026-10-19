@@ -14,6 +14,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Card } from '../../../shared/ui/card';
 import { Input } from '../../../shared/ui/input';
 import { Textarea } from '../../../shared/ui/textarea';
@@ -71,7 +72,7 @@ function precioAEuros(cents: number): string {
 @Component({
   selector: 'app-event-ticket-types',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Input, Textarea, PageHeader],
+  imports: [TranslocoDirective, Alert, Button, Card, DatetimePicker, Input, Textarea, PageHeader],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.ticketTypes.titulo')">
@@ -207,24 +208,16 @@ function precioAEuros(cents: number): string {
               </p>
             </div>
 
-            <div class="campo-fecha">
-              <label for="tipo-inicio-venta">{{ t('admin.events.ticketTypes.inicioVenta') }}</label>
-              <input
-                id="tipo-inicio-venta"
-                type="datetime-local"
-                [value]="inicioVenta()"
-                (input)="inicioVenta.set(alTexto($event))"
-              />
-            </div>
-            <div class="campo-fecha">
-              <label for="tipo-fin-venta">{{ t('admin.events.ticketTypes.finVenta') }}</label>
-              <input
-                id="tipo-fin-venta"
-                type="datetime-local"
-                [value]="finVenta()"
-                (input)="finVenta.set(alTexto($event))"
-              />
-            </div>
+            <app-datetime-picker
+              fieldId="tipo-inicio-venta"
+              [label]="t('admin.events.ticketTypes.inicioVenta')"
+              [(value)]="inicioVenta"
+            />
+            <app-datetime-picker
+              fieldId="tipo-fin-venta"
+              [label]="t('admin.events.ticketTypes.finVenta')"
+              [(value)]="finVenta"
+            />
 
             @if (formError(); as mensaje) {
               <app-alert tone="error">{{ mensaje }}</app-alert>
@@ -315,13 +308,11 @@ function precioAEuros(cents: number): string {
       border-top: 1px solid var(--border);
       max-width: 34rem;
     }
-    .campo-numero,
-    .campo-fecha {
+    .campo-numero {
       display: grid;
       gap: var(--space-xs);
     }
-    .campo-numero input,
-    .campo-fecha input {
+    .campo-numero input {
       width: 100%;
       max-width: 16rem;
       box-sizing: border-box;

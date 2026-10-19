@@ -22,6 +22,12 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
+
+# Markdown del editor del panel (o de la API/MCP). El tope protege la ficha
+# pública, que lo convierte y sanea en el navegador de cada visitante, y el
+# propio editor, que lo carga entero.
+LONGITUD_MAXIMA_DESCRIPCION = 20000
+DescripcionDeEvento = Annotated[str, Field(max_length=LONGITUD_MAXIMA_DESCRIPCION)]
 SessionType = Literal["talk", "break", "service", "other"]
 VideoPlatform = Literal["youtube", "vimeo", "twitch", "other"]
 
@@ -109,7 +115,7 @@ class EventCreate(BaseModel):
     slug: Annotated[str, Field(min_length=2, max_length=160, pattern=SLUG_PATTERN)]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # Id de una categoría **activa** del catálogo, o `None` (sin categoría).
     category_id: str | None = None
     # Minúsculas, máx. 5, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
@@ -152,7 +158,7 @@ class EventUpdate(BaseModel):
 
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # `null` explícito **quita** la categoría; si el campo no viene, no cambia.
     category_id: str | None = None
     # Si no viene, no cambia; `[]` quita todas. `null` no es válido.

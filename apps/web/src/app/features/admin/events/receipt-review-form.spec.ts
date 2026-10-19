@@ -191,7 +191,7 @@ describe('ReceiptReviewForm', () => {
     http.expectNone(CONFIRM);
 
     escribir(fixture, 'proveedor', 'Catering SL');
-    escribir(fixture, 'fecha', '');
+    escribir(fixture, 'fecha-nativo', '');
     await enviar(fixture);
     expect(fixture.nativeElement.textContent).toContain('Indica la fecha del gasto');
     http.expectNone(CONFIRM);
@@ -368,9 +368,12 @@ describe('ReceiptReviewForm', () => {
   it('se puede recorrer con teclado hasta confirmar, y el diálogo devuelve el foco al salir', async () => {
     const fixture = await montar();
 
-    // Ningún control del flujo está fuera del orden de tabulación ni inerte.
+    // Ningún control del flujo está fuera del orden de tabulación ni inerte
+    // (salvo los espejos ocultos de los componentes, `aria-hidden`).
     const enfocables = Array.from(
-      fixture.nativeElement.querySelectorAll('input:not([disabled]), button:not([disabled])'),
+      fixture.nativeElement.querySelectorAll(
+        'input:not([disabled]):not([aria-hidden="true"]), button:not([disabled])',
+      ),
     ) as HTMLElement[];
     for (const elemento of enfocables) {
       expect(elemento.tabIndex).toBeGreaterThanOrEqual(0);

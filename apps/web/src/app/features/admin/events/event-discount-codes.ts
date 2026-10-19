@@ -16,6 +16,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Card } from '../../../shared/ui/card';
 import { Input } from '../../../shared/ui/input';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -75,7 +76,7 @@ function vacio(): {
 @Component({
   selector: 'app-event-discount-codes',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Input, PageHeader, Select],
+  imports: [TranslocoDirective, Alert, Button, Card, DatetimePicker, Input, PageHeader, Select],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.discountCodes.titulo')">
@@ -206,28 +207,16 @@ function vacio(): {
               [(value)]="ticketTypeId"
             />
 
-            <div class="campo-fecha">
-              <label for="codigo-vigente-desde">
-                {{ t('admin.events.discountCodes.vigenteDesde') }}
-              </label>
-              <input
-                id="codigo-vigente-desde"
-                type="datetime-local"
-                [value]="validFrom()"
-                (input)="validFrom.set(alTexto($event))"
-              />
-            </div>
-            <div class="campo-fecha">
-              <label for="codigo-vigente-hasta">
-                {{ t('admin.events.discountCodes.vigenteHasta') }}
-              </label>
-              <input
-                id="codigo-vigente-hasta"
-                type="datetime-local"
-                [value]="validUntil()"
-                (input)="validUntil.set(alTexto($event))"
-              />
-            </div>
+            <app-datetime-picker
+              fieldId="codigo-vigente-desde"
+              [label]="t('admin.events.discountCodes.vigenteDesde')"
+              [(value)]="validFrom"
+            />
+            <app-datetime-picker
+              fieldId="codigo-vigente-hasta"
+              [label]="t('admin.events.discountCodes.vigenteHasta')"
+              [(value)]="validUntil"
+            />
 
             @if (formError(); as mensaje) {
               <app-alert tone="error">{{ mensaje }}</app-alert>
@@ -293,13 +282,11 @@ function vacio(): {
       border-top: 1px solid var(--border);
       max-width: 34rem;
     }
-    .campo-numero,
-    .campo-fecha {
+    .campo-numero {
       display: grid;
       gap: var(--space-xs);
     }
-    .campo-numero input,
-    .campo-fecha input {
+    .campo-numero input {
       width: 100%;
       max-width: 16rem;
       box-sizing: border-box;
