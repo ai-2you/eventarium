@@ -213,27 +213,30 @@ function zonasHorariasDisponibles(): readonly string[] {
                   [(value)]="city"
                 />
 
-                <app-select
-                  fieldId="evento-categoria"
-                  [label]="t('admin.events.formulario.categoria')"
-                  [etiquetaOculta]="true"
-                  [options]="opcionesDeCategoria()"
-                  [(value)]="categoria"
-                />
-                <app-tags-input
-                  class="campo-ancho"
-                  fieldId="evento-etiquetas"
-                  [label]="t('admin.events.formulario.etiquetas')"
-                  [hint]="t('admin.events.formulario.etiquetasAyuda')"
-                  [placeholder]="t('admin.events.formulario.etiquetasPlaceholder')"
-                  [textoQuitar]="t('admin.events.formulario.quitarEtiqueta')"
-                  [maximo]="maximoEtiquetas"
-                  [normalizar]="normalizarEtiqueta"
-                  [validar]="validarEtiqueta"
-                  [sugerencias]="sugerenciasDeEtiquetas()"
-                  [(value)]="etiquetas"
-                  (buscar)="buscarEtiquetas($event)"
-                />
+                <!-- Categoría y etiquetas en su propia fila de dos columnas: en la
+                     rejilla general la categoría caía junto a fechas y ciudad y
+                     descuadraba esa fila. -->
+                <div class="campo-ancho fila-clasificacion">
+                  <app-select
+                    fieldId="evento-categoria"
+                    [label]="t('admin.events.formulario.categoria')"
+                    [options]="opcionesDeCategoria()"
+                    [(value)]="categoria"
+                  />
+                  <app-tags-input
+                    fieldId="evento-etiquetas"
+                    [label]="t('admin.events.formulario.etiquetas')"
+                    [hint]="t('admin.events.formulario.etiquetasAyuda')"
+                    [placeholder]="t('admin.events.formulario.etiquetasPlaceholder')"
+                    [textoQuitar]="t('admin.events.formulario.quitarEtiqueta')"
+                    [maximo]="maximoEtiquetas"
+                    [normalizar]="normalizarEtiqueta"
+                    [validar]="validarEtiqueta"
+                    [sugerencias]="sugerenciasDeEtiquetas()"
+                    [(value)]="etiquetas"
+                    (buscar)="buscarEtiquetas($event)"
+                  />
+                </div>
                 <app-input
                   class="campo-ancho"
                   fieldId="evento-resumen"
@@ -450,6 +453,17 @@ function zonasHorariasDisponibles(): readonly string[] {
      * pago) en columnas cuando hay sitio; título, slug y dirección
      * ocupan la rejilla entera con \`.campo-ancho\`, en vez de la única
      * columna a todo el ancho que tenía el formulario antes. */
+    .fila-clasificacion {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-lg) var(--space-md);
+      align-items: start;
+    }
+    @media (max-width: 40rem) {
+      .fila-clasificacion {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
     .rejilla {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
