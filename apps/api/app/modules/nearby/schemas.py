@@ -5,24 +5,29 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 NearbyKind = Literal["hotel", "restaurant", "bar", "parking", "transport", "pharmacy", "other"]
 _TELEFONO = r"^\+?[0-9 ().-]{6,20}$"
 _WEB = r"^https?://"
 
 
+def _sin_espacios(valor: str | None) -> str | None:
+    return valor.strip() if isinstance(valor, str) else valor
+
+
 class _Campos(BaseModel):
     custom_kind: Annotated[str, Field(min_length=1, max_length=40)] | None = None
     address: Annotated[str, Field(max_length=300)] | None = None
-    phone: Annotated[str, Field(pattern=_TELEFONO)] | None = None
+    # `max_length`: hasta 20 caracteres en total, como la columna (con el `+`).
+    phone: Annotated[str, Field(max_length=20, pattern=_TELEFONO)] | None = None
     website: Annotated[str, Field(max_length=500, pattern=_WEB)] | None = None
     notes: Annotated[str, Field(max_length=300)] | None = None
 
 
 class NearbyPlaceCreate(_Campos):
     kind: NearbyKind
-    name: Annotated[str, Field(min_length=1, max_length=160)]
+    name: Annotated[str, BeforeValidator(_sin_espacios), Field(min_length=1, max_length=160)]
 
     @model_validator(mode="after")
     def _tipo_libre_solo_con_otro(self) -> NearbyPlaceCreate:
@@ -33,7 +38,16 @@ class NearbyPlaceCreate(_Campos):
 
 class NearbyPlaceUpdate(_Campos):
     kind: NearbyKind | None = None
-    name: Annotated[str, Field(min_length=1, max_length=160)] | None = None
+    name: (
+        Annotated[str, BeforeValidator(_sin_espacios), Field(min_length=1, max_length=160)] | None
+    ) = None
+
+    @model_validator(mode="after")
+    def _sin_nulos_en_obligatorios(self) -> NearbyPlaceUpdate:
+        for campo in ("kind", "name"):
+            if campo in self.model_fields_set and getattr(self, campo) is None:
+                raise ValueError(f"`{campo}` no admite `null`.")
+        return self
 
 
 class NearbyPlaceOrder(BaseModel):

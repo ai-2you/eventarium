@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.events import repository as events_repository
+from app.modules.events.models import Event
 from app.modules.nearby.models import EventNearbyPlace
 from app.shared.errors import NotFoundError, ValidationDomainError
 
@@ -46,6 +47,13 @@ async def listar(
 
 
 async def _contar(session: AsyncSession, organization_id: uuid.UUID, event_id: uuid.UUID) -> int:
+    """Bloquea la fila del evento antes de contar: dos altas simultáneas no
+    pueden pasar las dos del tope."""
+    await session.execute(
+        select(Event.id)
+        .where(Event.id == event_id, Event.organization_id == organization_id)
+        .with_for_update()
+    )
     return int(
         await session.scalar(
             select(func.count())

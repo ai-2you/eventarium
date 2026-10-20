@@ -24,9 +24,16 @@ from app.shared.errors import NotFoundError
 router = APIRouter(prefix="/events/{event_id}/nearby-places", tags=["sitios cercanos"])
 
 
+def _uuid_o_404(valor: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(valor)
+    except ValueError as exc:
+        raise NotFoundError("No existe.") from exc
+
+
 async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_id: str) -> Event:
     evento = await events_repository.get_event(
-        session, usuario.organization_id, uuid.UUID(event_id)
+        session, usuario.organization_id, _uuid_o_404(event_id)
     )
     if evento is None:
         raise NotFoundError("El evento no existe.")
@@ -112,7 +119,7 @@ async def copy_nearby_places(
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,
-        origen_id=uuid.UUID(source_event_id),
+        origen_id=_uuid_o_404(source_event_id),
     )
     return [_respuesta(sitio) for sitio in sitios]
 
@@ -130,7 +137,7 @@ async def update_nearby_place(
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,
-        place_id=uuid.UUID(place_id),
+        place_id=_uuid_o_404(place_id),
         datos=datos.model_dump(exclude_unset=True),
     )
     return _respuesta(sitio)
@@ -147,5 +154,5 @@ async def delete_nearby_place(place_id: str, evento: EventoDep, session: DbDep) 
         session,
         organization_id=evento.organization_id,
         event_id=evento.id,
-        place_id=uuid.UUID(place_id),
+        place_id=_uuid_o_404(place_id),
     )

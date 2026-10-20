@@ -64,8 +64,10 @@ async def test_alta_edicion_borrado_y_ficha_publica(
         {"kind": "hotel", "name": "Teléfono malo", "phone": "llámame"},
         {"kind": "hotel", "name": "Web mala", "website": "javascript:alert(1)"},
         {"kind": "spa", "name": "Tipo desconocido"},
+        {"kind": "hotel", "name": "   "},
+        {"kind": "hotel", "name": "Teléfono largo", "phone": "+34600000000000000000"},
     ],
-    ids=["otro-sin-nombre", "libre-sin-otro", "telefono", "web", "tipo"],
+    ids=["otro-sin-nombre", "libre-sin-otro", "telefono", "web", "tipo", "nombre-vacio", "largo"],
 )
 async def test_valida_los_datos(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba, cuerpo: dict
@@ -144,3 +146,24 @@ async def test_otra_organizacion_no_ve_ni_copia_los_sitios(
     assert editar.status_code == 404
     copiar = await cliente.post(f"{_url(suyo)}/copy-from/{evento['id']}", headers=cabeceras_ajenas)
     assert copiar.status_code == 404
+
+
+async def test_editar_no_admite_nulos_en_lo_obligatorio_y_un_id_malo_da_404(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, slug="nulos-cercanos")
+    sitio = (await cliente.post(_url(evento), headers=cabeceras, json=HOTEL)).json()
+
+    for campo in ("kind", "name"):
+        respuesta = await cliente.patch(
+            f"{_url(evento)}/{sitio['id']}", headers=cabeceras, json={campo: None}
+        )
+        assert respuesta.status_code == 422, respuesta.text
+    assert (
+        await cliente.get(f"{EVENTS}/no-es-un-id/nearby-places", headers=cabeceras)
+    ).status_code == 404
+    malo = await cliente.patch(
+        f"{_url(evento)}/no-es-un-id", headers=cabeceras, json={"notes": "x"}
+    )
+    assert malo.status_code == 404

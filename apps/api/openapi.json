@@ -19322,6 +19322,7 @@
             "anyOf": [
               {
                 "type": "string",
+                "maxLength": 20,
                 "pattern": "^\\+?[0-9 ().-]{6,20}$"
               },
               {
@@ -19532,6 +19533,7 @@
             "anyOf": [
               {
                 "type": "string",
+                "maxLength": 20,
                 "pattern": "^\\+?[0-9 ().-]{6,20}$"
               },
               {
