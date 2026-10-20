@@ -556,10 +556,11 @@ async def dispatch_event_reminders_task() -> None:
     await procesar_recordatorios()
 
 
-@broker.task(retry_on_error=True, max_retries=3)
+@broker.task
 async def send_event_reminder_task(registration_id: str) -> None:
     """Recordatorio de una inscripción ya reclamada: vuelve a comprobarla y lo
-    envía. Si falla del todo, la reclamación caduca y se reintenta."""
+    envía. Si falla, su reclamación caduca a los 30 minutos y se reintenta
+    entonces (sin reintento inmediato: el correo podría haber salido ya)."""
     from app.modules.reminders.service import enviar_recordatorio
 
     await enviar_recordatorio(uuid.UUID(registration_id))

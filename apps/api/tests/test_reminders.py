@@ -295,3 +295,91 @@ async def test_en_eventos_de_pago_dice_si_hay_devolucion(
 
     assert await reminders.procesar_recordatorios() == 1
     assert esperado in _cuerpo(correo)
+
+
+async def test_si_se_cancela_tras_reclamarla_no_se_envia(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    evento = await _evento(organizacion, horas=20)
+    inscripcion = await _inscripcion(organizacion, evento)
+    [reclamada] = await reminders.reclamar_lote()
+    await _sql("UPDATE event_registrations SET status = 'cancelled' WHERE id = :id", id=inscripcion)
+
+    assert await reminders.enviar_recordatorio(reclamada) is False
+    correo.assert_not_awaited()
+
+
+async def test_si_se_aplaza_tras_reclamarla_espera_a_su_momento(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    evento = await _evento(organizacion, horas=20)
+    await _inscripcion(organizacion, evento)
+    [reclamada] = await reminders.reclamar_lote()
+    await _sql(
+        "UPDATE events SET starts_at = starts_at + interval '7 days', "
+        "ends_at = ends_at + interval '7 days' WHERE id = :id",
+        id=evento,
+    )
+
+    assert await reminders.enviar_recordatorio(reclamada) is False
+    correo.assert_not_awaited()
+
+
+async def test_si_falla_el_correo_queda_reclamada_y_sin_marcar_como_enviada(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    evento = await _evento(organizacion, horas=20)
+    inscripcion = await _inscripcion(organizacion, evento)
+    correo.side_effect = OSError("SMTP caído")
+    [reclamada] = await reminders.reclamar_lote()
+
+    with pytest.raises(OSError):
+        await reminders.enviar_recordatorio(reclamada)
+
+    async with SessionMaintenance() as session:
+        fila = await session.get(EventRegistration, inscripcion)
+        assert fila.reminder_sent_at is None
+        assert fila.reminder_claimed_at is not None
+
+
+async def test_en_un_hibrido_el_boton_sigue_siendo_la_entrada(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    evento = await _evento(
+        organizacion, horas=20, location_mode="hybrid", online_url="https://meet.example/x"
+    )
+    await _inscripcion(organizacion, evento)
+
+    await reminders.procesar_recordatorios()
+
+    cuerpo = _cuerpo(correo)
+    assert "Sala Norte, Calle Mayor 1 (o en línea" in cuerpo
+    assert cuerpo.index("/mi-entrada?token=") < cuerpo.index("https://meet.example/x")
+
+
+async def test_con_la_entrada_revocada_no_promete_un_qr(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    from app.modules.tickets.service import emitir_entrada
+
+    evento = await _evento(organizacion, horas=20)
+    inscripcion = await _inscripcion(organizacion, evento)
+    async with SessionMaintenance() as session:
+        ticket = await emitir_entrada(session, await session.get(EventRegistration, inscripcion))
+        ticket.revoked_at = datetime.now(UTC)
+        await session.commit()
+
+    await reminders.procesar_recordatorios()
+
+    assert correo.await_args.kwargs["attachments"] == []
+    assert "código QR de este correo" not in _cuerpo(correo)
+
+
+async def test_una_organizacion_desactivada_no_envia(
+    organizacion: OrganizacionDePrueba, correo: AsyncMock
+) -> None:
+    evento = await _evento(organizacion, horas=20)
+    await _inscripcion(organizacion, evento)
+    await _sql("UPDATE organizations SET is_active = false WHERE id = :id", id=organizacion.id)
+
+    assert await reminders.procesar_recordatorios() == 0

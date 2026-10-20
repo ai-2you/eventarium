@@ -48,6 +48,7 @@ _RECLAMAR = text(
         SELECT r.id
         FROM event_registrations r
         JOIN events e ON e.id = r.event_id AND e.organization_id = r.organization_id
+        JOIN organizations o ON o.id = e.organization_id AND o.is_active
         WHERE e.status = 'published'
           AND e.deleted_at IS NULL
           AND e.reminder_enabled
@@ -73,9 +74,9 @@ _RECLAMAR = text(
 )
 
 
-async def reclamar_lote(limite: int = TAMANO_DE_LOTE) -> list[uuid.UUID]:
+async def reclamar_lote(limite: int | None = None) -> list[uuid.UUID]:
     async with maintenance_session() as session:
-        filas = await session.execute(_RECLAMAR, {"limite": limite})
+        filas = await session.execute(_RECLAMAR, {"limite": limite or TAMANO_DE_LOTE})
         return [fila[0] for fila in filas]
 
 
@@ -122,6 +123,8 @@ async def enviar_recordatorio(registration_id: uuid.UUID) -> bool:
             or evento.deleted_at is not None
             or not evento.reminder_enabled
             or evento.starts_at - ahora < MARGEN_MINIMO
+            # Si se aplazó mientras esperaba en la cola, aún no le toca.
+            or evento.starts_at - timedelta(hours=evento.reminder_hours_before) > ahora
             or inscripcion.reminder_sent_for_starts_at == inicio_al_minuto
         ):
             inscripcion.reminder_claimed_at = None
@@ -155,10 +158,12 @@ async def enviar_recordatorio(registration_id: uuid.UUID) -> bool:
             lugar=evento.location_name,
             direccion=evento.location_address,
             ciudad=evento.city,
-            url_online=evento.online_url,
+            # Sin saltos de línea: no puede inventar párrafos en el correo.
+            url_online=" ".join(evento.online_url.split()) if evento.online_url else None,
             enlace_mi_entrada=f"{base}/mi-entrada?token={cancel_token}",
             enlace_cancelacion=f"{base}/cancelar-inscripcion?token={cancel_token}",
             hay_lista_de_espera=bool(en_espera),
+            con_qr=qr is not None,
             reembolso=reembolso,
             limite_de_reembolso=evento.starts_at
             - timedelta(hours=get_settings().payment_refund_cutoff_hours),

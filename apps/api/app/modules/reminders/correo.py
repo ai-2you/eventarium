@@ -30,6 +30,7 @@ class DatosDelRecordatorio:
     enlace_mi_entrada: str
     enlace_cancelacion: str
     hay_lista_de_espera: bool
+    con_qr: bool
     # `en_curso`: se devolvería el importe; `sin_reembolso`: ya no; `None`: sin pago.
     reembolso: str | None
     limite_de_reembolso: datetime | None
@@ -67,8 +68,12 @@ def asunto_y_cuerpo(datos: DatosDelRecordatorio) -> tuple[str, str]:
     parrafos = [
         lineas[0],
         "\n".join(lineas[1:]),
-        "Tu entrada es el código QR de este correo: muéstrala en la puerta. "
-        f"También puedes verla aquí:\n{datos.enlace_mi_entrada}",
+        (
+            "Tu entrada es el código QR de este correo: muéstrala en la puerta. "
+            f"También puedes verla aquí:\n{datos.enlace_mi_entrada}"
+            if datos.con_qr
+            else f"Puedes consultar tu inscripción aquí:\n{datos.enlace_mi_entrada}"
+        ),
     ]
     otra_persona = " para otra persona de la lista de espera" if datos.hay_lista_de_espera else ""
     parrafos.append(
