@@ -38,6 +38,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.organizations import service
 from app.modules.organizations.models import Organization
+from app.modules.organizations.router import organization_response
 from app.modules.organizations.schemas import OrganizationCreate, OrganizationResponse
 from app.modules.theme_templates import repository as theme_templates_repository
 from app.modules.theme_templates.contrast import comprobar_contraste_de_plantilla
@@ -58,18 +59,7 @@ Superadmin = Annotated[CurrentUser, Depends(require_superadmin)]
 
 
 def _to_response(organizacion: Organization) -> OrganizationResponse:
-    return OrganizationResponse(
-        id=str(organizacion.id),
-        slug=organizacion.slug,
-        name=organizacion.name,
-        legal_name=organizacion.legal_name,
-        description=organizacion.description,
-        website=organizacion.website,
-        contact_email=organizacion.contact_email,
-        address=organizacion.address,
-        public_page_enabled=organizacion.public_page_enabled,
-        is_active=organizacion.is_active,
-    )
+    return organization_response(organizacion)
 
 
 @router.get(

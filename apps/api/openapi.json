@@ -12985,10 +12985,17 @@
             "title": "Theme Template Id"
           },
           "social_links": {
-            "items": {
-              "$ref": "#/components/schemas/SocialLinkInput"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Social Links"
           },
           "organizer_blurb": {
@@ -20069,6 +20076,52 @@
             ],
             "title": "Address"
           },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "type": "boolean",
+            "title": "Address Public",
+            "default": true
+          },
+          "social_links": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Social Links"
+          },
           "public_page_enabled": {
             "type": "boolean",
             "title": "Public Page Enabled"
@@ -20216,6 +20269,67 @@
               }
             ],
             "title": "Address"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Public"
+          },
+          "social_links": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Social Links"
           },
           "public_page_enabled": {
             "anyOf": [
@@ -22893,6 +23007,39 @@
             ],
             "title": "Address"
           },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
           "logo_url": {
             "anyOf": [
               {
@@ -23245,6 +23392,17 @@
           "url": {
             "type": "string",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -25489,8 +25647,15 @@
         "properties": {
           "kind": {
             "type": "string",
-            "maxLength": 40,
-            "minLength": 1,
+            "enum": [
+              "linkedin",
+              "instagram",
+              "x",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "other"
+            ],
             "title": "Kind"
           },
           "url": {
@@ -25499,6 +25664,19 @@
             "minLength": 1,
             "pattern": "^https?://",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -25507,7 +25685,7 @@
           "url"
         ],
         "title": "SocialLinkInput",
-        "description": "Enlace social del organizador."
+        "description": "Enlace social del organizador: uno por red; `other` lleva su nombre."
       },
       "SocialLinkResponse": {
         "properties": {

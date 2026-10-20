@@ -12,9 +12,12 @@ import { PublicSocialLink } from '../models/public-social-link';
  */
 export interface PublicOrganizationProfile {
   address: (string | null);
+  city?: (string | null);
   description: (string | null);
   logo_url: (string | null);
   name: string;
+  postal_code?: (string | null);
+  province?: (string | null);
   slug: string;
   social_links: Array<PublicSocialLink>;
   website: (string | null);

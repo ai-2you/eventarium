@@ -7,13 +7,20 @@
  */
 export interface OrganizationResponse {
   address?: (string | null);
+  address_public?: boolean;
+  city?: (string | null);
   contact_email?: (string | null);
   description?: (string | null);
   id: string;
   is_active: boolean;
   legal_name?: (string | null);
   name: string;
+  postal_code?: (string | null);
+  province?: (string | null);
   public_page_enabled: boolean;
   slug: string;
+  social_links?: Array<{
+[key: string]: any;
+}>;
   website?: (string | null);
 }
