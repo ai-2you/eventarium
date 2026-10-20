@@ -108,12 +108,17 @@ function vacio(): {
           fieldId="sesion-inicio"
           [label]="t('admin.events.agenda.inicio')"
           [required]="true"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
           [(value)]="inicio"
         />
         <app-datetime-picker
           fieldId="sesion-fin"
           [label]="t('admin.events.agenda.fin')"
           [required]="true"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
+          [error]="errorDeFin()"
           [(value)]="fin"
         />
         <app-input fieldId="sesion-sala" [label]="t('admin.events.agenda.sala')" [(value)]="sala" />
@@ -226,6 +231,10 @@ export class SessionForm implements OnInit {
   protected readonly guardando = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly sedes = signal<EventVenueOption[]>([]);
+  /** Rango del evento en hora local (la misma que usan los campos y la que se
+   * convierte a UTC al guardar): la sesión tiene que caer dentro. Vacío hasta
+   * cargar el evento, y entonces sin límite: el backend lo vuelve a exigir. */
+  protected readonly limites = signal<{ min: string; max: string }>({ min: '', max: '' });
 
   private readonly valoresIniciales = vacio();
   // Tipado como `string`, no `SessionType`/`VideoPlatform`: `app-select` exige
@@ -269,6 +278,38 @@ export class SessionForm implements OnInit {
 
   ngOnInit(): void {
     void this.cargarSedes();
+    void this.cargarLimites();
+    // Montado ya con una sesión (la edición en línea de la agenda): se rellena
+    // al nacer, sin esperar a que el padre llame a `cargarSesion`.
+    const sesion = this.sesion();
+    if (sesion) {
+      this.cargarSesion(sesion);
+    }
+  }
+
+  /** El fin, en el momento: antes que el inicio no tiene sentido guardarlo. */
+  protected readonly errorDeFin = computed(() =>
+    this.inicio() && this.fin() && this.fin() <= this.inicio()
+      ? this.transloco.translate('admin.events.agenda.finAntesDeInicio')
+      : null,
+  );
+
+  /** Fechas con las que se abrió la sesión en edición (`null` en el alta). */
+  private readonly fechasCargadas = signal<{ inicio: string; fin: string } | null>(null);
+
+  /** Una sesión que ya estaba fuera del evento (anterior a esta regla) se puede
+   * seguir editando mientras no se toquen sus fechas, como en el backend: hasta
+   * entonces no se le aplican los límites. */
+  protected readonly limitesActivos = computed(() => {
+    const cargadas = this.fechasCargadas();
+    const sinCambios =
+      cargadas !== null && cargadas.inicio === this.inicio() && cargadas.fin === this.fin();
+    return sinCambios ? { min: '', max: '' } : this.limites();
+  });
+
+  private fueraDelEvento(valor: string): boolean {
+    const { min, max } = this.limitesActivos();
+    return (min !== '' && valor < min) || (max !== '' && valor > max);
   }
 
   /** La sesión en edición, si la hay: quien consume lee esto, no el input crudo. */
@@ -285,6 +326,7 @@ export class SessionForm implements OnInit {
     this.titulo.set(sesion.title);
     this.inicio.set(isoAValorLocal(sesion.starts_at));
     this.fin.set(isoAValorLocal(sesion.ends_at));
+    this.fechasCargadas.set({ inicio: this.inicio(), fin: this.fin() });
     this.sala.set(sesion.room ?? '');
     this.videoPlatform.set((sesion.video_platform ?? '') as VideoPlatform);
     this.videoUrl.set(sesion.video_url ?? '');
@@ -316,6 +358,14 @@ export class SessionForm implements OnInit {
 
     if (!this.titulo().trim() || !this.inicio() || !this.fin()) {
       this.formError.set(this.transloco.translate('admin.events.agenda.camposRequeridos'));
+      return;
+    }
+    if (this.errorDeFin()) {
+      this.formError.set(this.errorDeFin());
+      return;
+    }
+    if (this.fueraDelEvento(this.inicio()) || this.fueraDelEvento(this.fin())) {
+      this.formError.set(this.transloco.translate('admin.events.agenda.fueraDelEvento'));
       return;
     }
 
@@ -370,6 +420,7 @@ export class SessionForm implements OnInit {
     this.videoUrl.set(vacios.video_url);
     this.materiales.set(vacios.materiales);
     this.venueId.set('');
+    this.fechasCargadas.set(null);
     this.formError.set(null);
   }
 
@@ -379,6 +430,23 @@ export class SessionForm implements OnInit {
       .map((linea) => linea.trim())
       .filter((linea) => linea.length > 0)
       .map((url) => ({ url }));
+  }
+
+  private async cargarLimites(): Promise<void> {
+    try {
+      const evento = await firstValueFrom(
+        this.http.get<{ starts_at: string; ends_at: string }>(
+          this.api.url(`/events/${this.eventId()}`),
+        ),
+      );
+      this.limites.set({
+        min: isoAValorLocal(evento.starts_at, { redondearArriba: true }),
+        max: isoAValorLocal(evento.ends_at),
+      });
+    } catch {
+      // Sin el evento no hay límites en el formulario; el backend sigue
+      // rechazando una sesión fuera de sus fechas.
+    }
   }
 
   private async cargarSedes(): Promise<void> {

@@ -16,6 +16,7 @@ export interface EventUpdate {
   location_address?: (string | null);
   location_mode?: ('in_person' | 'online' | 'hybrid' | null);
   location_name?: (string | null);
+  mover_sesiones?: boolean;
   online_url?: (string | null);
   payment_checkout_window_minutes?: (number | null);
   registration_mode?: ('free' | 'approval' | 'paid' | null);

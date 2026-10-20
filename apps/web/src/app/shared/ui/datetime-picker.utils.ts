@@ -14,6 +14,8 @@ export interface CeldaDia {
   readonly fueraDeMes: boolean;
   readonly esHoy: boolean;
   readonly esSeleccionado: boolean;
+  /** Fuera de `min`/`max`: se pinta pero no se puede elegir. */
+  readonly deshabilitado: boolean;
   readonly etiqueta: string;
 }
 

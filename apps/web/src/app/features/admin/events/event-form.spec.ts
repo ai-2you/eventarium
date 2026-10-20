@@ -315,6 +315,43 @@ describe('EventForm', () => {
       await avanzar(fixture);
     }
 
+    it('si las fechas nuevas dejan sesiones fuera, pregunta y reenvía moviéndolas', async () => {
+      if (!HTMLDialogElement.prototype.showModal) {
+        HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+          this.setAttribute('open', '');
+        };
+      }
+      const fixture = await abrirEdicion();
+      await enviar(fixture);
+      http
+        .expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH')
+        .flush(
+          {
+            detail:
+              'Con las fechas nuevas, 1 sesión de la agenda quedaría fuera del evento: «Charla».',
+            code: 'sesiones_fuera_de_rango',
+            sesiones_fuera: 1,
+            titulos: ['Charla'],
+            movidas: false,
+          },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await avanzar(fixture);
+      const texto = fixture.nativeElement.textContent as string;
+      expect(texto).toContain('quedaría fuera del evento: «Charla»');
+
+      const mover = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+      ).find((boton) => boton.textContent?.includes('Mover las sesiones con el evento'))!;
+      mover.click();
+      await avanzar(fixture);
+
+      const reenvio = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(reenvio.request.body.mover_sesiones).toBe(true);
+      reenvio.flush(eventoDetalle());
+      await avanzar(fixture);
+    });
+
     it('carga los cuatro campos del evento', async () => {
       const fixture = await abrirEdicion({
         summary: 'Una semana de IA',

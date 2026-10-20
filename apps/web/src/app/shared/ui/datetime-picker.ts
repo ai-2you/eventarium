@@ -62,6 +62,8 @@ import {
           [id]="idNativo()"
           [disabled]="disabled()"
           [required]="required()"
+          [attr.min]="min() || null"
+          [attr.max]="max() || null"
           [value]="value()"
           (input)="alEscribirEnNativo($event)"
         />
@@ -194,6 +196,7 @@ import {
                   [class.fuera]="celda.fueraDeMes"
                   [class.hoy]="celda.esHoy"
                   [class.elegido]="celda.esSeleccionado"
+                  [attr.aria-disabled]="celda.deshabilitado ? 'true' : null"
                   [tabindex]="i === indiceDiaEnfocado() ? 0 : -1"
                   (click)="elegirDia(celda)"
                   (focus)="indiceDiaEnfocado.set(i)"
@@ -204,7 +207,12 @@ import {
             </div>
 
             <div class="dt__pie">
-              <button type="button" class="dt__atajo" (click)="elegirHoy()">
+              <button
+                type="button"
+                class="dt__atajo"
+                [disabled]="hoyFueraDeRango()"
+                (click)="elegirHoy()"
+              >
                 {{ tHoy() }}
               </button>
             </div>
@@ -273,368 +281,7 @@ import {
       }
     </div>
   `,
-  styles: `
-    .campo {
-      display: grid;
-    }
-    .dt {
-      position: relative;
-    }
-    .dt__native {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-      pointer-events: none;
-    }
-    .dt__controles {
-      display: grid;
-      /* min-width 0: sin él, la fecha («jue, 29 oct 2026», sin saltos de
-       * línea) impide que la columna encoja y el par desborda su hueco. */
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      gap: var(--space-xs);
-    }
-    /* Mismas medidas que el input de Input (3.25rem, superficie 2, radio
-       pequeño): con la etiqueta flotante encima, este par de botones calca el
-       aspecto del resto de campos del formulario. */
-    .dt__btn {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      width: 100%;
-      min-width: 0;
-      min-height: 3.25rem;
-      padding: 1.25rem 0.75rem 0.4rem;
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      color: var(--fg);
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
-      transition:
-        border-color 0.15s,
-        background-color 0.15s;
-    }
-    .dt__btn:hover {
-      border-color: var(--faint);
-      background: var(--surface);
-    }
-    .dt__btn[aria-expanded='true'] {
-      border-color: var(--accent);
-      background: var(--surface);
-    }
-    .dt__btn[aria-invalid='true'] {
-      border-color: var(--danger);
-    }
-    .dt__btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    .dt__btn svg {
-      width: 18px;
-      height: 18px;
-      flex: 0 0 auto;
-      color: var(--muted);
-    }
-    .dt__btn span.vacio {
-      color: var(--muted);
-    }
-    .dt__btn span {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    /* Campo de hora: mismo aspecto que el botón de fecha, pero editable a
-       mano. El botón de saltos (reloj) va pegado a su derecha, dentro del
-       mismo borde. */
-    .dt__hora {
-      display: flex;
-      align-items: center;
-      flex: 0 0 auto;
-      min-height: 3.25rem;
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      transition:
-        border-color 0.15s,
-        background-color 0.15s;
-    }
-    .dt__hora:hover {
-      border-color: var(--faint);
-      background: var(--surface);
-    }
-    .dt__hora:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent);
-    }
-    .dt__hora.abierto {
-      border-color: var(--accent);
-      background: var(--surface);
-    }
-    .dt__hora input {
-      width: 5.5rem;
-      box-sizing: border-box;
-      padding: 1.25rem 0 0.4rem 0.75rem;
-      border: none;
-      background: none;
-      color: var(--fg);
-      font: inherit;
-      font-variant-numeric: tabular-nums;
-      text-align: left;
-    }
-    .dt__hora input:focus {
-      outline: none;
-    }
-    .dt__hora input::placeholder {
-      color: var(--muted);
-    }
-    .dt__hora-saltos {
-      display: grid;
-      place-items: center;
-      width: 2.25rem;
-      height: 2.25rem;
-      margin-right: 0.5rem;
-      border: none;
-      border-radius: var(--radius-md);
-      background: none;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    .dt__hora-saltos:hover {
-      background: var(--surface-hi);
-      color: var(--fg);
-    }
-    .dt__hora-saltos[aria-expanded='true'] {
-      color: var(--accent);
-    }
-    .dt__borrar {
-      display: grid;
-      place-items: center;
-      width: 2.25rem;
-      align-self: center;
-      height: 2.25rem;
-      border: none;
-      border-radius: var(--radius-md);
-      background: none;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    .dt__borrar:hover {
-      background: var(--surface-hi);
-      color: var(--fg);
-    }
-    .dt__borrar svg {
-      width: 16px;
-      height: 16px;
-    }
-    .dt__hora-saltos svg {
-      width: 18px;
-      height: 18px;
-    }
-    /* Etiquetas fijas, en la posición «flotada» de Input (arriba y pequeñas),
-       para que nunca desaparezcan ni se recorten al haber valor; acento con
-       foco dentro de su caja. */
-    .dt__parte {
-      position: relative;
-      min-width: 0;
-    }
-    .dt__hora {
-      position: relative;
-    }
-    .dt__rotulo {
-      position: absolute;
-      left: 0.8rem;
-      top: 0.45rem;
-      font-size: 0.78em;
-      font-weight: 500;
-      color: var(--muted);
-      pointer-events: none;
-      max-width: calc(100% - 3rem);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .dt__parte:focus-within .dt__rotulo,
-    .dt__hora:focus-within .dt__rotulo {
-      color: var(--accent);
-    }
-    .dt__panel {
-      position: absolute;
-      z-index: 60;
-      top: calc(100% + 6px);
-      left: 0;
-      display: grid;
-      gap: var(--space-sm);
-      width: 19rem;
-      max-width: calc(100vw - 2rem);
-      padding: var(--space-md);
-      background: var(--surface);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      box-shadow: var(--shadow-md);
-    }
-    .dt--up .dt__panel {
-      top: auto;
-      bottom: calc(100% + 6px);
-    }
-    .dt__mes {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-    .dt__titulo {
-      text-align: center;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-    .dt__flecha {
-      display: grid;
-      place-items: center;
-      width: 2rem;
-      height: 2rem;
-      border: none;
-      border-radius: var(--radius-md);
-      background: none;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    .dt__flecha:hover {
-      background: var(--surface-hi);
-      color: var(--fg);
-    }
-    .dt__flecha svg {
-      width: 16px;
-      height: 16px;
-    }
-    .dt__semana,
-    .dt__dias {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 2px;
-    }
-    .dt__semana span {
-      padding: 2px 0;
-      text-align: center;
-      font-size: var(--fs-sm);
-      color: var(--muted);
-    }
-    .dt__dia {
-      position: relative;
-      min-height: 2.25rem;
-      border: none;
-      border-radius: var(--radius-md);
-      background: none;
-      color: var(--fg);
-      font: inherit;
-      cursor: pointer;
-    }
-    .dt__dia:hover {
-      background: var(--surface-hi);
-    }
-    .dt__dia.fuera {
-      color: var(--muted);
-      opacity: 0.55;
-    }
-    .dt__dia.hoy::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      bottom: 4px;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--accent);
-      transform: translateX(-50%);
-    }
-    .dt__dia.elegido {
-      background: var(--accent);
-      color: var(--accent-contrast, #fff);
-      font-weight: 600;
-    }
-    .dt__dia.elegido::after {
-      background: var(--accent-contrast, #fff);
-    }
-    /* Panel de saltos de hora: la hora vigente grande y cuatro saltos con
-       aire (el «muy pegado, sin padding» de las antiguas rejillas). */
-    .dt__hora-actual {
-      margin: 0;
-      text-align: center;
-      font-size: 1.75rem;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      color: var(--fg);
-    }
-    .dt__saltos {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-xs);
-    }
-    .dt__salto {
-      min-height: 2.5rem;
-      padding: 0 0.5rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      background: none;
-      color: var(--fg);
-      font: inherit;
-      font-variant-numeric: tabular-nums;
-      cursor: pointer;
-    }
-    .dt__salto:hover {
-      background: var(--surface-hi);
-      border-color: var(--faint);
-    }
-    .dt__pie {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--space-sm);
-      border-top: 1px solid var(--border);
-      padding-top: var(--space-sm);
-    }
-    .dt__atajo,
-    .dt__listo {
-      min-height: 2.25rem;
-      padding: 0 0.875rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-sm);
-      background: none;
-      color: var(--fg);
-      font: inherit;
-      cursor: pointer;
-    }
-    .dt__atajo:hover,
-    .dt__listo:hover {
-      background: var(--surface-hi);
-    }
-    .dt__listo {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--accent-contrast, #fff);
-      font-weight: 600;
-    }
-    .dt__listo:hover {
-      background: var(--accent);
-      opacity: 0.9;
-    }
-    .error {
-      margin: 0;
-      color: var(--danger);
-      font-size: 0.875rem;
-    }
-    .ayuda {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.8125rem;
-    }
-  `,
+  styleUrl: './datetime-picker.css',
 })
 export class DatetimePicker {
   readonly label = input.required<string>();
@@ -657,6 +304,11 @@ export class DatetimePicker {
    * sustituye: quien consuma el componente no cambia ni una línea de su lógica
    * de fechas (parsear, validar, convertir a ISO…). */
   readonly value = model('');
+  /** Límites en el mismo formato que `value` (`YYYY-MM-DDTHH:mm`, o
+   * `YYYY-MM-DD` con `soloFecha`): los días de fuera no se pueden elegir y un
+   * valor fuera del rango se marca como error. Vacíos, sin límite. */
+  readonly min = input('');
+  readonly max = input('');
   readonly blurred = output<void>();
 
   private readonly elementoAnfitrion = inject(ElementRef<HTMLElement>);
@@ -721,8 +373,52 @@ export class DatetimePicker {
    * falta la hora de un día ya elegido, para que no se pierda en ningún
    * formulario que no la valide. */
   protected readonly mensajeError = computed(
-    () => this.error() ?? (this.horaPendiente() ? this.tIndicaHora() : null),
+    () => this.error() ?? (this.horaPendiente() ? this.tIndicaHora() : null) ?? this.errorDeRango(),
   );
+
+  /** Un valor fuera de `min`/`max` (escrito a mano, o que ya venía guardado).
+   * Mismo formato a los dos lados: la comparación de texto basta. */
+  private readonly errorDeRango = computed(() => {
+    const valor = this.value();
+    if (!valor || (!this.min() && !this.max())) return null;
+    if ((this.min() && valor < this.min()) || (this.max() && valor > this.max())) {
+      return this.transloco.translate('comun.datetime.fueraDeRango', {
+        desde: this.formatearLimite(this.min()),
+        hasta: this.formatearLimite(this.max()),
+      });
+    }
+    return null;
+  });
+
+  private formatearLimite(limite: string): string {
+    const partes = this.soloFecha() ? partirFecha(limite) : partirValor(limite);
+    if (!partes) return '—';
+    const fecha = new Date(partes.anio, partes.mes, partes.dia);
+    const dia = new Intl.DateTimeFormat(this.locale(), {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(fecha);
+    return 'hora' in partes ? `${dia} ${dosCifras(partes.hora)}:${dosCifras(partes.minuto)}` : dia;
+  }
+
+  /** Solo el día de un límite, para comparar celdas del calendario. */
+  private diaDeLimite(limite: string): string {
+    return limite.slice(0, 10);
+  }
+
+  private fueraDeRango(fecha: Date): boolean {
+    const dia = aValorFecha({
+      anio: fecha.getFullYear(),
+      mes: fecha.getMonth(),
+      dia: fecha.getDate(),
+    });
+    const min = this.diaDeLimite(this.min());
+    const max = this.diaDeLimite(this.max());
+    return (min !== '' && dia < min) || (max !== '' && dia > max);
+  }
+
+  protected readonly hoyFueraDeRango = computed(() => this.fueraDeRango(new Date()));
 
   protected readonly etiquetaFecha = computed(() => {
     const partes = this.fechaVisible();
@@ -795,6 +491,7 @@ export class DatetimePicker {
         fueraDeMes: fecha.getMonth() !== primero.getMonth(),
         esHoy,
         esSeleccionado,
+        deshabilitado: this.fueraDeRango(fecha),
         etiqueta: formatoEtiqueta.format(fecha),
       };
     });
@@ -823,7 +520,20 @@ export class DatetimePicker {
         const dias = untracked(this.dias);
         const elegido = dias.findIndex((celda) => celda.esSeleccionado);
         const hoyIdx = dias.findIndex((celda) => celda.esHoy);
-        const indice = elegido >= 0 ? elegido : hoyIdx >= 0 ? hoyIdx : 0;
+        // Ni el día elegido ni hoy (si cae fuera del rango): el primer día que
+        // se puede elegir, para que el foco no aterrice en uno deshabilitado.
+        const hoyElegible = hoyIdx >= 0 && !dias[hoyIdx]!.deshabilitado;
+        const primeroElegible = dias.findIndex(
+          (celda) => !celda.deshabilitado && !celda.fueraDeMes,
+        );
+        const indice =
+          elegido >= 0
+            ? elegido
+            : hoyElegible
+              ? hoyIdx
+              : primeroElegible >= 0
+                ? primeroElegible
+                : 0;
         this.indiceDiaEnfocado.set(indice);
         this.enfocar(anfitrion.querySelector(`#${this.idDia(indice)}`));
       } else if (panel === 'hora') {
@@ -870,10 +580,15 @@ export class DatetimePicker {
     if (panel === 'fecha') {
       // Resincroniza el mes con el valor vigente al abrir, no con el último
       // que se hojeó: cerrar sin elegir no debe dejar un mes huérfano recordado.
+      // Sin valor, abre en el mes del límite inferior (el del evento) si hoy
+      // queda fuera: así no hay que hojear meses para llegar a él.
       const partes = this.fechaVisible();
-      this.mesVisible.set(
-        partes ? new Date(partes.anio, partes.mes, 1) : primerDiaDeMes(new Date()),
-      );
+      const desde = partirFecha(this.diaDeLimite(this.min()));
+      const mesInicial =
+        desde && this.hoyFueraDeRango()
+          ? new Date(desde.anio, desde.mes, 1)
+          : primerDiaDeMes(new Date());
+      this.mesVisible.set(partes ? new Date(partes.anio, partes.mes, 1) : mesInicial);
     }
     this.panelAbierto.set(panel);
   }
@@ -900,6 +615,7 @@ export class DatetimePicker {
    * había hora, no se inventa: el día queda elegido a medias
    * (`horaPendiente`) hasta que se escriba o elija la hora. */
   protected elegirDia(celda: CeldaDia): void {
+    if (celda.deshabilitado) return;
     this.fijarFecha(celda.fecha);
     this.cerrar('fecha', true);
   }

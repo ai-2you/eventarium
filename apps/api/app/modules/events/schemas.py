@@ -156,6 +156,11 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     """Campos editables de un evento. `status` incluido: así se publica o archiva."""
 
+    # Al cambiar las fechas: mover también las sesiones de la agenda el mismo
+    # intervalo que el inicio. Sin él, si alguna quedara fuera, la API responde
+    # 409 (`sesiones_fuera_de_rango`) para que el panel pregunte.
+    mover_sesiones: bool = False
+
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
     description: DescripcionDeEvento | None = None
@@ -437,6 +442,18 @@ class SessionParticipantsUpdate(BaseModel):
     participants: list[SessionParticipantEntry]
 
 
+class SessionParticipationOut(BaseModel):
+    """Una persona del roster en una sesión, con su horario: lo justo para que
+    el panel avise de solapes sin pedir los participantes sesión a sesión."""
+
+    event_member_id: str
+    session_id: str
+    session_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_key: str
+
+
 class SessionParticipantResponse(BaseModel):
     """Participación de una persona en una sesión, con su rol libre."""
 
@@ -634,6 +651,8 @@ class SpeakerRowOut(BaseModel):
     """Fila de la vista agregada de ponentes de un evento."""
 
     organization_member_id: str
+    # Su entrada en el roster de este evento: la que se asigna a una sesión.
+    event_member_id: str
     user_id: str
     email: str
     first_name: str | None
@@ -641,6 +660,9 @@ class SpeakerRowOut(BaseModel):
     # Titular profesional de su ficha (`profile_data.titular`), para pintar
     # bajo el nombre; `None` si no lo rellenó.
     titular: str | None
+    # Biografía de su ficha, para que el equipo la lea sin salir del panel
+    # (quien ve esta vista ya puede leer los perfiles de los miembros).
+    bio: str | None = None
     sesiones: list[SpeakerSessionOut]
     completitud: SpeakerCompletitudOut
     # Eventos de esta organización donde la persona está en el roster,

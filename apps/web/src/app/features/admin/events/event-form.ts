@@ -1,5 +1,12 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -10,6 +17,7 @@ import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { Card } from '../../../shared/ui/card';
 import { DatetimePicker } from '../../../shared/ui/datetime-picker';
+import { Dialog } from '../../../shared/ui/dialog';
 import { ErrorSummary, ResumenDeError } from '../../../shared/ui/error-summary';
 import { Input } from '../../../shared/ui/input';
 import { AddressMap } from '../../../shared/ui/address-map';
@@ -117,6 +125,7 @@ function zonasHorariasDisponibles(): readonly string[] {
     Button,
     Card,
     DatetimePicker,
+    Dialog,
     ErrorSummary,
     Input,
     AddressMap,
@@ -337,6 +346,23 @@ function zonasHorariasDisponibles(): readonly string[] {
             </app-button>
           </div>
         </form>
+
+        <app-dialog #dialogoMoverSesiones (cerrado)="pendienteDeMover.set(null)">
+          <p>{{ avisoDeSesiones() }}</p>
+          <p>{{ t('admin.events.formulario.moverSesionesPregunta') }}</p>
+          <app-button
+            pie
+            variant="secundario"
+            type="button"
+            [disabled]="guardando()"
+            (pulsado)="dialogoMoverSesiones.cerrar()"
+          >
+            {{ t('comun.cancelar') }}
+          </app-button>
+          <app-button pie type="button" [loading]="guardando()" (pulsado)="moverSesiones()">
+            {{ t('admin.events.formulario.moverSesiones') }}
+          </app-button>
+        </app-dialog>
 
         @if (eventId(); as id) {
           <app-event-details [eventId]="id" />
@@ -749,6 +775,19 @@ export class EventForm {
     return Object.values(actuales).every((mensaje) => !mensaje);
   }
 
+  private readonly dialogoMoverSesiones = viewChild.required<Dialog>('dialogoMoverSesiones');
+  /** Lo que se intentó guardar cuando la API avisó de sesiones que quedarían
+   * fuera de las fechas nuevas: se reenvía tal cual, moviéndolas, si se acepta. */
+  protected readonly pendienteDeMover = signal<Record<string, unknown> | null>(null);
+  protected readonly avisoDeSesiones = signal('');
+
+  protected async moverSesiones(): Promise<void> {
+    const payload = this.pendienteDeMover();
+    if (!payload) return;
+    await this.enviar({ ...payload, mover_sesiones: true });
+    this.dialogoMoverSesiones().cerrar();
+  }
+
   protected async guardar(evento: Event): Promise<void> {
     evento.preventDefault();
     this.error.set(null);
@@ -778,7 +817,11 @@ export class EventForm {
       category_id: this.categoria() || null,
       tags: [...this.etiquetas()],
     };
+    await this.enviar(payload);
+  }
 
+  private async enviar(payload: Record<string, unknown>): Promise<void> {
+    this.error.set(null);
     this.guardando.set(true);
     try {
       const id = this.eventId();
@@ -791,6 +834,18 @@ export class EventForm {
       this.eventScope.actualizar(guardado.id, guardado);
       this.exito.set(true);
     } catch (error) {
+      // Fechas nuevas que dejan sesiones fuera: se pregunta antes que fallar.
+      // Si ya se pidió moverlas y aun así no caben, es un error normal.
+      if (
+        error instanceof ApiError &&
+        error.problem?.['code'] === 'sesiones_fuera_de_rango' &&
+        error.problem?.['movidas'] === false
+      ) {
+        this.avisoDeSesiones.set(error.message);
+        this.pendienteDeMover.set(payload);
+        this.dialogoMoverSesiones().abrir();
+        return;
+      }
       this.error.set(
         error instanceof ApiError
           ? error.message

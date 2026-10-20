@@ -17,7 +17,13 @@ from app.core.storage import build_object_key, get_storage, public_url_versionad
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
 from app.modules.events import public_router, repository, service, speakers_repository
 from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
-from app.modules.events.models import Event, EventMember, EventSession, EventVenue
+from app.modules.events.models import (
+    Event,
+    EventMember,
+    EventSession,
+    EventSessionParticipant,
+    EventVenue,
+)
 from app.modules.events.schemas import (
     EventCategoryOut,
     EventCreate,
@@ -38,6 +44,7 @@ from app.modules.events.schemas import (
     PublicEventDetail,
     SessionParticipantResponse,
     SessionParticipantsUpdate,
+    SessionParticipationOut,
     SpeakerCompletitudOut,
     SpeakerHistoryItemOut,
     SpeakerRowOut,
@@ -549,18 +556,26 @@ async def list_event_speakers(
     items: list[SpeakerRowOut] = []
     for miembro, miembro_org, persona, _rol in filas:
         titular = miembro_org.profile_data.get("titular")
+        bio = miembro_org.profile_data.get("bio")
         items.append(
             SpeakerRowOut(
                 organization_member_id=str(miembro_org.id),
+                event_member_id=str(miembro.id),
                 user_id=str(persona.id),
                 email=persona.email,
                 first_name=persona.first_name,
                 last_name=persona.last_name,
                 titular=titular.strip() if isinstance(titular, str) and titular.strip() else None,
-                sesiones=[
-                    SpeakerSessionOut(id=str(id_sesion), titulo=titulo, starts_at=empieza)
-                    for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
-                ],
+                bio=bio.strip() if isinstance(bio, str) and bio.strip() else None,
+                # Una fila por sesión aunque tenga ahí varios roles.
+                sesiones=list(
+                    {
+                        str(id_sesion): SpeakerSessionOut(
+                            id=str(id_sesion), titulo=titulo, starts_at=empieza
+                        )
+                        for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
+                    }.values()
+                ),
                 completitud=_completitud_de_ficha(miembro_org.profile_data),
                 ediciones=ediciones.get(miembro_org.user_id, 0),
                 public_slug=slugs.get(miembro_org.user_id),
@@ -808,6 +823,37 @@ async def remove_event_member(
         event_id=evento.id,
         event_member_id=uuid.UUID(event_member_id),
     )
+
+
+@router.get(
+    "/{event_id}/participations",
+    summary="Participaciones del roster en las sesiones del evento",
+    response_model=list[SessionParticipationOut],
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def list_event_participations(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
+) -> list[SessionParticipationOut]:
+    filas = await session.execute(
+        select(EventSessionParticipant, EventSession)
+        .join(EventSession, EventSession.id == EventSessionParticipant.session_id)
+        .where(
+            EventSessionParticipant.organization_id == evento.organization_id,
+            EventSession.event_id == evento.id,
+        )
+        .order_by(EventSession.starts_at)
+    )
+    return [
+        SessionParticipationOut(
+            event_member_id=str(participacion.event_member_id),
+            session_id=str(sesion.id),
+            session_title=sesion.title,
+            starts_at=sesion.starts_at,
+            ends_at=sesion.ends_at,
+            role_key=participacion.role_key,
+        )
+        for participacion, sesion in filas.all()
+    ]
 
 
 @router.get(

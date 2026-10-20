@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   type OnInit,
+  computed,
   inject,
   input,
   output,
@@ -16,8 +17,9 @@ import { ApiError } from '../../../core/api/error.interceptor';
 import { displayName } from '../../../core/auth/auth.service';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
-import { Input } from '../../../shared/ui/input';
+import { Select } from '../../../shared/ui/select';
 import type { RosterMember } from './event-roster';
+import { type Participacion, opcionesDeRol, solapesDe } from './session-roles';
 
 interface SessionParticipant {
   readonly id: string;
@@ -27,7 +29,8 @@ interface SessionParticipant {
 
 /**
  * Editor de los participantes de una sesión concreta: qué miembros del roster
- * intervienen y con qué roles (separados por comas).
+ * intervienen y con qué rol, de un desplegable. Avisa (sin impedirlo) de quien
+ * ya está en otra sesión a la misma hora.
  *
  * Se abre en línea desde el listado de sesiones y solo tiene estado propio
  * (los roles por persona mientras el editor está abierto), por eso vive
@@ -36,7 +39,7 @@ interface SessionParticipant {
 @Component({
   selector: 'app-session-participants',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Input],
+  imports: [TranslocoDirective, Alert, Button, Select],
   template: `
     <ng-container *transloco="let t">
       <div class="participantes-editor">
@@ -44,13 +47,14 @@ interface SessionParticipant {
           <p>{{ t('admin.events.agenda.participantes.sinRoster') }}</p>
         } @else {
           @for (persona of roster(); track persona.id) {
-            <app-input
+            <app-select
               [fieldId]="'participante-' + sessionId() + '-' + persona.id"
               [label]="nombreDe(persona)"
-              [hint]="t('admin.events.agenda.participantes.rolesAyuda')"
+              [options]="opciones(rolesDePersona()[persona.id] || '')"
               [value]="rolesDePersona()[persona.id] || ''"
               (valueChange)="fijarRolesDePersona(persona.id, $event)"
             />
+            <p class="solape" aria-live="polite">{{ avisoDeSolape(persona.id) }}</p>
           }
         }
         @if (error(); as mensaje) {
@@ -63,6 +67,13 @@ interface SessionParticipant {
     </ng-container>
   `,
   styles: `
+    .solape {
+      margin: 0;
+      font-size: var(--fs-sm);
+    }
+    .solape:empty {
+      display: none;
+    }
     .participantes-editor {
       display: grid;
       gap: var(--space-sm);
@@ -79,6 +90,9 @@ export class SessionParticipants implements OnInit {
   /** La versión de la sesión que se está editando, para el control optimista. */
   readonly updatedAt = input.required<string>();
   readonly roster = input.required<readonly RosterMember[]>();
+  /** Horario de la sesión, para avisar de solapes con las demás. */
+  readonly inicio = input.required<string>();
+  readonly fin = input.required<string>();
 
   /** Se emite cuando hay que recargar la agenda (guardado correcto o conflicto). */
   readonly guardado = output<void>();
@@ -91,6 +105,27 @@ export class SessionParticipants implements OnInit {
   protected readonly guardando = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly nombreDe = displayName;
+  private readonly participaciones = signal<readonly Participacion[]>([]);
+
+  protected opciones(valorActual: string) {
+    return opcionesDeRol((clave) => this.transloco.translate(clave), valorActual);
+  }
+
+  /** Solo si la persona participa en esta sesión: entonces importa con qué coincide. */
+  protected avisoDeSolape(eventMemberId: string): string | null {
+    if (!this.rolesDePersona()[eventMemberId]) return null;
+    const solapes = solapesDe(eventMemberId, this.franja(), this.participaciones());
+    if (solapes.length === 0) return null;
+    return this.transloco.translate('admin.events.agenda.participantes.solape', {
+      sesiones: solapes.map((solape) => `«${solape.session_title}»`).join(', '),
+    });
+  }
+
+  private readonly franja = computed(() => ({
+    id: this.sessionId(),
+    starts_at: this.inicio(),
+    ends_at: this.fin(),
+  }));
 
   constructor() {
     // El editor se monta solo cuando su sesión está desplegada, así que sus
@@ -100,6 +135,20 @@ export class SessionParticipants implements OnInit {
 
   ngOnInit(): void {
     void this.cargar();
+    void this.cargarParticipaciones();
+  }
+
+  /** Una sola petición para todo el evento; sin ella simplemente no hay aviso. */
+  private async cargarParticipaciones(): Promise<void> {
+    try {
+      this.participaciones.set(
+        await firstValueFrom(
+          this.http.get<Participacion[]>(this.api.url(`/events/${this.eventId()}/participations`)),
+        ),
+      );
+    } catch {
+      // El aviso de solapes es una ayuda: sin él, el editor funciona igual.
+    }
   }
 
   protected fijarRolesDePersona(eventMemberId: string, valor: string): void {
@@ -150,7 +199,7 @@ export class SessionParticipants implements OnInit {
         porPersona.set(participante.event_member_id, lista);
       }
       this.rolesDePersona.set(
-        Object.fromEntries([...porPersona.entries()].map(([id, roles]) => [id, roles.join(', ')])),
+        Object.fromEntries([...porPersona.entries()].map(([id, roles]) => [id, roles.join(',')])),
       );
     } catch (error) {
       this.error.set(

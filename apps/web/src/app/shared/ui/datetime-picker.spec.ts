@@ -256,4 +256,35 @@ describe('DatetimePicker', () => {
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('.dt__borrar')).toBeNull();
   });
+
+  it('con min y max solo deja elegir días del rango y marca un valor de fuera', async () => {
+    await montar({
+      fieldId: 'evento-inicio',
+      min: '2030-03-10T09:00',
+      max: '2030-03-12T18:00',
+    });
+
+    const calendario = await abrir('fecha');
+    const dia = (n: number): HTMLButtonElement =>
+      Array.from(calendario.querySelectorAll<HTMLButtonElement>('.dt__dia')).find(
+        (boton) => !boton.classList.contains('fuera') && boton.textContent?.trim() === String(n),
+      )!;
+    // Abre en el mes del evento aunque hoy quede lejos.
+    expect(calendario.textContent).toContain('2030');
+    // `aria-disabled`, no `disabled`: el foco y las flechas siguen pasando
+    // por ellos, pero no se pueden elegir.
+    expect(dia(9).getAttribute('aria-disabled')).toBe('true');
+    expect(dia(10).getAttribute('aria-disabled')).toBeNull();
+    expect(dia(13).getAttribute('aria-disabled')).toBe('true');
+    // La entrada del teclado (`tabindex=0`) es el primer día elegible.
+    expect(dia(10).getAttribute('tabindex')).toBe('0');
+    dia(9).click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.value()).toBe('');
+
+    fixture.componentRef.setInput('value', '2030-03-12T19:30');
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Tiene que estar entre');
+    expect(nativo.getAttribute('min')).toBe('2030-03-10T09:00');
+  });
 });

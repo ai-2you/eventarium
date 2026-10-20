@@ -33,7 +33,8 @@
       "menosUnaHora": "Restar una hora",
       "menosCincoMinutos": "Restar cinco minutos",
       "masCincoMinutos": "Sumar cinco minutos",
-      "masUnaHora": "Sumar una hora"
+      "masUnaHora": "Sumar una hora",
+      "fueraDeRango": "Tiene que estar entre {{desde}} y {{hasta}}."
     },
     "editor": {
       "barra": "Formato del texto",
@@ -1356,7 +1357,9 @@
         "exito": "Cambios guardados.",
         "error": "No hemos podido guardar los cambios.",
         "direccion": "Dirección",
-        "rotulo": "Datos del evento"
+        "rotulo": "Datos del evento",
+        "moverSesionesPregunta": "¿Las movemos con el evento? Se desplazan todas lo mismo que el inicio, así que la agenda mantiene su orden y sus horas relativas.",
+        "moverSesiones": "Mover las sesiones con el evento"
       },
       "agenda": {
         "titulo": "Agenda",
@@ -1386,14 +1389,17 @@
         "participantes": {
           "gestionar": "Participantes",
           "sinRoster": "Añade primero a alguien al evento en «Participantes del evento».",
-          "rolesAyuda": "Uno o varios roles separados por comas, p. ej. «ponente, moderador». Vacío para quitarla de esta sesión.",
           "guardar": "Guardar participantes",
-          "error": "No hemos podido guardar los participantes."
+          "error": "No hemos podido guardar los participantes.",
+          "noParticipa": "No participa",
+          "solape": "Ojo: a esta hora también está en {{sesiones}}."
         },
         "sede": "Sede",
         "sinSedeEspecifica": "Sin sede específica",
         "cabeceraInicio": "Sesiones y",
-        "cabeceraMarca": "quien las imparte."
+        "cabeceraMarca": "quien las imparte.",
+        "finAntesDeInicio": "El fin tiene que ser posterior al inicio.",
+        "fueraDelEvento": "La sesión tiene que caer dentro de las fechas y horas del evento."
       },
       "design": {
         "titulo": "Diseño",
@@ -2067,7 +2073,26 @@
           "presenter": "Presentador/a"
         },
         "verPerfilPublico": "Ver el perfil público",
-        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha."
+        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha.",
+        "asignar": {
+          "titulo": "Asignar a {{nombre}} a una sesión",
+          "sinSesiones": "Todavía no hay sesiones en la agenda.",
+          "crearSesion": "Crear una sesión en la agenda",
+          "yaEsta": "Ya está en:",
+          "sesion": "Sesión",
+          "eligeSesion": "Elige una sesión",
+          "rol": "Rol",
+          "guardar": "Asignar",
+          "hecho": "Asignado a «{{sesion}}».",
+          "yaAsignado": "Ya está asignado a esa sesión con ese rol.",
+          "yaNoExiste": "Esa sesión ya no existe; elige otra.",
+          "error": "No hemos podido asignar la sesión."
+        },
+        "verBio": "Ver bio",
+        "verBioDe": "Ver la biografía de {{nombre}} (se abre en otra pestaña)",
+        "bioDe": "Biografía de {{nombre}}",
+        "bioSinPerfil": "No tiene el perfil público activado, así que no hay página que abrir: esta es la biografía de su ficha.",
+        "columnaAcciones": "Acciones"
       },
       "rotulo": "Eventos",
       "cabeceraInicio": "Toda la programación de la organización,",
