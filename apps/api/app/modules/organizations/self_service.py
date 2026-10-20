@@ -30,6 +30,7 @@ from app.core.turnstile import require_turnstile
 from app.modules.auth import service as auth_service
 from app.modules.auth.cookies import fijar_cookie_refresh
 from app.modules.auth.service import AuthenticatedUser
+from app.modules.events import session_types
 from app.modules.organizations import service as organization_service
 from app.modules.organizations.models import OrganizationBranding, OrganizationMember
 from app.modules.organizations.schemas import (
@@ -118,6 +119,8 @@ async def create_organization(
 
     roles_clonados = await organization_service.clone_system_roles(session, organization_id)
     owner_role = roles_clonados[OWNER_KEY]
+    # Mismo código que el alta por superadmin: nace con los tipos de sesión base.
+    await session_types.crear_tipos_base(session, organization_id)
 
     session.add(
         OrganizationBranding(

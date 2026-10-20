@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import set_organization_context
 from app.core.storage import get_storage, public_url_versionada
+from app.modules.events import session_types
 from app.modules.media.models import Media
 from app.modules.organizations.models import Organization, OrganizationBranding
 from app.modules.organizations.schemas import (
@@ -110,6 +111,7 @@ async def create_organization(
         )
     )
     await clone_system_roles(session, organizacion.id)
+    await session_types.crear_tipos_base(session, organizacion.id)
     await session.flush()
     return organizacion
 

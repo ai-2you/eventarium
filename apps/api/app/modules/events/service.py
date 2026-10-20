@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.core.database import set_organization_context
 from app.core.permissions import Permission
 from app.core.storage import get_storage, public_url_versionada
-from app.modules.events import categories, repository
+from app.modules.events import categories, repository, session_types
 from app.modules.events import schemas as events_schemas
 from app.modules.events.geocoding import geocode_address
 from app.modules.events.models import (
@@ -30,6 +30,7 @@ from app.modules.events.models import (
     EventSession,
     EventSessionParticipant,
     EventVenue,
+    SessionType,
 )
 from app.modules.media import service as media_service
 from app.modules.media.models import Media
@@ -500,10 +501,25 @@ async def create_session(
     if datos.get("venue_id") is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 
-    sesion = EventSession(event_id=event_id, organization_id=organization_id, **datos)
+    tipo = await _tipo_de_sesion(session, organization_id, datos["session_type"])
+    sesion = EventSession(
+        event_id=event_id, organization_id=organization_id, session_type_id=tipo.id, **datos
+    )
     session.add(sesion)
     await session.flush()
     return sesion
+
+
+async def _tipo_de_sesion(
+    session: AsyncSession, organization_id: uuid.UUID, clave: str
+) -> SessionType:
+    """El tipo de la organización para el texto heredado (`talk`, `workshop`…)."""
+    tipo = await session_types.tipo_por_clave_base(session, organization_id, clave)
+    if tipo is None:
+        raise ValidationDomainError(
+            "La organización no tiene tipos de sesión: crea al menos uno antes de añadir sesiones."
+        )
+    return tipo
 
 
 async def update_session(
@@ -546,6 +562,9 @@ async def update_session(
     except ValueError as exc:
         raise ValidationDomainError(str(exc)) from exc
 
+    if "session_type" in datos and datos["session_type"] != sesion.session_type:
+        tipo = await _tipo_de_sesion(session, organization_id, datos["session_type"])
+        sesion.session_type_id = tipo.id
     for campo, valor in datos.items():
         setattr(sesion, campo, valor)
     await session.flush()
