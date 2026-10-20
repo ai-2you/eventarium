@@ -21,6 +21,8 @@ export interface EventUpdate {
   payment_checkout_window_minutes?: (number | null);
   registration_mode?: ('free' | 'approval' | 'paid' | null);
   registration_opens_at?: (string | null);
+  reminder_enabled?: (boolean | null);
+  reminder_hours_before?: (2 | 6 | 12 | 24 | 48 | 72 | null);
   starts_at?: (string | null);
   status?: ('draft' | 'published' | 'archived' | null);
   summary?: (string | null);

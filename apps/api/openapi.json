@@ -14905,6 +14905,30 @@
             "minimum": 30.0,
             "title": "Payment Checkout Window Minutes",
             "default": 30
+          },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled",
+            "default": true
+          },
+          "reminder_hours_before": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  2,
+                  6,
+                  12,
+                  24,
+                  48,
+                  72
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Hours Before"
           }
         },
         "type": "object",
@@ -15157,6 +15181,26 @@
             "type": "integer",
             "title": "Payment Checkout Window Minutes"
           },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "type": "integer",
+            "title": "Reminder Hours Before"
+          },
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -15285,6 +15329,8 @@
           "registration_opens_at",
           "email_verification_required",
           "payment_checkout_window_minutes",
+          "reminder_enabled",
+          "reminder_hours_before",
           "latitude",
           "longitude",
           "contingency_fund_percent",
@@ -15656,6 +15702,26 @@
             "type": "integer",
             "title": "Payment Checkout Window Minutes"
           },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "type": "integer",
+            "title": "Reminder Hours Before"
+          },
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -15757,6 +15823,8 @@
           "registration_opens_at",
           "email_verification_required",
           "payment_checkout_window_minutes",
+          "reminder_enabled",
+          "reminder_hours_before",
           "latitude",
           "longitude",
           "contingency_fund_percent",
@@ -16476,6 +16544,36 @@
               }
             ],
             "title": "Payment Checkout Window Minutes"
+          },
+          "reminder_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  2,
+                  6,
+                  12,
+                  24,
+                  48,
+                  72
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Hours Before"
           },
           "contingency_fund_percent": {
             "anyOf": [
