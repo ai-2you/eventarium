@@ -33,6 +33,8 @@ export interface RegistrationListItem {
   readonly confirmed_at: string | null;
   readonly waitlist_promoted_at: string | null;
   readonly waitlist_promotion_expires_at: string | null;
+  /** Veces que no se presentó, sin cancelar, a eventos con la asistencia cerrada. */
+  readonly absences_count?: number;
 }
 
 export interface RegistrationAnswerOut {
@@ -56,11 +58,17 @@ export interface RegistrationConsentOut {
   readonly accepted_policies?: readonly AcceptedPolicyOut[];
 }
 
+export interface AbsenceOut {
+  readonly event_title: string;
+  readonly starts_at: string;
+}
+
 export interface RegistrationDetail extends RegistrationListItem {
   readonly approved_at: string | null;
   readonly rejected_at: string | null;
   readonly cancelled_at: string | null;
   readonly answers: readonly RegistrationAnswerOut[];
+  readonly absences?: readonly AbsenceOut[];
   readonly consent: RegistrationConsentOut | null;
 }
 

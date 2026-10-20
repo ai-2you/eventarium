@@ -4,7 +4,8 @@ Tras el evento, el organizador declara que la asistencia está completa: solo
 entonces cuentan las ausencias (un check-in a medias o un escaneo de prueba no
 marca a nadie). Se puede reabrir durante 7 días para corregir escaneos
 olvidados, contados desde el fin del evento (cerrar y reabrir no lo alarga).
-Solo en eventos presenciales o híbridos que se celebraron.
+Solo en eventos presenciales que se celebraron: son los únicos que cuentan
+ausencias (en un híbrido, quien lo sigue en línea no pasa por la puerta).
 """
 
 from __future__ import annotations
@@ -17,11 +18,13 @@ from app.shared.errors import ConflictError
 PLAZO_PARA_REABRIR = timedelta(days=7)
 
 
+def admite_cierre(evento: Event) -> bool:
+    return evento.status in ("published", "archived") and evento.location_mode == "in_person"
+
+
 def cerrar(evento: Event) -> None:
-    if evento.status not in ("published", "archived") or evento.location_mode == "online":
-        raise ConflictError(
-            "Solo se cierra la asistencia de eventos presenciales o híbridos celebrados."
-        )
+    if not admite_cierre(evento):
+        raise ConflictError("Solo se cierra la asistencia de eventos presenciales celebrados.")
     if datetime.now(UTC) < evento.ends_at:
         raise ConflictError("La asistencia se cierra cuando el evento ha terminado.")
     if evento.attendance_closed_at is None:

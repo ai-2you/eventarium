@@ -3,8 +3,11 @@
 
 
 /**
- * Estado del cierre de asistencia de un evento.
+ * Estado del cierre de asistencia de un evento, con lo que necesita la
+ * pantalla de check-in para ofrecerlo (sin pedir el evento con otro permiso).
  */
 export interface AttendanceOut {
   attendance_closed_at: (string | null);
+  can_close: boolean;
+  ends_at: string;
 }

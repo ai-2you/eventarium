@@ -287,8 +287,13 @@ async def test_un_pago_cuenta_aunque_el_correo_no_se_verificara(
 
 @pytest.mark.parametrize(
     "extra",
-    [{"location_mode": "online"}, {"status": "cancelled"}, {"status": "draft"}],
-    ids=["en-linea", "cancelado", "borrador"],
+    [
+        {"location_mode": "online"},
+        {"location_mode": "hybrid"},
+        {"status": "cancelled"},
+        {"status": "draft"},
+    ],
+    ids=["en-linea", "hibrido", "cancelado", "borrador"],
 )
 async def test_no_se_cierra_la_asistencia_de_eventos_que_no_la_tienen(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba, extra: dict
@@ -299,3 +304,19 @@ async def test_no_se_cierra_la_asistencia_de_eventos_que_no_la_tienen(
     respuesta = await cliente.post(f"{EVENTS}/{evento}/attendance/close", headers=cabeceras)
 
     assert respuesta.status_code == 409
+
+
+async def test_el_estado_de_la_asistencia_lo_ve_quien_hace_el_check_in(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    pasado = await _evento(organizacion, dias=-1)
+    voluntario = await crear_miembro(organizacion, "volunteer")
+    _, cabeceras = await iniciar_sesion_con(
+        cliente, organizacion, voluntario.email, voluntario.password
+    )
+
+    estado = await cliente.get(f"{EVENTS}/{pasado}/attendance", headers=cabeceras)
+
+    assert estado.status_code == 200, estado.text
+    assert estado.json()["can_close"] is True
+    assert estado.json()["attendance_closed_at"] is None

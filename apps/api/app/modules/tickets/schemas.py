@@ -86,6 +86,9 @@ class MyTicketResponse(BaseModel):
 
 
 class AttendanceOut(BaseModel):
-    """Estado del cierre de asistencia de un evento."""
+    """Estado del cierre de asistencia de un evento, con lo que necesita la
+    pantalla de check-in para ofrecerlo (sin pedir el evento con otro permiso)."""
 
     attendance_closed_at: datetime | None
+    ends_at: datetime
+    can_close: bool

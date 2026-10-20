@@ -7792,6 +7792,48 @@
         }
       }
     },
+    "/api/v1/events/{event_id}/attendance": {
+      "get": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Estado del cierre de asistencia de un evento",
+        "operationId": "get_attendance_api_v1_events__event_id__attendance_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/attendance/close": {
       "post": {
         "tags": [
@@ -12265,14 +12307,25 @@
               }
             ],
             "title": "Attendance Closed At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "can_close": {
+            "type": "boolean",
+            "title": "Can Close"
           }
         },
         "type": "object",
         "required": [
-          "attendance_closed_at"
+          "attendance_closed_at",
+          "ends_at",
+          "can_close"
         ],
         "title": "AttendanceOut",
-        "description": "Estado del cierre de asistencia de un evento."
+        "description": "Estado del cierre de asistencia de un evento, con lo que necesita la\npantalla de check-in para ofrecerlo (sin pedir el evento con otro permiso)."
       },
       "AuditLogEntry": {
         "properties": {
