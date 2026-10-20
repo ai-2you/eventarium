@@ -66,6 +66,8 @@ export interface PublicVenue {
 }
 
 export interface PublicEventDetail {
+  /** `hidden` = «solo con enlace»: se marca `noindex`. */
+  readonly visibility?: 'public' | 'hidden' | 'private';
   readonly organization: OrganizacionPublica;
   /** Categoría activa del catálogo; `null` si no tiene o está desactivada. */
   readonly category?: { readonly slug: string; readonly name: string } | null;

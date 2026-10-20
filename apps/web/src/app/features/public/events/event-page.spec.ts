@@ -367,6 +367,24 @@ describe('EventPage', () => {
     await esperarSinViolacionesDeAccesibilidad(raiz);
   });
 
+  it('un evento «solo con enlace» se muestra pero no se indexa', async () => {
+    const robots = () =>
+      document.querySelector('meta[name="robots"]')?.getAttribute('content') ?? null;
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({ ...eventoDetalle(), visibility: 'hidden' });
+    await avanzar(fixture);
+
+    expect(fixture.nativeElement.querySelector('#agenda-h2')).not.toBeNull();
+    expect(robots()).toBe('noindex, nofollow');
+  });
+
   it('la categoría y las etiquetas son enlaces que filtran el directorio', async () => {
     const fixture = TestBed.createComponent(EventPage);
     fixture.componentRef.setInput('org', 'acme');

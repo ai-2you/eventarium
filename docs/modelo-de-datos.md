@@ -490,10 +490,14 @@ RLS aísla por **organización**, no por si un evento está publicado: un borrad
 la propia organización sigue siendo visible bajo RLS para cualquiera con el
 contexto de esa organización fijado (incluido el contexto anónimo de los endpoints
 públicos, que solo fija `app.organization_id`, sin usuario — y que hoy se fija desde
-el propio evento vía `app_resolve_public_event`). El filtro `status = 'published'
-AND visibility = 'public'` de las páginas públicas (`public_router.py`) es por tanto
-explícito en cada consulta (y dentro de la propia función de resolución), nunca
-delegado a RLS — ver `docs/arquitectura.md`.
+el propio evento vía `app_resolve_public_event`). El filtro de publicación de las
+páginas públicas (`public_router.py`) es por tanto explícito en cada consulta (y
+dentro de la propia función de resolución), nunca delegado a RLS — ver
+`docs/arquitectura.md`. Desde la migración `0065`, la resolución de un evento por su
+URL acepta `visibility IN ('public', 'hidden')` («solo con enlace»), mientras que todos
+los listados públicos (organización, portada y su lista de organizaciones, perfil de
+ponente, otros eventos de un patrocinador) siguen exigiendo `public`; `private` no se
+abre nunca.
 
 `users` tiene además una política solo de `INSERT` que permite crear la fila cuando hay
 contexto de organización: dar de alta a alguien crea primero el usuario y después la

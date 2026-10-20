@@ -931,7 +931,8 @@ export class EventPage implements OnInit {
       description: evento.summary ?? this.transloco.translate('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug),
-      noIndexar: vistaPrevia,
+      // «Solo con enlace»: se abre por su URL, pero los buscadores no deben indexarlo.
+      noIndexar: vistaPrevia || evento.visibility === 'hidden',
     });
   }
 }

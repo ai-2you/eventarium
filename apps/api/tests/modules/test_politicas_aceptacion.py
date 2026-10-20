@@ -125,7 +125,7 @@ async def test_sin_textos_la_pagina_publica_devuelve_lista_vacia(
 
 @pytest.mark.parametrize(
     ("status", "visibility"),
-    [("draft", "public"), ("published", "hidden"), ("published", "private")],
+    [("draft", "public"), ("published", "private")],
 )
 async def test_la_pagina_publica_no_revela_eventos_no_publicables(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba, status: str, visibility: str
@@ -133,6 +133,13 @@ async def test_la_pagina_publica_no_revela_eventos_no_publicables(
     await _crear_evento(organizacion, "no-publicable", status=status, visibility=visibility)
     respuesta = await cliente.get(_publicas("no-publicable"))
     assert respuesta.status_code == 404
+
+
+async def test_un_evento_solo_con_enlace_muestra_sus_politicas(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    await _crear_evento(organizacion, "solo-con-enlace", status="published", visibility="hidden")
+    assert (await cliente.get(_publicas("solo-con-enlace"))).status_code == 200
 
 
 async def test_la_pagina_publica_tiene_limite_por_ip(

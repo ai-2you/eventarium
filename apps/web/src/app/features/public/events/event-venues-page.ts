@@ -576,6 +576,7 @@ export class EventVenuesPage implements OnInit {
       description: evento.summary ?? this.traducir('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug, 'programa'),
+      noIndexar: evento.visibility === 'hidden',
     });
   }
 }

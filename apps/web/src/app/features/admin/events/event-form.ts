@@ -46,6 +46,9 @@ const LONGITUD_MAXIMA_SLUG = 160;
 /** `EventCreate.description`, mismo tope que la API. */
 const LONGITUD_MAXIMA_DESCRIPCION = 20000;
 
+/** «Solo con enlace» (`hidden`): se abre con la URL pero no sale en listados ni buscadores. */
+type Visibilidad = 'public' | 'hidden' | 'private';
+
 interface EventoBase {
   readonly id: string;
   readonly slug: string;
@@ -53,6 +56,7 @@ interface EventoBase {
   readonly summary: string | null;
   readonly description: string | null;
   readonly registration_mode: RegistrationMode;
+  readonly visibility: Visibilidad;
   readonly capacity: number | null;
   readonly starts_at: string;
   readonly ends_at: string;
@@ -261,6 +265,14 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [hint]="t('admin.events.formulario.modoAyuda.' + registrationMode())"
                 [value]="registrationMode()"
                 (valueChange)="alCambiarModo($any($event))"
+              />
+              <app-select
+                fieldId="evento-visibilidad"
+                [label]="t('admin.events.formulario.visibilidad')"
+                [options]="opcionesDeVisibilidad()"
+                [hint]="t('admin.events.formulario.visibilidadAyuda.' + visibility())"
+                [value]="visibility()"
+                (valueChange)="visibility.set($any($event))"
               />
               <div class="campo-numero">
                 <label for="evento-aforo">{{ t('admin.events.formulario.aforo') }}</label>
@@ -490,6 +502,7 @@ export class EventForm {
   protected readonly description = signal('');
   protected readonly longitudMaximaDescripcion = LONGITUD_MAXIMA_DESCRIPCION;
   protected readonly registrationMode = signal<RegistrationMode>('free');
+  protected readonly visibility = signal<Visibilidad>('public');
   protected readonly reminderEnabled = signal(true);
   /** `null` en un evento nuevo sin elegir: la API decide (24 h, o 48 h si es de pago). */
   protected readonly reminderHours = signal<number | null>(null);
@@ -582,6 +595,13 @@ export class EventForm {
     { value: 'paid', label: this.transloco.translate('admin.events.formulario.modoPago') },
   ]);
 
+  protected readonly opcionesDeVisibilidad = computed<SelectOption[]>(() =>
+    (['public', 'hidden', 'private'] as const).map((valor) => ({
+      value: valor,
+      label: this.transloco.translate(`admin.events.formulario.visibilidadOpcion.${valor}`),
+    })),
+  );
+
   protected readonly opcionesDeZonaHoraria = computed<SelectOption[]>(() =>
     zonasHorariasDisponibles().map((zona) => ({ value: zona, label: zona })),
   );
@@ -646,6 +666,7 @@ export class EventForm {
       this.summary.set(evento.summary ?? '');
       this.description.set(evento.description ?? '');
       this.registrationMode.set(evento.registration_mode);
+      this.visibility.set(evento.visibility ?? 'public');
       this.capacity.set(evento.capacity);
       this.startsAt.set(isoAValorLocal(evento.starts_at));
       this.endsAt.set(isoAValorLocal(evento.ends_at));
@@ -831,6 +852,7 @@ export class EventForm {
       summary: this.summary().trim() || null,
       description: this.description().trim() || null,
       registration_mode: this.registrationMode(),
+      visibility: this.visibility(),
       capacity: this.capacity(),
       starts_at: new Date(this.startsAt()).toISOString(),
       ends_at: new Date(this.endsAt()).toISOString(),

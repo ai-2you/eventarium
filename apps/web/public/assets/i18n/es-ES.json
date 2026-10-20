@@ -1386,6 +1386,17 @@
             "48": "2 días antes",
             "72": "3 días antes"
           }
+        },
+        "visibilidad": "Visibilidad",
+        "visibilidadOpcion": {
+          "public": "Público",
+          "hidden": "Solo con enlace",
+          "private": "Privado"
+        },
+        "visibilidadAyuda": {
+          "public": "Aparece en la página de tu organización, en el directorio de eventos y en los buscadores.",
+          "hidden": "Lo abre quien tenga el enlace, pero no sale en ningún listado ni en los buscadores. No es secreto: no lo uses para información confidencial.",
+          "private": "Nadie puede abrirlo, ni con el enlace. Quien ya esté inscrito conserva su entrada, pero no podrá ver la ficha."
         }
       },
       "agenda": {

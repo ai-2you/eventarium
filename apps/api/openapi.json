@@ -6133,7 +6133,7 @@
           "público"
         ],
         "summary": "Ver la ficha pública de un patrocinador",
-        "description": "Anidado bajo el evento, mismo criterio que la sesión: exige `published` + `public` además de que el patrocinador pertenezca a este evento. Nunca lleva el importe de la aportación (ver `PublicSponsor`).",
+        "description": "Anidado bajo el evento, mismo criterio que la sesión: exige `published` y visibilidad `public` o `hidden` (solo con enlace) además de que el patrocinador pertenezca a este evento. Nunca lleva el importe de la aportación (ver `PublicSponsor`).",
         "operationId": "get_public_sponsor_api_v1_public_organizations__org_slug__events__slug__sponsors__sponsor_id__get",
         "parameters": [
           {
@@ -6192,7 +6192,7 @@
           "público"
         ],
         "summary": "Ver el detalle de una sesión publicada",
-        "description": "Anidado bajo el evento: exige que el evento sea `published` + `public` además de que la propia sesión le pertenezca. Sin este anidamiento, un `id` de sesión (UUIDv7, con entropía reducida frente a un v4 dentro de una ventana de tiempo conocida) sería enumerable y filtraría agendas de eventos sin publicar.",
+        "description": "Anidado bajo el evento: exige que el evento sea `published` y `public` o `hidden` además de que la propia sesión le pertenezca. Sin este anidamiento, un `id` de sesión (UUIDv7, con entropía reducida frente a un v4 dentro de una ventana de tiempo conocida) sería enumerable y filtraría agendas de eventos sin publicar.",
         "operationId": "get_public_session_api_v1_public_organizations__org_slug__events__slug__sessions__session_id__get",
         "parameters": [
           {
@@ -21532,6 +21532,16 @@
             ],
             "title": "Cancellation Reason"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -22461,6 +22471,16 @@
             "type": "string",
             "title": "Event Title"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"
           },
@@ -22737,6 +22757,16 @@
           "event_title": {
             "type": "string",
             "title": "Event Title"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
           },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"

@@ -39,7 +39,8 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
 - Lectura: `listar_eventos`, `ver_evento`, `cifras_de_inscripcion`,
   `listar_niveles_de_patrocinio`, `listar_categorias`, `listar_tipos_de_sesion`.
   `ver_evento` devuelve
-  `enlace_publico` con la URL pública del evento, `/{organización}/{evento}`.
+  `enlace_publico` con la URL pública del evento, `/{organización}/{evento}` (vacío si es
+  privado), y los ajustes del recordatorio (`recordatorio`, `recordatorio_horas`).
   `listar_eventos` filtra por `estado`, por `categoria` (slug) y por hasta 3
   `etiquetas` (el evento debe tener todas). No hay filtro por organización:
   una conexión pertenece a una sola.
@@ -57,6 +58,10 @@ aceptan `tipo` con el nombre (sin distinguir mayúsculas), el id o la clave base
 desconocido se rechaza con la lista de los disponibles. Las sesiones devuelven
 en `tipo` el nombre que le dio la organización. `editar_evento` acepta
 `mover_sesiones=True` para mover la agenda con el evento al cambiar sus fechas.
+
+**Visibilidad.** `editar_evento` acepta `visibilidad`: `public` (sale en listados y
+buscadores), `hidden` («solo con enlace»: se abre por su URL, no sale en ningún listado y
+se marca `noindex`) o `private` (no se abre).
 
 **Recordatorio a los inscritos.** `crear_evento` y `editar_evento` aceptan
 `recordatorio` (si se envía; por defecto, sí) y `recordatorio_horas` (2, 6, 12,
