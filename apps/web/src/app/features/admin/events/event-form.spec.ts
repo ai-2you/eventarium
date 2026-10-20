@@ -6,6 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { emularDialogoNativo } from '../../../../testing/dialog';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { By } from '@angular/platform-browser';
@@ -316,11 +317,7 @@ describe('EventForm', () => {
     }
 
     it('si las fechas nuevas dejan sesiones fuera, pregunta y reenvía moviéndolas', async () => {
-      if (!HTMLDialogElement.prototype.showModal) {
-        HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-          this.setAttribute('open', '');
-        };
-      }
+      emularDialogoNativo();
       const fixture = await abrirEdicion();
       await enviar(fixture);
       http

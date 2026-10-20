@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { emularDialogoNativo } from '../../../../testing/dialog';
 import { MembersPage } from './members-page';
 import { AuthService } from '../../../core/auth/auth.service';
 import { TODOS_LOS_PERMISOS, authConPermisos } from '../../../../testing/auth';
@@ -231,12 +232,7 @@ describe('MembersPage, ficha de un rol', () => {
   let http: HttpTestingController;
 
   function configurar(permisos: readonly string[], roles: readonly string[] = ['owner']): void {
-    // jsdom no implementa el `<dialog>` modal (como en `media-edit-dialog.spec.ts`).
-    if (!HTMLDialogElement.prototype.showModal) {
-      HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      };
-    }
+    emularDialogoNativo();
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({

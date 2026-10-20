@@ -116,7 +116,7 @@ async def create_organization(
     # aparte que pudiera divergir con el tiempo.
     await set_organization_context(session, organization_id, persona.id)
 
-    roles_clonados = await organization_service.clone_system_roles(session, organization_id)
+    roles_clonados = await organization_service.inicializar_organizacion(session, organization_id)
     owner_role = roles_clonados[OWNER_KEY]
 
     session.add(

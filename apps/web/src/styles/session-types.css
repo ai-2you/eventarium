@@ -1,0 +1,29 @@
+/*
+ * Paleta cerrada de los tipos de sesión (`session_types.color` en la API).
+ *
+ * Tokens propios, no los de la plantilla de tema: la organización elige el color
+ * de cada tipo, y su plantilla no debe poder dejarlo ilegible. Mismo tono en los
+ * dos temas; la luminosidad cambia: claro sobre las superficies oscuras y oscuro
+ * sobre el papel, con margen para leerse también sobre `--surface-hi`.
+ */
+:root {
+  --tipo-azul: oklch(76% 0.12 250);
+  --tipo-violeta: oklch(76% 0.13 300);
+  --tipo-verde: oklch(78% 0.14 150);
+  --tipo-ambar: oklch(80% 0.14 75);
+  --tipo-rosa: oklch(77% 0.13 350);
+  --tipo-cian: oklch(79% 0.11 210);
+  --tipo-rojo: oklch(74% 0.15 25);
+  --tipo-gris: oklch(74% 0 0);
+}
+
+[data-theme='light'] {
+  --tipo-azul: oklch(42% 0.15 250);
+  --tipo-violeta: oklch(42% 0.16 300);
+  --tipo-verde: oklch(42% 0.13 150);
+  --tipo-ambar: oklch(42% 0.12 75);
+  --tipo-rosa: oklch(42% 0.16 350);
+  --tipo-cian: oklch(42% 0.1 210);
+  --tipo-rojo: oklch(42% 0.17 25);
+  --tipo-gris: oklch(42% 0 0);
+}

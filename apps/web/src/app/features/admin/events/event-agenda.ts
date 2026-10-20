@@ -21,6 +21,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { isoAValorLocal } from './datetime-local';
 import { EventRoster, type RosterMember } from './event-roster';
 import { EventVenues } from './event-venues';
+import { SessionTypeChip } from '../../../shared/ui/session-type-chip';
 import { SessionForm, type EventSession } from './session-form';
 import { SessionParticipants } from './session-participants';
 
@@ -51,6 +52,7 @@ interface DiaDeAgenda {
     EventRoster,
     EventVenues,
     SessionForm,
+    SessionTypeChip,
     SessionParticipants,
     PageHeader,
   ],
@@ -83,6 +85,15 @@ interface DiaDeAgenda {
                   <li>
                     <div class="fila">
                       <div>
+                        @if (sesion.type; as tipo) {
+                          <app-session-type-chip
+                            class="tipo"
+                            [nombre]="tipo.name"
+                            [color]="tipo.color"
+                            [pausa]="tipo.is_break"
+                            [compacto]="true"
+                          />
+                        }
                         <strong>{{ sesion.title }}</strong>
                         <span class="detalle">
                           {{ sesion.starts_at | date: 'shortTime' }} –
@@ -152,6 +163,10 @@ interface DiaDeAgenda {
     </ng-container>
   `,
   styles: `
+    .tipo {
+      margin-right: var(--space-sm);
+      vertical-align: 2px;
+    }
     .edicion-en-linea {
       margin-top: var(--space-sm);
       padding: var(--space-sm) var(--space-md);

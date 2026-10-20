@@ -8018,6 +8018,213 @@
         }
       }
     },
+    "/api/v1/organizations/me/session-types": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Listar los tipos de sesión de la organización",
+        "operationId": "list_session_types_api_v1_organizations_me_session_types_get",
+        "parameters": [
+          {
+            "name": "activos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Activos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionTypeOut"
+                  },
+                  "title": "Response List Session Types Api V1 Organizations Me Session Types Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Crear un tipo de sesión",
+        "operationId": "create_session_type_api_v1_organizations_me_session_types_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/order": {
+      "put": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Reordenar los tipos de sesión",
+        "description": "Recibe **todos** los tipos en el orden nuevo; si cambiaron entretanto, 409.",
+        "operationId": "reorder_session_types_api_v1_organizations_me_session_types_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/{tipo_id}": {
+      "patch": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Editar un tipo de sesión",
+        "operationId": "update_session_type_api_v1_organizations_me_session_types__tipo_id__patch",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Borrar un tipo de sesión que no se usa",
+        "description": "Con sesiones que lo usan responde 409: hay que desactivarlo.",
+        "operationId": "delete_session_type_api_v1_organizations_me_session_types__tipo_id__delete",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/sponsors": {
       "get": {
         "tags": [
@@ -15473,15 +15680,33 @@
       "EventSessionCreate": {
         "properties": {
           "session_type": {
-            "type": "string",
-            "enum": [
-              "talk",
-              "workshop",
-              "break",
-              "service",
-              "other"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "talk",
+                  "workshop",
+                  "break",
+                  "service",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "type": "string",
@@ -15578,13 +15803,12 @@
         },
         "type": "object",
         "required": [
-          "session_type",
           "title",
           "starts_at",
           "ends_at"
         ],
         "title": "EventSessionCreate",
-        "description": "Alta de una sesión de agenda."
+        "description": "Alta de una sesión de agenda.\n\nEl tipo va por `session_type_id` (el catálogo de la organización). El texto\n`session_type` se sigue aceptando durante la transición: se traduce al tipo\ncon esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo\nque no es una pausa."
       },
       "EventSessionResponse": {
         "properties": {
@@ -15594,14 +15818,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "workshop",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -15700,6 +15920,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -15734,6 +15955,17 @@
               }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "anyOf": [
@@ -21215,14 +21447,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "workshop",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -21319,6 +21547,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -21759,14 +21988,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "workshop",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -21884,6 +22109,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -23884,6 +24110,243 @@
         ],
         "title": "SessionParticipationOut",
         "description": "Una persona del roster en una sesión, con su horario: lo justo para que\nel panel avise de solapes sin pedir los participantes sesión a sesión."
+      },
+      "SessionTypeCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "azul",
+              "violeta",
+              "verde",
+              "ambar",
+              "rosa",
+              "cian",
+              "rojo",
+              "gris"
+            ],
+            "title": "Color",
+            "default": "azul"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SessionTypeCreate"
+      },
+      "SessionTypeOrder": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "SessionTypeOrder",
+        "description": "Todos los tipos de la organización, en el orden nuevo."
+      },
+      "SessionTypeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "base_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Key"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "sesiones": {
+            "type": "integer",
+            "title": "Sesiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break",
+          "description",
+          "base_key",
+          "display_order",
+          "is_active",
+          "sesiones"
+        ],
+        "title": "SessionTypeOut",
+        "description": "Un tipo de sesión del catálogo de la organización."
+      },
+      "SessionTypeRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break"
+        ],
+        "title": "SessionTypeRef",
+        "description": "El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."
+      },
+      "SessionTypeUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "azul",
+                  "violeta",
+                  "verde",
+                  "ambar",
+                  "rosa",
+                  "cian",
+                  "rojo",
+                  "gris"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "is_break": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Break"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "SessionTypeUpdate"
       },
       "SocialLinkInput": {
         "properties": {

@@ -122,6 +122,7 @@ TABLAS = (
     # test contaminarían al siguiente dentro de la misma suite.
     "sponsor_tiers",
     "sponsors",
+    "session_types",
     "audit_log",
     "cookie_consents",
     # Fase 6 del PRD, fase 1 de trabajo: las cinco tablas de dominio cascadean

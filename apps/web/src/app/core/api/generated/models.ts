@@ -250,6 +250,11 @@ export type { SessionParticipantEntry } from './models/session-participant-entry
 export type { SessionParticipantResponse } from './models/session-participant-response';
 export type { SessionParticipantsUpdate } from './models/session-participants-update';
 export type { SessionParticipationOut } from './models/session-participation-out';
+export type { SessionTypeCreate } from './models/session-type-create';
+export type { SessionTypeOrder } from './models/session-type-order';
+export type { SessionTypeOut } from './models/session-type-out';
+export type { SessionTypeRef } from './models/session-type-ref';
+export type { SessionTypeUpdate } from './models/session-type-update';
 export type { SocialLinkInput } from './models/social-link-input';
 export type { SocialLinkResponse } from './models/social-link-response';
 export type { SocialLinkUpdate } from './models/social-link-update';

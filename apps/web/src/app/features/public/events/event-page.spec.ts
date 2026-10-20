@@ -276,6 +276,29 @@ describe('EventPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('la agenda muestra el tipo con el nombre que le dio la organización', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    const base = eventoDetalle();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({
+        ...base,
+        sessions: base.sessions.map((sesion) => ({
+          ...sesion,
+          type: { id: 't9', name: 'Mesa redonda', color: 'rosa', is_break: false },
+        })),
+      });
+    await avanzar(fixture);
+
+    const chip = fixture.nativeElement.querySelector('app-session-type-chip') as HTMLElement;
+    expect(chip.textContent?.trim()).toBe('Mesa redonda');
+  });
+
   it('cambia de día de agenda con las flechas del teclado en las pestañas', async () => {
     const fixture = TestBed.createComponent(EventPage);
     fixture.componentRef.setInput('org', 'acme');

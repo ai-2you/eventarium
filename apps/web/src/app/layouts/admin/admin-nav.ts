@@ -34,6 +34,11 @@ export const ORGANIZATION_NAV_LINKS: readonly AdminNavLink[] = [
   { path: ['/dashboard/members'], labelKey: 'admin.miembrosNav', requisito: 'members' },
   { path: ['/dashboard/events'], labelKey: 'admin.eventsNav', requisito: 'events' },
   {
+    path: ['/dashboard/session-types'],
+    labelKey: 'admin.tiposSesionNav',
+    requisito: 'session-types',
+  },
+  {
     path: ['/dashboard/sponsor-tiers'],
     labelKey: 'admin.sponsorTiersNav',
     requisito: 'sponsor-tiers',

@@ -353,6 +353,14 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'session-types',
+        canActivate: [guardDe('session-types')],
+        loadComponent: () =>
+          import('./features/admin/session-types/session-types-page').then(
+            (m) => m.SessionTypesPage,
+          ),
+      },
+      {
         path: 'sponsor-tiers',
         canActivate: [guardDe('sponsor-tiers')],
         loadComponent: () =>

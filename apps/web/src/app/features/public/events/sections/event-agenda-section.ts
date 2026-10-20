@@ -11,10 +11,10 @@ import {
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import { Chip } from '../../../../shared/ui/chip';
+import { SessionTypeChip } from '../../../../shared/ui/session-type-chip';
 import { Panel } from '../../../../shared/ui/panel';
 import { rutaEvento } from '../../../../core/routing/rutas-publicas';
-import { claveTipoSesion, type PublicEventSession } from '../event-page.types';
+import { type PublicEventSession, esPausa, nombreTipoSesion } from '../event-page.types';
 
 export interface DiaDeAgenda {
   readonly fecha: string;
@@ -39,7 +39,7 @@ export interface DiaDeAgenda {
 @Component({
   selector: 'app-event-agenda-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, TranslocoDirective, Chip, Panel],
+  imports: [DatePipe, RouterLink, TranslocoDirective, SessionTypeChip, Panel],
   template: `
     <ng-container *transloco="let t">
       <div class="dias" role="tablist" [attr.aria-label]="t('publico.eventos.diasAria')">
@@ -107,7 +107,11 @@ export interface DiaDeAgenda {
                     }
                   </div>
                   <div class="slot__meta">
-                    <app-chip>{{ t(claveTipoSesion(sesion.session_type)) }}</app-chip>
+                    <app-session-type-chip
+                      [nombre]="nombreTipo(sesion, t)"
+                      [color]="sesion.type?.color ?? 'gris'"
+                      [pausa]="esPausa(sesion)"
+                    />
                     <a
                       class="ficha"
                       [routerLink]="rutaEvento(org(), eventSlug(), 'sesiones', sesion.id)"
@@ -253,7 +257,8 @@ export class EventAgendaSection {
   protected readonly diaActivo = signal(0);
   private readonly pestanas = viewChildren<ElementRef<HTMLButtonElement>>('pestana');
 
-  protected readonly claveTipoSesion = claveTipoSesion;
+  protected readonly nombreTipo = nombreTipoSesion;
+  protected readonly esPausa = esPausa;
 
   constructor() {
     effect(() => {

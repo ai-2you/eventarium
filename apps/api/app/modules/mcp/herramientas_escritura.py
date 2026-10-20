@@ -37,7 +37,7 @@ from app.core.config import get_settings
 from app.core.database import maintenance_session
 from app.core.permissions import Permission
 from app.core.storage import get_storage
-from app.modules.events import cancelacion
+from app.modules.events import cancelacion, session_types
 from app.modules.events import categories as events_categories
 from app.modules.events import service as events_service
 from app.modules.events.schemas import (
@@ -168,7 +168,7 @@ def _sesion_out(sesion_agenda: Any) -> schemas.Sesion:  # noqa: ANN401 - EventSe
     return schemas.Sesion(
         id=str(sesion_agenda.id),
         titulo=sesion_agenda.title,
-        tipo=sesion_agenda.session_type,
+        tipo=sesion_agenda.tipo.name,
         inicio=sesion_agenda.starts_at,
         fin=sesion_agenda.ends_at,
         sala=sesion_agenda.room,
@@ -362,19 +362,20 @@ def registrar(mcp: MCPServer) -> None:
         titulo: str,
         inicio: datetime,
         fin: datetime,
-        tipo: str = "talk",
+        tipo: str | None = None,
         sala: str | None = None,
         descripcion: str | None = None,
         sede_id: str | None = None,
     ) -> schemas.Sesion:
-        """Añade una sesión a la agenda. `tipo`: talk, workshop, break, service u other.
-        Debe caer dentro de las fechas del evento."""
+        """Añade una sesión a la agenda; debe caer dentro de las fechas del evento.
+        `tipo`: nombre, id o clave base (talk, workshop, break, service, other) de un
+        tipo activo de la organización (ver `listar_tipos_de_sesion`); sin él, el
+        primero activo que no es una pausa."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         datos = _validar(
             EventSessionCreate,
             _sin_nulos(
-                session_type=tipo,
                 title=titulo,
                 starts_at=inicio,
                 ends_at=fin,
@@ -385,6 +386,9 @@ def registrar(mcp: MCPServer) -> None:
         ).model_dump(exclude_unset=True)
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
+            if tipo:
+                elegido = await session_types.por_texto(session, contexto.organization_id, tipo)
+                datos["session_type_id"] = str(elegido.id)
             nueva = await events_service.create_session(
                 session, organization_id=contexto.organization_id, event_id=evento.id, datos=datos
             )
@@ -406,11 +410,11 @@ def registrar(mcp: MCPServer) -> None:
         descripcion: str | None = None,
         sede_id: str | None = None,
     ) -> schemas.Sesion:
-        """Cambia una sesión de la agenda del evento indicado."""
+        """Cambia una sesión de la agenda del evento indicado. `tipo`: nombre, id o
+        clave base de un tipo activo de la organización."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(
-            session_type=tipo,
             title=titulo,
             starts_at=inicio,
             ends_at=fin,
@@ -418,11 +422,14 @@ def registrar(mcp: MCPServer) -> None:
             description=descripcion,
             venue_id=sede_id,
         )
-        if not cambios:
+        if not cambios and not tipo:
             raise ErrorDeHerramienta("Indica al menos un dato que cambiar.")
         datos = _validar(EventSessionUpdate, cambios).model_dump(exclude_unset=True)
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
+            if tipo:
+                elegido = await session_types.por_texto(session, contexto.organization_id, tipo)
+                datos["session_type_id"] = str(elegido.id)
             cambiada = await events_service.update_session(
                 session,
                 organization_id=contexto.organization_id,

@@ -17,6 +17,8 @@ erDiagram
   users ||--o{ user_social_links : "perfil"
   organizations ||--o{ events : "publica"
   events ||--o{ event_sessions : "agenda"
+  organizations ||--o{ session_types : "define"
+  session_types ||--o{ event_sessions : "clasifica"
   organizations ||--o{ event_members : "roster"
   organization_members ||--o{ event_members : "participa en"
   event_members ||--o{ event_session_participants : "asignado a"
@@ -121,6 +123,7 @@ erDiagram
     uuid event_id FK
     uuid organization_id FK
     text session_type
+    uuid session_type_id FK
     text title
     text description
     timestamptz starts_at
@@ -130,6 +133,17 @@ erDiagram
     text video_url
     jsonb materials
     int sort_order
+  }
+  session_types {
+    uuid id PK
+    uuid organization_id FK
+    text name
+    text description
+    text color
+    bool is_break
+    text base_key
+    int display_order
+    bool is_active
   }
   event_members {
     uuid id PK
@@ -625,3 +639,25 @@ cuerpo o los argumentos de entrada.
 membresía ya es visible para la política `tenant_users` (que exige compartir
 organización) en cuanto la función marca el correo como verificado, sin depender de que
 `app_accept_invited_user` sea la única vía de lectura.
+
+### Tipos de sesión por organización (migración `0063`)
+
+`session_types` es el catálogo de tipos de sesión de cada organización, con RLS
+(`tenant_session_types`) como `sponsor_tiers`. Cada organización nace con cinco
+tipos base (`organizations/service.inicializar_organizacion`, usada por las dos
+altas): Charla (`talk`), Taller (`workshop`), Descanso (`break`, pausa), Servicio
+(`service`, pausa) y Otro (`other`). Puede renombrarlos, desactivarlos, reordenarlos
+o crear los suyos (`base_key` nulo).
+
+- Nombre único por organización sin distinguir mayúsculas ni espacios de los
+  extremos (índice funcional `lower(btrim(name))`).
+- `color`: clave de una paleta cerrada (`events/session_types.PALETA`), nunca libre.
+- `is_break`: pausa; se pinta apagada en la agenda y no pide ponentes.
+- `base_key`: empareja el texto heredado y los alias del MCP aunque cambie el nombre.
+
+`event_sessions.session_type_id` apunta al tipo con FK compuesta
+`(session_type_id, organization_id)` y sin `ondelete`: un tipo en uso no se borra,
+se desactiva (las sesiones que lo tienen lo conservan). `event_sessions.session_type`
+(texto) se mantiene durante la transición con la `base_key` del tipo, u `other`
+para los propios; se retirará en una migración posterior.
+

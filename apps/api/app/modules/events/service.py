@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.core.database import set_organization_context
 from app.core.permissions import Permission
 from app.core.storage import get_storage, public_url_versionada
-from app.modules.events import categories, repository
+from app.modules.events import categories, repository, session_types
 from app.modules.events import schemas as events_schemas
 from app.modules.events.geocoding import geocode_address
 from app.modules.events.models import (
@@ -30,6 +30,7 @@ from app.modules.events.models import (
     EventSession,
     EventSessionParticipant,
     EventVenue,
+    SessionType,
 )
 from app.modules.media import service as media_service
 from app.modules.media.models import Media
@@ -500,10 +501,53 @@ async def create_session(
     if datos.get("venue_id") is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 
-    sesion = EventSession(event_id=event_id, organization_id=organization_id, **datos)
+    tipo = await _tipo_pedido(session, organization_id, datos)
+    sesion = EventSession(
+        event_id=event_id,
+        organization_id=organization_id,
+        session_type_id=tipo.id,
+        session_type=session_types.clave_heredada(tipo),
+        **datos,
+    )
     session.add(sesion)
-    await session.flush()
+    await _guardar_sesion(session)
+    await session.refresh(sesion, ["tipo"])
     return sesion
+
+
+async def _guardar_sesion(session: AsyncSession) -> None:
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # El tipo se borró entre elegirlo y guardar (la FK compuesta lo impide).
+        if "fk_event_sessions_session_type_id_organization_id" in str(exc.orig):
+            raise ConflictError(
+                "Ese tipo de sesión acaba de borrarse: elige otro y vuelve a guardar."
+            ) from exc
+        raise
+
+
+async def _tipo_pedido(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    datos: dict[str, Any],
+    *,
+    actual: uuid.UUID | None = None,
+) -> SessionType:
+    """Saca de `datos` el tipo pedido (por id o por clave heredada) y lo resuelve."""
+    tipo_id = datos.pop("session_type_id", None)
+    clave = datos.pop("session_type", None)
+    try:
+        id_pedido = uuid.UUID(tipo_id) if tipo_id else None
+    except ValueError as exc:
+        raise ValidationDomainError("Ese tipo de sesión no es válido.") from exc
+    return await session_types.resolver_para_sesion(
+        session,
+        organization_id,
+        tipo_id=id_pedido,
+        clave=clave,
+        actual=actual,
+    )
 
 
 async def update_session(
@@ -546,9 +590,19 @@ async def update_session(
     except ValueError as exc:
         raise ValidationDomainError(str(exc)) from exc
 
+    pide_tipo = datos.get("session_type_id") is not None or (
+        datos.get("session_type") is not None and datos["session_type"] != sesion.session_type
+    )
+    if pide_tipo:
+        tipo = await _tipo_pedido(session, organization_id, datos, actual=sesion.session_type_id)
+        sesion.session_type_id = tipo.id
+        sesion.session_type = session_types.clave_heredada(tipo)
+    datos.pop("session_type_id", None)
+    datos.pop("session_type", None)
     for campo, valor in datos.items():
         setattr(sesion, campo, valor)
-    await session.flush()
+    await _guardar_sesion(session)
+    await session.refresh(sesion, ["tipo"])
     return sesion
 
 

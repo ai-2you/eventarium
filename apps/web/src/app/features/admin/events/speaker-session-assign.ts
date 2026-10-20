@@ -20,6 +20,7 @@ import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { Select, type SelectOption } from '../../../shared/ui/select';
 import type { EventSession } from './session-form';
+import { esPausa } from '../../public/events/event-page.types';
 import { type Participacion, opcionesDeRol, solapesDe } from './session-roles';
 
 interface ParticipanteDeSesion {
@@ -146,11 +147,15 @@ export class SpeakerSessionAssign implements OnInit {
     return this.sesiones().filter((sesion) => ids.has(sesion.id));
   });
 
+  // Las pausas (descanso, comida…) no piden ponentes: no se ofrecen aquí. Quien
+  // ya estuviera asignado a una se conserva y se edita desde la agenda.
   protected readonly opcionesDeSesion = computed<SelectOption[]>(() =>
-    this.sesiones().map((sesion) => ({
-      value: sesion.id,
-      label: `${sesion.title} · ${this.formatoFecha.format(new Date(sesion.starts_at))}`,
-    })),
+    this.sesiones()
+      .filter((sesion) => !esPausa(sesion))
+      .map((sesion) => ({
+        value: sesion.id,
+        label: `${sesion.title} · ${this.formatoFecha.format(new Date(sesion.starts_at))}`,
+      })),
   );
 
   // Aquí se asigna: «No participa» no es una opción (enviaría un rol vacío).
