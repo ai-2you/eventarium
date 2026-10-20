@@ -578,6 +578,17 @@ async def submit_registration(
         # Reenvía siempre el email que corresponda al estado actual (decisión
         # #1 del PRD, fase 3) — la respuesta pública es la misma en cualquier
         # caso, nunca revela en qué estado está la inscripción existente.
+        if existente.status == "pending_verification" and event.registration_mode == "paid":
+            # Una inscripción de pago que se quedó esperando la verificación
+            # (antes de que el pago la sustituyera): pasa directa a pagar.
+            evento_bloqueado = await repository.lock_event_for_capacity(
+                session, event.organization_id, event.id
+            )
+            existente.status = await _evaluar_estado_por_aforo(
+                session, evento_bloqueado, registration_id=existente.id
+            )
+            await session.flush()
+            return existente
         if existente.status == "pending_verification":
             token = await generate_token(PROPOSITO_VERIFICACION_INSCRIPCION, str(existente.id))
             await send_registration_verification_email.kiq(
@@ -596,7 +607,10 @@ async def submit_registration(
     user_id = await repository.find_user_id_by_email(session, email_normalizado)
     ahora = datetime.now(UTC)
 
-    if event.email_verification_required:
+    # En un evento de pago no se verifica el correo: pagar ya prueba que la
+    # persona existe y quiere ir, y la pasarela confirma su correo. Pedir antes
+    # un enlace por correo solo añadía un paso entre el formulario y el pago.
+    if event.email_verification_required and event.registration_mode != "paid":
         estado_inicial = "pending_verification"
     else:
         evento_bloqueado = await repository.lock_event_for_capacity(
