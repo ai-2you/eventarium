@@ -36,6 +36,7 @@ export type { BudgetLineUpdate } from './models/budget-line-update';
 export type { BudgetReopenIn } from './models/budget-reopen-in';
 export type { BudgetSummaryOut } from './models/budget-summary-out';
 export type { CancelarEventoIn } from './models/cancelar-evento-in';
+export type { CancelPreviewResponse } from './models/cancel-preview-response';
 export type { CancelRegistrationRequest } from './models/cancel-registration-request';
 export type { CancelRegistrationResponse } from './models/cancel-registration-response';
 export type { CeldaDeConsentimientos } from './models/celda-de-consentimientos';

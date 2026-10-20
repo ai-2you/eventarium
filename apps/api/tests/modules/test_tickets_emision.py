@@ -58,7 +58,7 @@ def _payload_evento(slug: str, **overrides: object) -> dict:
     payload = {
         "slug": slug,
         "title": f"Evento {slug}",
-        "starts_at": AHORA.isoformat(),
+        "starts_at": (AHORA + timedelta(hours=1)).isoformat(),
         "ends_at": (AHORA + timedelta(days=2)).isoformat(),
         "location_mode": "in_person",
     }
@@ -258,7 +258,7 @@ async def _crear_evento_directo(organizacion: OrganizacionDePrueba) -> Event:
             title="Evento de prueba",
             status="published",
             visibility="public",
-            starts_at=AHORA,
+            starts_at=AHORA + timedelta(hours=1),
             ends_at=AHORA + timedelta(days=1),
             location_mode="online",
         )

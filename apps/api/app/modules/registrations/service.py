@@ -34,6 +34,7 @@ from app.modules.auth.verification import (
     PROPOSITO_VERIFICACION_INSCRIPCION,
     consume_token,
     generate_token,
+    peek_token,
 )
 from app.modules.events.models import Event
 from app.modules.payments import refunds_service as payments_refunds_service
@@ -361,11 +362,17 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
     (`registration_cancel`), cada uno con su propio TTL. Devuelve si había
     alguien a quien promover.
     """
+    ahora = datetime.now(UTC)
+    # Con el evento ya empezado nadie puede aprovechar la plaza; y la ventana
+    # para confirmarla nunca pasa del inicio.
+    if ahora >= evento.starts_at:
+        return False
     siguiente = await repository.get_oldest_waitlisted(session, evento.organization_id, evento.id)
     if siguiente is None:
         return False
-    ahora = datetime.now(UTC)
-    ventana = timedelta(hours=get_settings().waitlist_promotion_window_hours)
+    ventana = min(
+        timedelta(hours=get_settings().waitlist_promotion_window_hours), evento.starts_at - ahora
+    )
     siguiente.waitlist_promoted_at = ahora
     siguiente.waitlist_promotion_expires_at = ahora + ventana
     confirm_token = await generate_token(
@@ -881,10 +888,15 @@ async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> 
     Idempotente si la inscripción ya estaba `cancelled`/`rejected` (puede
     haber varios tokens vigentes para la misma inscripción, uno por cada
     email enviado): no es un error, simplemente no hace nada más.
+
+    Una vez empezado el evento ya no se cancela (la plaza no se puede ofrecer
+    a nadie y borraría la ausencia): se comprueba **antes** de consumir el
+    token, para que el enlace no quede gastado por un intento rechazado.
     """
-    bruto = await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
+    invalido = "El enlace de cancelación no es válido o ha caducado."
+    bruto = await peek_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
     if bruto is None:
-        raise ValidationDomainError("El enlace de cancelación no es válido o ha caducado.")
+        raise ValidationDomainError(invalido)
 
     registration_id = uuid.UUID(bruto)
     await _fijar_contexto_por_inscripcion(session, registration_id)
@@ -893,7 +905,22 @@ async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> 
     # inscripción no deben poder promover dos veces un único hueco liberado.
     inscripcion = await session.get(EventRegistration, registration_id, with_for_update=True)
     if inscripcion is None:
+        await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
         return
+
+    evento = await session.get(Event, inscripcion.event_id)
+    if (
+        evento is not None
+        and inscripcion.status not in ("cancelled", "rejected")
+        and datetime.now(UTC) >= evento.starts_at
+    ):
+        raise ConflictError(
+            "El evento ya ha empezado: la inscripción ya no se puede cancelar desde el enlace."
+        )
+    # Otra petición con el mismo enlace puede haberlo gastado entre la lectura
+    # y aquí (la fila ya estaba bloqueada, así que no ha cancelado aún).
+    if await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token) is None:
+        raise ValidationDomainError(invalido)
 
     await _cancelar_inscripcion(
         session,

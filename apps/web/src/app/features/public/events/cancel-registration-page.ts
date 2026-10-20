@@ -1,35 +1,73 @@
 import { isPlatformBrowser } from '@angular/common';
-import { ChangeDetectionStrategy, Component, PLATFORM_ID, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  PLATFORM_ID,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
+import { ApiError } from '../../../core/api/error.interceptor';
 import { seoDePagina } from '../../../core/seo/meta.service';
-import { RegistrationsService } from '../../../core/registrations/registrations.service';
+import {
+  RegistrationsService,
+  type VistaPreviaCancelacion,
+} from '../../../core/registrations/registrations.service';
 import { AuthFrame } from '../../../layouts/public/auth-frame';
 import { Alert } from '../../../shared/ui/alert';
+import { Button } from '../../../shared/ui/button';
 import { Card } from '../../../shared/ui/card';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 
-type Estado = 'comprobando' | 'exito' | 'error';
+type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 'error';
 
 /**
- * Consume el token de autocancelación de una inscripción. Mismo patrón que
- * `verify-registration-page`: CSR, sin interacción del usuario que dispare
- * el resultado, así que se anuncia con `aria-live="assertive"`.
+ * Cancelación por el enlace del correo, en dos pasos: primero enseña qué se
+ * cancela (sin gastar el token) y solo el clic de confirmación cancela. Así
+ * un clic por error, o el escáner de enlaces del correo, no cancela la plaza.
  */
 @Component({
   selector: 'app-cancel-registration-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, AuthFrame, Alert, Card, Reveal],
+  imports: [TranslocoDirective, AuthFrame, Alert, Button, Card, Reveal],
   template: `
     <ng-container *transloco="let t">
       <app-auth-frame [titulo]="t('cancelarInscripcion.titulo')">
         <div class="envoltura" appReveal>
           <app-card [heading]="t('cancelarInscripcion.titulo')">
-            <div aria-live="assertive">
+            <div aria-live="polite">
               @switch (estado()) {
                 @case ('comprobando') {
                   <app-alert tone="info">{{ t('cancelarInscripcion.comprobando') }}</app-alert>
+                }
+                @case ('listo') {
+                  <div class="confirmar">
+                    <p>
+                      {{ t('cancelarInscripcion.pregunta') }}
+                      <strong>{{ vista()?.event_title }}</strong>
+                      <span class="fecha">{{ fecha() }}</span>
+                    </p>
+                    <p>{{ t('cancelarInscripcion.plaza') }}</p>
+                    @if (vista()?.refund === 'en_curso') {
+                      <app-alert tone="info">{{ t('cancelarInscripcion.conReembolso') }}</app-alert>
+                    } @else if (vista()?.refund === 'sin_reembolso') {
+                      <app-alert tone="info">{{ t('cancelarInscripcion.sinReembolso') }}</app-alert>
+                    }
+                    <app-button variant="peligro" [loading]="cancelando()" (pulsado)="confirmar()">
+                      {{ t('cancelarInscripcion.confirmar') }}
+                    </app-button>
+                  </div>
+                }
+                @case ('ya-cancelada') {
+                  <app-alert tone="info">{{ t('cancelarInscripcion.yaCancelada') }}</app-alert>
+                }
+                @case ('empezado') {
+                  <app-alert tone="info" [title]="t('cancelarInscripcion.empezadoTitulo')">
+                    {{ t('cancelarInscripcion.empezadoDetalle') }}
+                  </app-alert>
                 }
                 @case ('exito') {
                   <app-alert tone="exito" [title]="t('cancelarInscripcion.exitoTitulo')">
@@ -52,6 +90,17 @@ type Estado = 'comprobando' | 'exito' | 'error';
     .envoltura {
       width: min(26rem, 100%);
     }
+    .confirmar {
+      display: grid;
+      gap: var(--space-md);
+    }
+    .confirmar p {
+      margin: 0;
+    }
+    .fecha {
+      display: block;
+      color: var(--color-text-muted);
+    }
   `,
 })
 export class CancelRegistrationPage {
@@ -60,36 +109,74 @@ export class CancelRegistrationPage {
   private readonly registrations = inject(RegistrationsService);
   private readonly ruta = inject(ActivatedRoute);
   private readonly enNavegador = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly token = this.ruta.snapshot.queryParamMap.get('token');
 
   protected readonly estado = signal<Estado>('comprobando');
   protected readonly mensaje = signal('');
+  protected readonly vista = signal<VistaPreviaCancelacion | null>(null);
+  protected readonly cancelando = signal(false);
+
+  /** En la zona horaria del evento, que es la que la persona tiene en su entrada. */
+  protected readonly fecha = computed(() => {
+    const vista = this.vista();
+    if (!vista) return '';
+    try {
+      return new Intl.DateTimeFormat('es-ES', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+        timeZone: vista.timezone,
+      }).format(new Date(vista.starts_at));
+    } catch {
+      return new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: 'short' }).format(
+        new Date(vista.starts_at),
+      );
+    }
+  });
 
   constructor() {
-    // La URL lleva un token de un solo uso: que ningún buscador la guarde.
+    // La URL lleva un token: que ningún buscador la guarde.
     this.seo.set({
       title: this.transloco.translate('cancelarInscripcion.titulo'),
       noIndexar: true,
     });
-    const token = this.ruta.snapshot.queryParamMap.get('token');
-    if (!token) {
+    if (!this.token) {
       this.estado.set('error');
       return;
     }
-    // El token es de un solo uso: el servidor pinta «comprobando» con su
-    // título y solo el navegador lo consume. Si lo gastara el servidor, la
-    // hidratación volvería a intentarlo y mostraría «enlace caducado».
+    // La vista previa no gasta el token, pero se pide solo en el navegador:
+    // el servidor pinta «comprobando» y la hidratación no la repite.
     if (this.enNavegador) {
-      void this.cancelar(token);
+      void this.cargar(this.token);
     }
   }
 
-  private async cancelar(token: string): Promise<void> {
+  private async cargar(token: string): Promise<void> {
     try {
-      const resultado = await this.registrations.cancel(token);
-      this.mensaje.set(resultado.message);
-      this.estado.set('exito');
+      const vista = await this.registrations.previewCancel(token);
+      this.vista.set(vista);
+      if (vista.status === 'cancelled' || vista.status === 'rejected') {
+        this.estado.set('ya-cancelada');
+      } else if (vista.already_started) {
+        this.estado.set('empezado');
+      } else {
+        this.estado.set('listo');
+      }
     } catch {
       this.estado.set('error');
+    }
+  }
+
+  protected async confirmar(): Promise<void> {
+    if (!this.token || this.cancelando()) return;
+    this.cancelando.set(true);
+    try {
+      const resultado = await this.registrations.cancel(this.token);
+      this.mensaje.set(resultado.message);
+      this.estado.set('exito');
+    } catch (error) {
+      this.estado.set(error instanceof ApiError && error.status === 409 ? 'empezado' : 'error');
+    } finally {
+      this.cancelando.set(false);
     }
   }
 }

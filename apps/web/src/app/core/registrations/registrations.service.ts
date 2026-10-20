@@ -79,6 +79,16 @@ export interface MyRegistrationItem {
  * indexar. La respuesta de `submit` es siempre la misma exista o no ya el
  * email inscrito — el componente no debe intentar distinguir ambos casos.
  */
+/** `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si no, nulo sin pago. */
+export interface VistaPreviaCancelacion {
+  readonly status: string;
+  readonly event_title: string;
+  readonly starts_at: string;
+  readonly timezone: string;
+  readonly already_started: boolean;
+  readonly refund?: 'en_curso' | 'sin_reembolso' | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RegistrationsService {
   private readonly http = inject(HttpClient);
@@ -122,6 +132,15 @@ export class RegistrationsService {
         this.api.url('/public/registrations/confirm-waitlist-promotion'),
         { token },
       ),
+    );
+  }
+
+  /** Qué se cancelaría con el enlace, sin gastarlo (la página pide confirmación). */
+  async previewCancel(token: string): Promise<VistaPreviaCancelacion> {
+    return firstValueFrom(
+      this.http.post<VistaPreviaCancelacion>(this.api.url('/public/registrations/cancel/preview'), {
+        token,
+      }),
     );
   }
 

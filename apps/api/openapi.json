@@ -7358,13 +7358,55 @@
         }
       }
     },
+    "/api/v1/public/registrations/cancel/preview": {
+      "post": {
+        "tags": [
+          "público"
+        ],
+        "summary": "Ver qué se cancelaría con un enlace de autocancelación",
+        "description": "No consume el token: devuelve el evento, si ya ha empezado y si se devolvería el pago, para que la persona confirme antes de cancelar.",
+        "operationId": "preview_cancel_registration_api_v1_public_registrations_cancel_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/registrations/cancel": {
       "post": {
         "tags": [
           "público"
         ],
         "summary": "Cancelar una inscripción por autocancelación",
-        "description": "Consume el token del enlace de cancelación (un solo uso). Si liberaba una plaza confirmada, promueve automáticamente a la lista de espera.",
+        "description": "Consume el token del enlace de cancelación (un solo uso). Si liberaba una plaza confirmada, promueve automáticamente a la lista de espera. Una vez empezado el evento responde 409 sin gastar el enlace.",
         "operationId": "cancel_registration_api_v1_public_registrations_cancel_post",
         "requestBody": {
           "content": {
@@ -12731,6 +12773,56 @@
         ],
         "title": "BudgetSummaryOut",
         "description": "Resumen numérico de presupuesto/contingencia de un evento — insumo del\npanel de la fase 5, expuesto ya en esta fase (plan.md, arquitectura de la\nfase 3: \"expuestos en el endpoint de resumen\")."
+      },
+      "CancelPreviewResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "already_started": {
+            "type": "boolean",
+            "title": "Already Started"
+          },
+          "refund": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en_curso",
+                  "sin_reembolso"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "event_title",
+          "starts_at",
+          "timezone",
+          "already_started"
+        ],
+        "title": "CancelPreviewResponse",
+        "description": "Lo que se va a cancelar, para confirmarlo antes de gastar el enlace.\n\n`refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si hay pago\npero la política de plazo no lo devuelve, o nulo si no hay nada que\ndevolver (evento gratuito, o inscripción ya cancelada)."
       },
       "CancelRegistrationRequest": {
         "properties": {

@@ -43,13 +43,15 @@ describe('CancelRegistrationPage', () => {
 
   it('en el servidor no consume el token y pinta el estado de comprobación', () => {
     const cancel = vi.fn();
-    configurar({ cancel }, rutaConToken('token-de-un-solo-uso'));
+    const previewCancel = vi.fn();
+    configurar({ cancel, previewCancel }, rutaConToken('token-de-un-solo-uso'));
     TestBed.overrideProvider(PLATFORM_ID, { useValue: 'server' });
 
     const fixture = TestBed.createComponent(CancelRegistrationPage);
     fixture.detectChanges();
 
     expect(cancel).not.toHaveBeenCalled();
+    expect(previewCancel).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Comprobando el enlace');
     expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(
       'noindex, nofollow',
@@ -76,26 +78,101 @@ describe('CancelRegistrationPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
-  it('con un token válido lo consume y muestra el mensaje de la API', async () => {
-    const cancel = vi.fn().mockResolvedValue({ message: 'Tu inscripción ha sido cancelada.' });
-    configurar({ cancel }, rutaConToken('token-valido'));
+  const VISTA = {
+    status: 'confirmed',
+    event_title: 'Jornada de IA',
+    starts_at: '2026-11-10T17:00:00Z',
+    timezone: 'Europe/Madrid',
+    already_started: false,
+    refund: null,
+  };
+
+  it('al abrir el enlace no cancela: enseña el evento y pide confirmación', async () => {
+    const cancel = vi.fn();
+    const previewCancel = vi.fn().mockResolvedValue(VISTA);
+    configurar({ cancel, previewCancel }, rutaConToken('token-valido'));
 
     const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(previewCancel).toHaveBeenCalledWith('token-valido');
+    expect(cancel).not.toHaveBeenCalled();
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('Jornada de IA');
+    // En la zona del evento: 17:00 UTC son las 18:00 en Madrid en noviembre.
+    expect(texto).toContain('18:00');
+    expect(texto).toContain('Sí, cancelar mi inscripción');
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('al confirmar cancela y muestra el mensaje de la API', async () => {
+    const cancel = vi.fn().mockResolvedValue({ message: 'Tu inscripción ha sido cancelada.' });
+    configurar(
+      { cancel, previewCancel: vi.fn().mockResolvedValue(VISTA) },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    (fixture.nativeElement.querySelector('app-button button') as HTMLButtonElement).click();
     await fixture.whenStable();
 
     expect(cancel).toHaveBeenCalledWith('token-valido');
     expect(fixture.nativeElement.textContent).toContain('Tu inscripción ha sido cancelada.');
-    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('avisa de si se devolvería el pago', async () => {
+    configurar(
+      {
+        cancel: vi.fn(),
+        previewCancel: vi.fn().mockResolvedValue({ ...VISTA, refund: 'sin_reembolso' }),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('no se devuelve el importe');
+  });
+
+  it('con el evento ya empezado no ofrece cancelar', async () => {
+    configurar(
+      {
+        cancel: vi.fn(),
+        previewCancel: vi.fn().mockResolvedValue({ ...VISTA, already_started: true }),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('El evento ya ha empezado');
+    expect(fixture.nativeElement.querySelector('app-button')).toBeNull();
+  });
+
+  it('si la inscripción ya estaba cancelada lo dice sin ofrecer el botón', async () => {
+    configurar(
+      {
+        cancel: vi.fn(),
+        previewCancel: vi.fn().mockResolvedValue({ ...VISTA, status: 'cancelled' }),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('ya estaba cancelada');
+    expect(fixture.nativeElement.querySelector('app-button')).toBeNull();
   });
 
   it('con un token caducado muestra el error genérico', async () => {
-    const cancel = vi.fn().mockRejectedValue(new Error('caducado'));
-    configurar({ cancel }, rutaConToken('token-caducado'));
+    const previewCancel = vi.fn().mockRejectedValue(new Error('caducado'));
+    configurar({ cancel: vi.fn(), previewCancel }, rutaConToken('token-caducado'));
 
     const fixture = TestBed.createComponent(CancelRegistrationPage);
     await fixture.whenStable();
 
-    const zonaAnuncio = fixture.nativeElement.querySelector('[aria-live="assertive"]');
+    const zonaAnuncio = fixture.nativeElement.querySelector('[aria-live="polite"]');
     expect(zonaAnuncio?.textContent).toContain('no es válido o ha caducado');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
