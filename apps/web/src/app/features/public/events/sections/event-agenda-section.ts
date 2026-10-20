@@ -73,7 +73,7 @@ export interface DiaDeAgenda {
             </p>
             <ul class="sesiones">
               @for (sesion of dia.sesiones; track sesion.id) {
-                <li class="slot">
+                <li class="slot" [class.slot--pausa]="esPausa(sesion)">
                   <span class="slot__hora">
                     {{ sesion.starts_at | date: 'shortTime' : eventTimezone() }}
                   </span>
@@ -193,6 +193,18 @@ export interface DiaDeAgenda {
       align-items: start;
     }
     .slot:last-child {
+      border-bottom: 0;
+    }
+    /* Descansos y servicios: un fondo distinto a lo ancho del panel (el margen
+       negativo compensa el relleno del tabpanel). El fondo ya marca la fila, así
+       que sobran el separador de encima (el de la fila anterior) y el suyo. */
+    .slot--pausa {
+      margin-inline: calc(-1 * var(--sp-5));
+      padding-inline: var(--sp-5);
+      background-color: var(--surface-hi);
+      border-bottom: 0;
+    }
+    .slot:has(+ .slot--pausa) {
       border-bottom: 0;
     }
     .slot__hora {
