@@ -16,7 +16,7 @@ from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from app.core.cleanup import sweep_unverified_accounts
 from app.core.config import get_settings
-from app.core.email import EmailAttachment, get_email_provider
+from app.core.email import get_email_provider
 from app.core.email_template import neutralizar_texto_de_usuario
 from app.core.tenant import base_url_de_organizacion
 
@@ -41,7 +41,7 @@ from app.modules.registrations import models as _registration_models  # noqa: F4
 from app.modules.roles import models as _role_models  # noqa: F401
 from app.modules.sponsors import models as _sponsor_models  # noqa: F401
 from app.modules.tickets import models as _ticket_models  # noqa: F401
-from app.modules.tickets.service import generar_imagen_qr
+from app.modules.tickets.service import adjunto_qr
 from app.modules.users import models as _user_models  # noqa: F401
 
 _settings = get_settings()
@@ -308,20 +308,7 @@ async def send_registration_confirmed_email(
             f"{enlace_mi_entrada}",
             enlace_cancelacion,
         ),
-        attachments=(
-            [
-                EmailAttachment(
-                    filename="entrada.png",
-                    content=generar_imagen_qr(qr_token),
-                    maintype="image",
-                    subtype="png",
-                    cid="entrada@eventarium",
-                    alt="Código QR de tu entrada",
-                )
-            ]
-            if qr_token is not None
-            else []
-        ),
+        attachments=[adjunto_qr(qr_token)] if qr_token is not None else [],
     )
 
 
@@ -558,6 +545,25 @@ async def send_registration_payment_link_email(
             enlace_cancelacion,
         ),
     )
+
+
+@broker.task(schedule=[{"cron": "*/10 * * * *"}])
+async def dispatch_event_reminders_task() -> None:
+    """Cada 10 minutos: reclama las inscripciones a las que ya les toca el
+    recordatorio y encola su envío (`app/modules/reminders/service.py`)."""
+    from app.modules.reminders.service import procesar_recordatorios
+
+    await procesar_recordatorios()
+
+
+@broker.task
+async def send_event_reminder_task(registration_id: str) -> None:
+    """Recordatorio de una inscripción ya reclamada: vuelve a comprobarla y lo
+    envía. Si falla, su reclamación caduca a los 30 minutos y se reintenta
+    entonces (sin reintento inmediato: el correo podría haber salido ya)."""
+    from app.modules.reminders.service import enviar_recordatorio
+
+    await enviar_recordatorio(uuid.UUID(registration_id))
 
 
 @broker.task(schedule=[{"cron": "* * * * *"}])
