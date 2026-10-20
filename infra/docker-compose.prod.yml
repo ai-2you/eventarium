@@ -235,9 +235,14 @@ services:
       disable: true
     command: ["taskiq", "scheduler", "app.core.tasks:scheduler"]
 
+  # events.2you.ai: build propio en vez de la imagen de GHCR. La imagen publicada lleva
+  # grabado el turnstileSiteKey real del propietario (apps/web/src/environments/
+  # environment.ts), restringido a sus dominios en Cloudflare; esta rama de despliegue
+  # sustituye esa clave por la universal de pruebas de Cloudflare, así que necesita
+  # compilar su propio bundle en vez de usar `ghcr.io/.../web`.
   web:
-    image: ghcr.io/${GITHUB_REPOSITORY:-yosnap/eventarium}/web:${IMAGE_TAG:?falta IMAGE_TAG}
-    pull_policy: always
+    build:
+      context: ../apps/web
     restart: unless-stopped
     depends_on:
       api:

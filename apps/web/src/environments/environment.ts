@@ -25,6 +25,10 @@ export const environment = {
   // Clave pública de Turnstile (no es un secreto: la verificación real ocurre en la
   // API con TURNSTILE_SECRET_KEY). Sustituir por la del sitio antes de compilar para
   // producción; ver docs/despliegue.md.
+  //
+  // Clave universal de pruebas de Cloudflare para esta instalación (events.2you.ai):
+  // funciona en cualquier dominio pero no da protección anti-bot real. Sustituir por
+  // un sitio propio de Turnstile en cuanto exista.
   turnstileEnabled: true,
-  turnstileSiteKey: '0x4AAAAAAE-r2Qgfg7ktnNvc',
+  turnstileSiteKey: '1x00000000000000000000AA',
 } as const;
