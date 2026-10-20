@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from sqlalchemy import inspect as sa_inspect
@@ -37,6 +37,7 @@ from app.modules.organizations.schemas import (
     MemberRoleOut,
     OrganizationResponse,
     OrganizationUpdate,
+    PublicSocialLink,
 )
 from app.modules.roles.models import Role
 from app.modules.roles.schemas import ProfileFieldResponse
@@ -100,13 +101,17 @@ async def get_me(usuario: CurrentUserDep, session: DbDep) -> OrganizationRespons
     return organization_response(organizacion)
 
 
-def _redes_cargadas(organizacion: Organization) -> list[dict[str, Any]]:
+def _redes_cargadas(organizacion: Organization) -> list[PublicSocialLink]:
     """Las redes de la marca si ya están cargadas; sin consulta perezosa (en
     async no se puede), que en una organización recién creada no las hay."""
     branding = sa_inspect(organizacion).attrs.branding.loaded_value
     if branding is NO_VALUE or branding is None:
         return []
-    return list(branding.social_links or [])
+    return [
+        PublicSocialLink(kind=str(e["kind"]), url=str(e["url"]), label=e.get("label"))
+        for e in branding.social_links or []
+        if e.get("kind") and e.get("url")
+    ]
 
 
 def organization_response(organizacion: Organization) -> OrganizationResponse:

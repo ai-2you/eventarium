@@ -106,7 +106,7 @@ class OrganizationResponse(BaseModel):
     province: str | None = None
     # Si la dirección se muestra en la página pública de la organización.
     address_public: bool = True
-    social_links: list[dict[str, Any]] = Field(default_factory=list)
+    social_links: list[PublicSocialLink] = Field(default_factory=list)
     # Sin valor por defecto: un constructor que se olvide de pasarlo falla en
     # tipos en vez de devolver un `false` falso.
     public_page_enabled: bool

@@ -20116,8 +20116,7 @@
           },
           "social_links": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/PublicSocialLink"
             },
             "type": "array",
             "title": "Social Links"

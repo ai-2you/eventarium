@@ -378,7 +378,14 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
             evento.online_url ||
             (evento.location_mode !== 'online' && evento.nearby_places?.length)
           ) {
-            <section class="seccion" aria-labelledby="lugar-h2">
+            <section
+              class="seccion"
+              [attr.aria-labelledby]="
+                evento.location_name || evento.location_address || evento.online_url
+                  ? 'lugar-h2'
+                  : 'cercanos-h2'
+              "
+            >
               <div class="ancho-maximo lugar__grid" appReveal>
                 @if (evento.location_name || evento.location_address || evento.online_url) {
                   <div>

@@ -14,7 +14,11 @@ import { Checkbox } from '../../../shared/ui/checkbox';
 import { Input } from '../../../shared/ui/input';
 import { Textarea } from '../../../shared/ui/textarea';
 import { PageHeader } from '../../../shared/ui/page-header';
-import { type EnlaceSocial, OrganizationSocialLinks } from './organization-social-links';
+import {
+  type EnlaceSocial,
+  OrganizationSocialLinks,
+  nombreDeRed,
+} from './organization-social-links';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -141,7 +145,9 @@ const WEB_RE = /^https?:\/\/\S+$/;
                 <li>{{ t('admin.organizacion.paginaPublica.campos.nombre') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.descripcion') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.web') }}</li>
-                <li>{{ t('admin.organizacion.paginaPublica.campos.direccion') }}</li>
+                @if (addressPublic()) {
+                  <li>{{ t('admin.organizacion.paginaPublica.campos.direccion') }}</li>
+                }
                 <li>{{ t('admin.organizacion.paginaPublica.campos.logo') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.redes') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.eventos') }}</li>
@@ -317,6 +323,15 @@ export class OrganizationPage {
     const libre = this.socialLinks().find((enlace) => enlace.kind === 'other');
     if (libre && !(libre.url && libre.label)) {
       this.error.set(this.transloco.translate('admin.organizacion.redes.libreIncompleto'));
+      return;
+    }
+    const malEscrita = this.socialLinks().find((enlace) => !WEB_RE.test(enlace.url));
+    if (malEscrita) {
+      this.error.set(
+        this.transloco.translate('admin.organizacion.redes.urlInvalida', {
+          red: malEscrita.kind === 'other' ? malEscrita.label : nombreDeRed(malEscrita.kind),
+        }),
+      );
       return;
     }
 

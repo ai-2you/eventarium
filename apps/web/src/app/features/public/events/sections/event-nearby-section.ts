@@ -61,7 +61,7 @@ const ICONOS: Record<string, string> = {
                     [href]="mapa(sitio)"
                     target="_blank"
                     rel="noopener noreferrer"
-                    [attr.aria-label]="t('mapa', { nombre: sitio.name })"
+                    [attr.aria-label]="t('mapa', { direccion: sitio.address, nombre: sitio.name })"
                     >{{ sitio.address }}</a
                   >
                 }
@@ -72,7 +72,7 @@ const ICONOS: Record<string, string> = {
                   @if (sitio.phone) {
                     <a
                       [href]="'tel:' + telefono(sitio.phone)"
-                      [attr.aria-label]="t('llamar', { nombre: sitio.name })"
+                      [attr.aria-label]="t('llamar', { telefono: sitio.phone, nombre: sitio.name })"
                       >{{ sitio.phone }}</a
                     >
                   }
@@ -81,7 +81,9 @@ const ICONOS: Record<string, string> = {
                       [href]="sitio.website"
                       target="_blank"
                       rel="noopener noreferrer nofollow"
-                      [attr.aria-label]="t('web', { nombre: sitio.name })"
+                      [attr.aria-label]="
+                        t('web', { dominio: dominio(sitio.website), nombre: sitio.name })
+                      "
                       >{{ dominio(sitio.website) }}</a
                     >
                   }

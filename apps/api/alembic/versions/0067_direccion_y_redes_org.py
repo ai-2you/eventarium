@@ -55,6 +55,8 @@ def normalizar(enlaces: list[dict]) -> list[dict]:
     resultado: list[dict] = []
     vistos: set[str] = set()
     for enlace in enlaces:
+        if not isinstance(enlace, dict):
+            continue
         url = str(enlace.get("url") or "").strip()
         if not url:
             continue
@@ -64,7 +66,9 @@ def normalizar(enlaces: list[dict]) -> list[dict]:
         if tipo not in _TIPOS:
             tipo = _por_dominio(url) or "other"
         if tipo == "other":
-            etiqueta = (str(enlace.get("label") or "") or texto or "Web")[:40].strip().capitalize()
+            etiqueta = (str(enlace.get("label") or "") or texto or "Web")[:40].strip()
+            if etiqueta.lower() == "web":
+                etiqueta = "Web"
         if tipo in vistos:
             logger.warning("Red repetida descartada al normalizar: %s %s", tipo, url)
             continue

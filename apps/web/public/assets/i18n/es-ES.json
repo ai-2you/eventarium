@@ -237,9 +237,6 @@
       "lugar": {
         "rotulo": "Cómo llegar",
         "titulo": "Lugar del evento",
-        "cercaRotulo": "Cerca del recinto",
-        "cercaTitulo": "Dónde dormir y comer",
-        "cercaPendiente": "El organizador todavía no ha publicado alojamiento ni locales cercanos.",
         "mapaAria": "Mapa con la ubicación de {{lugar}}"
       },
       "datoPendiente": "Dato pendiente",
@@ -295,9 +292,9 @@
           "pharmacy": "Farmacia",
           "other": "Otros"
         },
-        "llamar": "Llamar a {{nombre}}",
-        "web": "Web de {{nombre}} (se abre en otra pestaña)",
-        "mapa": "Ver {{nombre}} en el mapa (se abre en otra pestaña)"
+        "llamar": "{{telefono}}: llamar a {{nombre}}",
+        "web": "{{dominio}}: web de {{nombre}} (se abre en otra pestaña)",
+        "mapa": "{{direccion}}: {{nombre}} en el mapa (se abre en otra pestaña)"
       }
     },
     "accesoMenu": {
@@ -1061,7 +1058,7 @@
           "web": "El sitio web",
           "direccion": "La dirección",
           "logo": "El logotipo",
-          "redes": "Las redes sociales de la marca",
+          "redes": "Las redes sociales",
           "eventos": "Tus eventos públicos, próximos y pasados"
         },
         "noSePublica": "La razón social y el correo de contacto nunca se publican.",
@@ -1084,7 +1081,8 @@
         "libreNombre": "Otro enlace: nombre",
         "libreNombreAyuda": "Por ejemplo: Mastodon, Bluesky, Discord.",
         "libreUrl": "Otro enlace: dirección",
-        "libreIncompleto": "El otro enlace necesita nombre y dirección."
+        "libreIncompleto": "El otro enlace necesita nombre y dirección.",
+        "urlInvalida": "El enlace de {{red}} tiene que empezar por https://"
       }
     },
     "branding": {
@@ -1102,11 +1100,6 @@
       "subirLogo": "Subir logotipo (PNG, JPEG o WebP, hasta 5 MB)",
       "logoNoValido": "Solo se aceptan imágenes PNG, JPEG o WebP.",
       "logoDemasiadoGrande": "El logotipo no puede superar los 5 MB.",
-      "redesSociales": "Redes sociales",
-      "tipoDeRed": "Red",
-      "urlDeRed": "Enlace",
-      "anadirRed": "Añadir red social",
-      "quitarRed": "Quitar",
       "resumenOrganizador": "Resumen del organizador",
       "guardando": "Guardando…",
       "guardado": "Cambios guardados.",

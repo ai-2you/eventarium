@@ -33,6 +33,52 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
+    version: '0.29.0',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Cómo llegar',
+            descripcion:
+              'La ficha de un evento presencial, y cada sede del programa, tienen un enlace que abre Google Maps con la ruta hasta el lugar desde donde esté la persona.',
+          },
+          {
+            titulo: 'Qué hay cerca',
+            descripcion:
+              'En la ficha del evento del panel se añaden hoteles, restaurantes, bares, parkings, transporte, farmacias u otros sitios con dirección, teléfono, web y una nota, se ordenan y se copian de otro evento. La ficha pública los muestra agrupados por tipo. También por MCP.',
+          },
+          {
+            titulo: 'Dirección y redes de la organización',
+            descripcion:
+              'La ficha de la organización guarda calle, código postal, ciudad y provincia (con una casilla para mostrarla o no en la página pública) y las redes: LinkedIn, Instagram, X, Facebook, YouTube, TikTok y un enlace libre con nombre. Las redes ya no se editan en «Marca».',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Página pública de la organización renovada',
+            descripcion:
+              'El logo se ve grande en la mitad izquierda y los datos a la derecha (apilado en el móvil), con la dirección en líneas y las redes como botones con su icono.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Avisos de plaza libre más fiables',
+            descripcion:
+              'El correo que ofrece una plaza de la lista de espera sale cuando el cambio ya está guardado, también al subir el aforo desde el asistente MCP. Y las pausas de la agenda ya no admiten ponentes tampoco por la API.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.28.0',
     fecha: '2026-10-20',
     secciones: [

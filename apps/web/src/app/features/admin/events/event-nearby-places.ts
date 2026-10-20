@@ -352,6 +352,7 @@ export class EventNearbyPlaces implements OnInit {
         id ? this.http.patch(this.url(`/${id}`), cuerpo) : this.http.post(this.url(), cuerpo),
       );
       this.limpiar();
+      this.error.set(null);
       await this.cargar();
     } catch (error) {
       this.errorDeFormulario.set(this.mensaje(error));

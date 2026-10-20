@@ -155,7 +155,7 @@ interface EstadoTransferido {
               </dl>
               @if (p.social_links.length) {
                 <ul class="redes" [attr.aria-label]="t('publico.organizacion.redes')">
-                  @for (enlace of p.social_links; track enlace.url) {
+                  @for (enlace of p.social_links; track enlace.kind) {
                     <li>
                       <a
                         class="red"

@@ -22,6 +22,17 @@ const NOMBRES: Record<Red, string> = {
   tiktok: 'TikTok',
 };
 
+export function nombreDeRed(red: Red): string {
+  return NOMBRES[red];
+}
+
+/** Siempre en el orden de la lista: editar una URL no mueve la red en la página pública. */
+function ordenar(enlaces: readonly EnlaceSocial[]): readonly EnlaceSocial[] {
+  const posicion = (kind: EnlaceSocial['kind']) =>
+    kind === 'other' ? REDES.length : REDES.indexOf(kind);
+  return [...enlaces].sort((a, b) => posicion(a.kind) - posicion(b.kind));
+}
+
 /**
  * Las redes de la organización en su ficha: un campo por red (vacío = no la
  * tiene) y un enlace libre con su nombre (Mastodon, Bluesky, Discord…).
@@ -101,7 +112,7 @@ export class OrganizationSocialLinks {
   protected readonly otraUrl = computed(() => this.otra()?.url ?? '');
 
   protected nombre(red: Red): string {
-    return NOMBRES[red];
+    return nombreDeRed(red);
   }
 
   protected url(red: Red): string {
@@ -111,15 +122,17 @@ export class OrganizationSocialLinks {
   protected cambiar(red: Red, url: string): void {
     const resto = this.enlaces().filter((enlace) => enlace.kind !== red);
     const limpia = url.trim();
-    this.enlaces.set(limpia ? [...resto, { kind: red, url: limpia }] : resto);
+    this.enlaces.set(ordenar(limpia ? [...resto, { kind: red, url: limpia }] : resto));
   }
 
   protected cambiarOtra(etiqueta: string, url: string): void {
     const resto = this.enlaces().filter((enlace) => enlace.kind !== 'other');
     this.enlaces.set(
-      etiqueta.trim() || url.trim()
-        ? [...resto, { kind: 'other', url: url.trim(), label: etiqueta.trim() }]
-        : resto,
+      ordenar(
+        etiqueta.trim() || url.trim()
+          ? [...resto, { kind: 'other', url: url.trim(), label: etiqueta.trim() }]
+          : resto,
+      ),
     );
   }
 }

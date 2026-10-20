@@ -55,7 +55,6 @@ export interface PublicSponsorTier {
   readonly sponsors: readonly PublicSponsor[];
 }
 
-/** Sede del evento, para la vista de programa multisede. */
 /** Un sitio que el organizador señala cerca del evento. */
 export interface PublicNearbyPlace {
   readonly kind: 'hotel' | 'restaurant' | 'bar' | 'parking' | 'transport' | 'pharmacy' | 'other';
@@ -67,6 +66,7 @@ export interface PublicNearbyPlace {
   readonly notes: string | null;
 }
 
+/** Sede del evento, para la vista de programa multisede. */
 export interface PublicVenue {
   readonly id: string;
   readonly name: string;
