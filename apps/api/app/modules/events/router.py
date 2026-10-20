@@ -559,15 +559,21 @@ async def list_event_speakers(
         items.append(
             SpeakerRowOut(
                 organization_member_id=str(miembro_org.id),
+                event_member_id=str(miembro.id),
                 user_id=str(persona.id),
                 email=persona.email,
                 first_name=persona.first_name,
                 last_name=persona.last_name,
                 titular=titular.strip() if isinstance(titular, str) and titular.strip() else None,
-                sesiones=[
-                    SpeakerSessionOut(id=str(id_sesion), titulo=titulo, starts_at=empieza)
-                    for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
-                ],
+                # Una fila por sesión aunque tenga ahí varios roles.
+                sesiones=list(
+                    {
+                        str(id_sesion): SpeakerSessionOut(
+                            id=str(id_sesion), titulo=titulo, starts_at=empieza
+                        )
+                        for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
+                    }.values()
+                ),
                 completitud=_completitud_de_ficha(miembro_org.profile_data),
                 ediciones=ediciones.get(miembro_org.user_id, 0),
                 public_slug=slugs.get(miembro_org.user_id),

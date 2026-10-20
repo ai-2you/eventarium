@@ -646,6 +646,8 @@ class SpeakerRowOut(BaseModel):
     """Fila de la vista agregada de ponentes de un evento."""
 
     organization_member_id: str
+    # Su entrada en el roster de este evento: la que se asigna a una sesión.
+    event_member_id: str
     user_id: str
     email: str
     first_name: str | None

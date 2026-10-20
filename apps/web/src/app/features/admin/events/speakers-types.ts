@@ -20,6 +20,7 @@ export interface SpeakerCompletitud {
 
 export interface SpeakerRow {
   readonly organization_member_id: string;
+  readonly event_member_id: string;
   readonly user_id: string;
   readonly email: string;
   readonly first_name: string | null;

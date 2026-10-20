@@ -24076,6 +24076,10 @@
             "type": "string",
             "title": "Organization Member Id"
           },
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
           "user_id": {
             "type": "string",
             "title": "User Id"
@@ -24146,6 +24150,7 @@
         "type": "object",
         "required": [
           "organization_member_id",
+          "event_member_id",
           "user_id",
           "email",
           "first_name",

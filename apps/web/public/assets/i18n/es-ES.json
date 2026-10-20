@@ -2071,7 +2071,21 @@
           "presenter": "Presentador/a"
         },
         "verPerfilPublico": "Ver el perfil público",
-        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha."
+        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha.",
+        "asignar": {
+          "titulo": "Asignar a {{nombre}} a una sesión",
+          "sinSesiones": "Todavía no hay sesiones en la agenda.",
+          "crearSesion": "Crear una sesión en la agenda",
+          "yaEsta": "Ya está en:",
+          "sesion": "Sesión",
+          "eligeSesion": "Elige una sesión",
+          "rol": "Rol",
+          "guardar": "Asignar",
+          "hecho": "Asignado a «{{sesion}}».",
+          "yaAsignado": "Ya está asignado a esa sesión con ese rol.",
+          "yaNoExiste": "Esa sesión ya no existe; elige otra.",
+          "error": "No hemos podido asignar la sesión."
+        }
       },
       "rotulo": "Eventos",
       "cabeceraInicio": "Toda la programación de la organización,",

@@ -26,6 +26,7 @@ import { Panel } from '../../../shared/ui/panel';
 import { SegmentedFilter } from '../../../shared/ui/segmented-filter';
 import { TableToolbar } from '../../../shared/ui/table-toolbar';
 import { EventRoster } from './event-roster';
+import { SpeakerSessionAssign } from './speaker-session-assign';
 import {
   type EventSpeakersView,
   type SpeakerHistoryItem,
@@ -55,6 +56,7 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
     DataTable,
     Dialog,
     EventRoster,
+    SpeakerSessionAssign,
     KpiCard,
     PageHeader,
     Panel,
@@ -190,11 +192,14 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                         {{ t('admin.events.speakers.pedirBio') }}
                       </app-button>
                     }
-                    @if (fila.sesiones.length === 0) {
-                      <a class="enlace" routerLink="/dashboard/events/{{ eventId() }}/agenda">
-                        {{ t('admin.events.speakers.asignarSesion') }}
-                      </a>
-                    }
+                    <app-button
+                      variant="secundario"
+                      type="button"
+                      [compacto]="true"
+                      (pulsado)="abrirAsignar(fila)"
+                    >
+                      {{ t('admin.events.speakers.asignarSesion') }}
+                    </app-button>
                     <app-button
                       variant="terciario"
                       type="button"
@@ -256,6 +261,19 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
             {{ t('comun.cerrar') }}
           </app-button>
         </div>
+      </app-dialog>
+
+      <app-dialog #dialogoAsignar (cerrado)="asignando.set(null)">
+        @if (asignando(); as fila) {
+          <span class="rotulo-seccion">{{
+            t('admin.events.speakers.asignar.titulo', { nombre: nombre(fila) })
+          }}</span>
+          <app-speaker-session-assign
+            [eventId]="eventId()"
+            [eventMemberId]="fila.event_member_id"
+            (asignado)="alCambiarRoster()"
+          />
+        }
       </app-dialog>
 
       <app-dialog #dialogoInvitar (cerrado)="invitarAbierto.set(false)">
@@ -385,6 +403,14 @@ export class EventSpeakers implements OnInit {
   // uno cualquiera de los dos de forma ambigua.
   private readonly dialogoHistorialRef = viewChild.required<Dialog>('dialogoHistorial');
   private readonly dialogoInvitarRef = viewChild.required<Dialog>('dialogoInvitar');
+  private readonly dialogoAsignarRef = viewChild.required<Dialog>('dialogoAsignar');
+  /** Ponente al que se está asignando sesión (monta el diálogo solo entonces). */
+  protected readonly asignando = signal<SpeakerRow | null>(null);
+
+  protected abrirAsignar(fila: SpeakerRow): void {
+    this.asignando.set(fila);
+    this.dialogoAsignarRef().abrir();
+  }
 
   protected readonly monograma = monograma;
 

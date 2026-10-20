@@ -11,6 +11,7 @@ export interface SpeakerRowOut {
   completitud: SpeakerCompletitudOut;
   ediciones: number;
   email: string;
+  event_member_id: string;
   first_name: (string | null);
   last_name: (string | null);
   organization_member_id: string;
