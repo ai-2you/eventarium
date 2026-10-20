@@ -142,6 +142,22 @@ class CancelRegistrationRequest(BaseModel):
     token: str
 
 
+class CancelPreviewResponse(BaseModel):
+    """Lo que se va a cancelar, para confirmarlo antes de gastar el enlace.
+
+    `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si hay pago
+    pero la política de plazo no lo devuelve, o nulo si no hay nada que
+    devolver (evento gratuito, o inscripción ya cancelada).
+    """
+
+    status: str
+    event_title: str
+    starts_at: datetime
+    timezone: str
+    already_started: bool
+    refund: Literal["en_curso", "sin_reembolso"] | None = None
+
+
 class CancelRegistrationResponse(BaseModel):
     """Resultado de cancelar una inscripción por autocancelación."""
 
@@ -224,6 +240,16 @@ class RegistrationListItem(BaseModel):
     confirmed_at: datetime | None
     waitlist_promoted_at: datetime | None
     waitlist_promotion_expires_at: datetime | None
+    # Veces que esta persona no se presentó, sin cancelar, a eventos de la
+    # organización con la asistencia cerrada (últimos 12 meses).
+    absences_count: int = 0
+
+
+class AbsenceOut(BaseModel):
+    """Un evento al que la persona no se presentó."""
+
+    event_title: str
+    starts_at: datetime
 
 
 class RegistrationDetail(RegistrationListItem):
@@ -234,6 +260,7 @@ class RegistrationDetail(RegistrationListItem):
     cancelled_at: datetime | None
     answers: list[RegistrationAnswerOut]
     consent: RegistrationConsentOut | None
+    absences: list[AbsenceOut] = []
 
 
 class RegistrationStats(BaseModel):

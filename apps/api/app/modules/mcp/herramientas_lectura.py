@@ -195,8 +195,14 @@ def registrar(mcp: MCPServer) -> None:
                 resumen=evento.summary,
                 descripcion=evento.description,
                 zona_horaria=evento.timezone,
-                enlace_publico=f"{base}/{organizacion.slug}/{evento.slug}",
+                enlace_publico=(
+                    f"{base}/{organizacion.slug}/{evento.slug}"
+                    if evento.visibility != "private"
+                    else None
+                ),
                 motivo_cancelacion=evento.cancellation_reason,
+                recordatorio=evento.reminder_enabled,
+                recordatorio_horas=evento.reminder_hours_before,
                 sedes=[
                     schemas.Sede(id=str(s.id), nombre=s.name, direccion=s.address) for s in sedes
                 ],

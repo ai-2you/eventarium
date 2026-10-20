@@ -139,7 +139,12 @@ export class PublicPoliciesPage implements OnInit {
       }
       this.datos.set(datos);
       this.aplicarTema(datos.theme);
-      this.seo.set({ title: this.transloco.translate('publico.politicas.titulo') });
+      // Texto legal de un evento: sin valor en buscadores, y así nunca delata
+      // uno «solo con enlace» (esta página no recibe su visibilidad).
+      this.seo.set({
+        title: this.transloco.translate('publico.politicas.titulo'),
+        noIndexar: true,
+      });
     } catch {
       this.error.set(true);
     } finally {

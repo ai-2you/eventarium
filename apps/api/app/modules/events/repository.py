@@ -142,23 +142,6 @@ def public_events_with_confirmed_count_query(
     return filtrar_por_categoria_y_etiquetas(consulta, category_slug, tags)
 
 
-async def get_public_event_by_slug(
-    session: AsyncSession, organization_id: uuid.UUID, slug: str
-) -> Event | None:
-    """`None` tanto si el slug no existe como si el evento no es público — mismo
-    404 uniforme en el router, para no filtrar por qué no está disponible."""
-    resultado: Event | None = await session.scalar(
-        select(Event).where(
-            Event.organization_id == organization_id,
-            Event.slug == slug,
-            Event.status == "published",
-            Event.visibility == "public",
-            Event.deleted_at.is_(None),
-        )
-    )
-    return resultado
-
-
 async def get_event(
     session: AsyncSession, organization_id: uuid.UUID, event_id: uuid.UUID
 ) -> Event | None:

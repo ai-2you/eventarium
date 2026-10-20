@@ -106,6 +106,22 @@ import { claveDeEstado, type RegistrationDetail } from './registration-types';
                 <dd>{{ inscripcion.cancelled_at | date: 'medium' }}</dd>
               </div>
             }
+            <div>
+              <dt>{{ t('admin.events.registrations.ausencias.titulo') }}</dt>
+              <dd>
+                @if (inscripcion.absences?.length) {
+                  <ul class="ausencias">
+                    @for (ausencia of inscripcion.absences; track $index) {
+                      <li>
+                        {{ ausencia.event_title }} · {{ ausencia.starts_at | date: 'mediumDate' }}
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  {{ t('admin.events.registrations.ausencias.ninguna') }}
+                }
+              </dd>
+            </div>
             @if (inscripcion.waitlist_promoted_at) {
               <div>
                 <dt>{{ t('admin.events.registrations.detalle.fechaPromocion') }}</dt>

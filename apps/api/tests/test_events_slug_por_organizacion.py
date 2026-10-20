@@ -82,8 +82,11 @@ async def test_lo_no_publicable_da_404_en_la_url_anidada(
     privado = await _crear_evento(cliente, cabeceras, slug="privado")
     await _publicar(cliente, cabeceras, privado["id"], visibility="private")
 
-    for slug in (borrador["slug"], oculto["slug"], privado["slug"]):
+    for slug in (borrador["slug"], privado["slug"]):
         assert (await cliente.get(_anidada(organizacion, slug))).status_code == 404
+    # «Solo con enlace» se abre por su URL; bajo otra organización, no.
+    assert (await cliente.get(_anidada(organizacion, oculto["slug"]))).status_code == 200
+    assert (await cliente.get(_anidada(otra_organizacion, oculto["slug"]))).status_code == 404
     # Un evento de una organización no se ve bajo el slug de otra.
     assert (await cliente.get(_anidada(otra_organizacion, "borrador"))).status_code == 404
 

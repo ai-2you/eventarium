@@ -560,7 +560,8 @@
       "reintentar": "Reintentar",
       "sinCargar": "Espera a que se carguen las condiciones del organizador para enviar el formulario."
     },
-    "seoTitulo": "Inscripción"
+    "seoTitulo": "Inscripción",
+    "avisoAsistencia": "La organización registra tu asistencia al evento. Si no asistes sin cancelar, podrá tenerlo en cuenta al revisar tus próximas inscripciones durante los 12 meses siguientes."
   },
   "pago": {
     "retorno": {
@@ -608,7 +609,16 @@
     "comprobando": "Comprobando el enlace…",
     "exitoTitulo": "Inscripción cancelada",
     "errorTitulo": "El enlace no es válido o ha caducado",
-    "errorDetalle": "Vuelve a la página del evento si necesitas hacer algo más."
+    "errorDetalle": "Vuelve a la página del evento si necesitas hacer algo más.",
+    "pregunta": "Vas a cancelar tu inscripción a",
+    "plaza": "Tu plaza quedará libre y, si hay lista de espera, pasará a otra persona.",
+    "conReembolso": "Se te devolverá el importe de tu entrada en el mismo medio de pago.",
+    "sinReembolso": "Ya ha pasado el plazo de reembolso: si cancelas, no se devuelve el importe.",
+    "confirmar": "Sí, cancelar mi inscripción",
+    "yaCancelada": "Esta inscripción ya estaba cancelada. No tienes que hacer nada más.",
+    "empezadoTitulo": "El evento ya ha empezado",
+    "empezadoDetalle": "Ya no se puede cancelar la inscripción desde este enlace. Si lo necesitas, contacta con la organización.",
+    "noActiva": "Esta inscripción no está activa. No tienes que hacer nada más."
   },
   "recuperarContrasena": {
     "titulo": "Recuperar la contraseña",
@@ -1361,7 +1371,33 @@
         "direccion": "Dirección",
         "rotulo": "Datos del evento",
         "moverSesionesPregunta": "¿Las movemos con el evento? Se desplazan todas lo mismo que el inicio, así que la agenda mantiene su orden y sus horas relativas.",
-        "moverSesiones": "Mover las sesiones con el evento"
+        "moverSesiones": "Mover las sesiones con el evento",
+        "recordatorio": {
+          "titulo": "Recordatorio a los inscritos",
+          "activar": "Enviar un recordatorio a los inscritos",
+          "cuando": "Cuándo",
+          "ayuda": "Un correo a cada inscrito confirmado con la fecha, el lugar, su entrada y un enlace para cancelar si no puede ir. Se envía una sola vez por persona.",
+          "avisoPago": "En eventos de pago, con 24 horas o menos ya ha pasado el plazo de reembolso: quien cancele desde el recordatorio no recuperará el importe.",
+          "horas": {
+            "2": "2 horas antes",
+            "6": "6 horas antes",
+            "12": "12 horas antes",
+            "24": "1 día antes",
+            "48": "2 días antes",
+            "72": "3 días antes"
+          }
+        },
+        "visibilidad": "Visibilidad",
+        "visibilidadOpcion": {
+          "public": "Público",
+          "hidden": "Solo con enlace",
+          "private": "Privado"
+        },
+        "visibilidadAyuda": {
+          "public": "Aparece en la página de tu organización, en el directorio de eventos y en los buscadores.",
+          "hidden": "Lo abre quien tenga el enlace, pero no sale en ningún listado ni en los buscadores. No es secreto: no lo uses para información confidencial.",
+          "private": "Nadie puede abrirlo, ni con el enlace. Quien ya esté inscrito conserva su entrada, pero no podrá ver la ficha."
+        }
       },
       "agenda": {
         "titulo": "Agenda",
@@ -1540,6 +1576,12 @@
           "verVersion": "{{tipo}}, versión {{version}}",
           "ocultarVersion": "Ocultar texto",
           "errorVersion": "No se ha podido cargar esa versión."
+        },
+        "ausencias": {
+          "una": "Faltó a 1 evento",
+          "varias": "Faltó a {{veces}} eventos",
+          "titulo": "Ausencias sin cancelar (últimos 12 meses)",
+          "ninguna": "Ninguna"
         }
       },
       "registrationQuestions": {
@@ -1598,7 +1640,18 @@
           "error": "No hemos podido completar la búsqueda."
         },
         "cabeceraInicio": "Escaneo a la puerta,",
-        "cabeceraMarca": "con o sin conexión."
+        "cabeceraMarca": "con o sin conexión.",
+        "asistencia": {
+          "titulo": "Asistencia",
+          "sugerencia": "El evento ha terminado. Cuando hayas registrado a todos los asistentes, cierra la asistencia: quien estaba confirmado y no se ha registrado contará como ausencia en su historial.",
+          "cerrar": "Cerrar asistencia",
+          "confirmacion": "¿Cerrar la asistencia? Quien no se haya registrado contará como ausencia. Podrás reabrirla hasta 7 días después del evento.",
+          "confirmar": "Sí, cerrar la asistencia",
+          "volver": "Todavía no",
+          "cerrada": "Asistencia cerrada el {{fecha}}.",
+          "reabrir": "Reabrir asistencia",
+          "error": "No se ha podido guardar. Inténtalo de nuevo."
+        }
       },
       "sponsors": {
         "titulo": "Patrocinadores",

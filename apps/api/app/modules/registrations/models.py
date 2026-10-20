@@ -117,6 +117,13 @@ class EventRegistration(Base, TimestampMixin):
         # estadísticas de la fase 3 de trabajo (`COUNT(*) ... WHERE event_id = ?
         # AND status = ?`).
         Index("ix_event_registrations_event_id_status", "event_id", "status"),
+        # Historial de ausencias de una persona en su organización.
+        Index(
+            "ix_event_registrations_org_email_confirmadas",
+            "organization_id",
+            "email",
+            postgresql_where=text("status = 'confirmed'"),
+        ),
         # Plan «mis-eventos-asistente» (migración 0052): `email` en solitario,
         # sin `event_id` delante — a diferencia del índice de arriba, este lo
         # usan `app_has_registration_by_email`/`app_list_registrations_by_email`
@@ -189,6 +196,17 @@ class EventRegistration(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Recordatorio antes del evento: reclamado por la tarea, enviado, y para
+    # qué `starts_at` (al minuto). Si la fecha cambia, vuelve a ser elegible.
+    reminder_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reminder_sent_for_starts_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     answers: Mapped[list[EventRegistrationAnswer]] = relationship(
         back_populates="registration",

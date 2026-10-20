@@ -7,6 +7,7 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { emularDialogoNativo } from '../../../../testing/dialog';
+import { elegirEnSelect } from '../../../../testing/select';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { By } from '@angular/platform-browser';
@@ -25,12 +26,15 @@ function eventoDetalle(overrides: Record<string, unknown> = {}) {
     summary: null,
     description: null,
     registration_mode: 'free',
+    visibility: 'public',
     capacity: null,
     starts_at: '2026-10-01T09:00:00Z',
     ends_at: '2026-10-02T18:00:00Z',
     location_mode: 'in_person',
     timezone: 'Europe/Madrid',
     payment_checkout_window_minutes: 45,
+    reminder_enabled: true,
+    reminder_hours_before: 24,
     category: null,
     tags: [],
     ...overrides,
@@ -232,6 +236,53 @@ describe('EventForm', () => {
       const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
       expect(peticion.request.body.category_id).toBe('c-taller');
       expect(peticion.request.body.tags).toEqual(['ia', 'datos', 'machine learning']);
+      peticion.flush(eventoDetalle());
+    });
+
+    it('envía los ajustes del recordatorio: activado y las horas elegidas', async () => {
+      const fixture = await abrirEdicion();
+      elegirEnSelect(fixture, 'evento-recordatorio-horas', '72');
+      await avanzar(fixture);
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body.reminder_enabled).toBe(true);
+      expect(peticion.request.body.reminder_hours_before).toBe(72);
+      peticion.flush(eventoDetalle());
+    });
+
+    it('al pasar a pago sube el recordatorio de 24 a 48 horas si no se eligieron otras', async () => {
+      const fixture = await abrirEdicion();
+      elegirEnSelect(fixture, 'evento-modo-inscripcion', 'paid');
+      await avanzar(fixture);
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body.reminder_hours_before).toBe(48);
+      peticion.flush(eventoDetalle());
+    });
+
+    it('elige la visibilidad y explica la opción elegida', async () => {
+      const fixture = await abrirEdicion();
+      expect(fixture.nativeElement.textContent).toContain(
+        'Aparece en la página de tu organización',
+      );
+      elegirEnSelect(fixture, 'evento-visibilidad', 'hidden');
+      await avanzar(fixture);
+      expect(fixture.nativeElement.textContent).toContain('Lo abre quien tenga el enlace');
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body.visibility).toBe('hidden');
       peticion.flush(eventoDetalle());
     });
 

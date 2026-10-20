@@ -9,6 +9,7 @@ import { EventCategoryOut } from '../models/event-category-out';
  */
 export interface EventListItem {
   accounting_currency: string;
+  attendance_closed_at?: (string | null);
   budget_approved_at: (string | null);
   cancellation_reason?: (string | null);
   cancelled_at?: (string | null);
@@ -34,6 +35,8 @@ export interface EventListItem {
   price_multiple?: boolean;
   registration_mode: 'free' | 'approval' | 'paid';
   registration_opens_at: (string | null);
+  reminder_enabled: boolean;
+  reminder_hours_before: number;
   slug: string;
   starts_at: string;
   status: 'draft' | 'published' | 'archived' | 'cancelled';

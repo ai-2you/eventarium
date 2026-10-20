@@ -28,6 +28,7 @@ import { TagsInput } from '../../../shared/ui/tags-input';
 import { EventScope } from '../../../layouts/admin/event-scope';
 import { isoAValorLocal } from './datetime-local';
 import { slugify } from '../../../core/texto/slug';
+import { EventReminderSettings } from './event-reminder-settings';
 import { EventDetails } from './event-details';
 import {
   LONGITUD_MAX_ETIQUETA,
@@ -45,6 +46,9 @@ const LONGITUD_MAXIMA_SLUG = 160;
 /** `EventCreate.description`, mismo tope que la API. */
 const LONGITUD_MAXIMA_DESCRIPCION = 20000;
 
+/** «Solo con enlace» (`hidden`): se abre con la URL pero no sale en listados ni buscadores. */
+type Visibilidad = 'public' | 'hidden' | 'private';
+
 interface EventoBase {
   readonly id: string;
   readonly slug: string;
@@ -52,6 +56,7 @@ interface EventoBase {
   readonly summary: string | null;
   readonly description: string | null;
   readonly registration_mode: RegistrationMode;
+  readonly visibility: Visibilidad;
   readonly capacity: number | null;
   readonly starts_at: string;
   readonly ends_at: string;
@@ -62,6 +67,8 @@ interface EventoBase {
   readonly longitude: number | null;
   readonly timezone: string;
   readonly payment_checkout_window_minutes: number;
+  readonly reminder_enabled: boolean;
+  readonly reminder_hours_before: number;
   readonly category: CategoriaDelCatalogo | null;
   readonly tags: readonly string[];
 }
@@ -130,6 +137,7 @@ function zonasHorariasDisponibles(): readonly string[] {
     Input,
     AddressMap,
     EventDetails,
+    EventReminderSettings,
     PageHeader,
     Select,
     RichTextEditor,
@@ -256,7 +264,15 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [options]="opcionesDeModoDeInscripcion()"
                 [hint]="t('admin.events.formulario.modoAyuda.' + registrationMode())"
                 [value]="registrationMode()"
-                (valueChange)="registrationMode.set($any($event))"
+                (valueChange)="alCambiarModo($any($event))"
+              />
+              <app-select
+                fieldId="evento-visibilidad"
+                [label]="t('admin.events.formulario.visibilidad')"
+                [options]="opcionesDeVisibilidad()"
+                [hint]="t('admin.events.formulario.visibilidadAyuda.' + visibility())"
+                [value]="visibility()"
+                (valueChange)="visibility.set($any($event))"
               />
               <div class="campo-numero">
                 <label for="evento-aforo">{{ t('admin.events.formulario.aforo') }}</label>
@@ -281,6 +297,14 @@ function zonasHorariasDisponibles(): readonly string[] {
                   </p>
                 }
               </div>
+
+              <app-event-reminder-settings
+                class="campo-ancho"
+                [dePago]="registrationMode() === 'paid'"
+                [(activado)]="reminderEnabled"
+                [(horas)]="reminderHours"
+                [(horasElegidas)]="reminderHoursElegidas"
+              />
 
               @if (locationMode() !== 'online') {
                 <app-address-map
@@ -478,6 +502,11 @@ export class EventForm {
   protected readonly description = signal('');
   protected readonly longitudMaximaDescripcion = LONGITUD_MAXIMA_DESCRIPCION;
   protected readonly registrationMode = signal<RegistrationMode>('free');
+  protected readonly visibility = signal<Visibilidad>('public');
+  protected readonly reminderEnabled = signal(true);
+  /** `null` en un evento nuevo sin elegir: la API decide (24 h, o 48 h si es de pago). */
+  protected readonly reminderHours = signal<number | null>(null);
+  protected readonly reminderHoursElegidas = signal(false);
   /** `null` = sin límite de aforo; `NaN` = lo escrito no es un número. */
   protected readonly capacity = signal<number | null>(null);
   protected readonly startsAt = signal('');
@@ -566,6 +595,13 @@ export class EventForm {
     { value: 'paid', label: this.transloco.translate('admin.events.formulario.modoPago') },
   ]);
 
+  protected readonly opcionesDeVisibilidad = computed<SelectOption[]>(() =>
+    (['public', 'hidden', 'private'] as const).map((valor) => ({
+      value: valor,
+      label: this.transloco.translate(`admin.events.formulario.visibilidadOpcion.${valor}`),
+    })),
+  );
+
   protected readonly opcionesDeZonaHoraria = computed<SelectOption[]>(() =>
     zonasHorariasDisponibles().map((zona) => ({ value: zona, label: zona })),
   );
@@ -630,6 +666,7 @@ export class EventForm {
       this.summary.set(evento.summary ?? '');
       this.description.set(evento.description ?? '');
       this.registrationMode.set(evento.registration_mode);
+      this.visibility.set(evento.visibility ?? 'public');
       this.capacity.set(evento.capacity);
       this.startsAt.set(isoAValorLocal(evento.starts_at));
       this.endsAt.set(isoAValorLocal(evento.ends_at));
@@ -640,6 +677,8 @@ export class EventForm {
       this.longitud.set(evento.longitude);
       this.timezone.set(evento.timezone);
       this.paymentWindow.set(evento.payment_checkout_window_minutes);
+      this.reminderEnabled.set(evento.reminder_enabled);
+      this.reminderHours.set(evento.reminder_hours_before);
       this.categoria.set(evento.category?.id ?? '');
       this.categoriaActual.set(evento.category);
       this.etiquetas.set([...evento.tags]);
@@ -684,6 +723,15 @@ export class EventForm {
     // Al crear, vaciarlo devuelve el control al título; en un evento existente
     // nunca, porque cambiaría su URL pública.
     this.slugManual.set(valor.trim() !== '' || this.esEdicion());
+  }
+
+  /** Al pasar a pago, el recordatorio por defecto (24 h) llegaría con el plazo de
+   * reembolso ya cerrado: sube a 48 h si nadie ha elegido otras horas, como la API. */
+  protected alCambiarModo(modo: RegistrationMode): void {
+    this.registrationMode.set(modo);
+    if (modo === 'paid' && this.reminderHours() === 24 && !this.reminderHoursElegidas()) {
+      this.reminderHours.set(48);
+    }
   }
 
   protected alCambiarAforo(evento: Event): void {
@@ -804,6 +852,7 @@ export class EventForm {
       summary: this.summary().trim() || null,
       description: this.description().trim() || null,
       registration_mode: this.registrationMode(),
+      visibility: this.visibility(),
       capacity: this.capacity(),
       starts_at: new Date(this.startsAt()).toISOString(),
       ends_at: new Date(this.endsAt()).toISOString(),
@@ -813,6 +862,9 @@ export class EventForm {
         this.locationMode() !== 'online' ? this.locationAddress().trim() || null : null,
       timezone: this.timezone(),
       payment_checkout_window_minutes: this.paymentWindow(),
+      reminder_enabled: this.reminderEnabled(),
+      // Sin elegir en un evento nuevo no se envía: la API pone su valor por defecto.
+      ...(this.reminderHours() === null ? {} : { reminder_hours_before: this.reminderHours() }),
       // Siempre explícitos: `null` quita la categoría, `[]` las etiquetas.
       category_id: this.categoria() || null,
       tags: [...this.etiquetas()],

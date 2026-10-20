@@ -217,8 +217,9 @@ def plantilla_html(
     nombre_marca: str,
     logo_html: str | None,
     base_url: str,
+    imagenes_html: str = "",
 ) -> str:
-    """El mensaje completo en HTML: cabecera + cuerpo (+ botón) + pie.
+    """El mensaje completo en HTML: cabecera + cuerpo (+ imágenes) (+ botón) + pie.
 
     `cuerpo` es el texto plano original: aquí se promueve la URL de acción y se
     convierte el resto a HTML. `logo_html` es el `<img src="cid:...">` ya
@@ -231,6 +232,14 @@ def plantilla_html(
         if url_accion is not None
         else ""
     )
+    # `imagenes_html` ya viene construido (y escapado) por `email.py`: las
+    # imágenes embebidas por `cid:`, como el QR de la entrada. Van tras el
+    # primer párrafo, el que las anuncia, y no al final, detrás del enlace
+    # para cancelar.
+    if imagenes_html:
+        bloque = f'<div style="text-align:center;padding:8px 0 16px;">{imagenes_html}</div>'
+        primero, cierre, resto = html_cuerpo.partition("</p>")
+        html_cuerpo = f"{primero}{cierre}{bloque}{resto}" if cierre else html_cuerpo + bloque
     return (
         '<!DOCTYPE html><html><body style="margin:0;padding:0;background-color:#f4f5f7;">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '

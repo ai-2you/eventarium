@@ -490,10 +490,14 @@ RLS aísla por **organización**, no por si un evento está publicado: un borrad
 la propia organización sigue siendo visible bajo RLS para cualquiera con el
 contexto de esa organización fijado (incluido el contexto anónimo de los endpoints
 públicos, que solo fija `app.organization_id`, sin usuario — y que hoy se fija desde
-el propio evento vía `app_resolve_public_event`). El filtro `status = 'published'
-AND visibility = 'public'` de las páginas públicas (`public_router.py`) es por tanto
-explícito en cada consulta (y dentro de la propia función de resolución), nunca
-delegado a RLS — ver `docs/arquitectura.md`.
+el propio evento vía `app_resolve_public_event`). El filtro de publicación de las
+páginas públicas (`public_router.py`) es por tanto explícito en cada consulta (y
+dentro de la propia función de resolución), nunca delegado a RLS — ver
+`docs/arquitectura.md`. Desde la migración `0065`, la resolución de un evento por su
+URL acepta `visibility IN ('public', 'hidden')` («solo con enlace»), mientras que todos
+los listados públicos (organización, portada y su lista de organizaciones, perfil de
+ponente, otros eventos de un patrocinador) siguen exigiendo `public`; `private` no se
+abre nunca.
 
 `users` tiene además una política solo de `INSERT` que permite crear la fila cuando hay
 contexto de organización: dar de alta a alguien crea primero el usuario y después la
@@ -661,3 +665,23 @@ se desactiva (las sesiones que lo tienen lo conservan). `event_sessions.session_
 (texto) se mantiene durante la transición con la `base_key` del tipo, u `other`
 para los propios; se retirará en una migración posterior.
 
+
+### Recordatorio a los inscritos y ausencias (migración `0064`)
+
+`events.reminder_enabled` (por defecto `true`) y `events.reminder_hours_before`
+(`CHECK IN (2, 6, 12, 24, 48, 72)`; 24 por defecto, 48 en eventos de pago, a tiempo
+de cancelar con reembolso) controlan el recordatorio por correo a los inscritos
+confirmados (`app/modules/reminders/`). Cada inscripción guarda
+`reminder_claimed_at` (reclamada por la tarea cada 10 minutos, con `SKIP LOCKED`;
+caduca a los 30 minutos), `reminder_sent_at` y `reminder_sent_for_starts_at` (el
+`starts_at` al minuto para el que se envió: si el evento cambia de fecha, vuelve a
+ser elegible). Como mucho un recordatorio por fecha del evento.
+
+`events.attendance_closed_at` lo fija quien gestiona entradas tras el evento
+(`POST /events/{id}/attendance/close`; se reabre hasta 7 días después del fin).
+El historial de ausencias no se guarda: se calcula al consultar
+(`registrations/absences.py`) y solo cuenta inscripciones confirmadas antes del
+inicio, avisadas para esa fecha, con el correo verificado o un pago, en eventos
+presenciales con la asistencia cerrada en los últimos 12 meses y con la entrada sin
+escanear ni revocar. Nunca cruza organizaciones; índice parcial
+`ix_event_registrations_org_email_confirmadas`.

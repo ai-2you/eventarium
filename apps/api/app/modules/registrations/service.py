@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import maintenance_session, set_organization_context
+from app.core.fechas import fecha_y_hora
 from app.core.tasks import (
     process_refunds_task,
     send_registration_cancelled_email,
@@ -34,6 +35,7 @@ from app.modules.auth.verification import (
     PROPOSITO_VERIFICACION_INSCRIPCION,
     consume_token,
     generate_token,
+    peek_token,
 )
 from app.modules.events.models import Event
 from app.modules.payments import refunds_service as payments_refunds_service
@@ -353,6 +355,9 @@ async def _reservar_ventana_de_pago(
     inscripcion.payment_expires_at = datetime.now(UTC) + ventana
 
 
+_VENTANA_MINIMA_DE_PROMOCION = timedelta(minutes=15)
+
+
 async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool:
     """Promueve a la primera persona en lista de espera, si hay alguna.
 
@@ -361,11 +366,18 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
     (`registration_cancel`), cada uno con su propio TTL. Devuelve si había
     alguien a quien promover.
     """
+    ahora = datetime.now(UTC)
+    # La ventana para confirmar nunca pasa del inicio del evento; si ya no
+    # quedan ni unos minutos, ofrecer la plaza sería un correo imposible de
+    # cumplir (y con el evento empezado nadie puede aprovecharla).
+    ventana = min(
+        timedelta(hours=get_settings().waitlist_promotion_window_hours), evento.starts_at - ahora
+    )
+    if ventana < _VENTANA_MINIMA_DE_PROMOCION:
+        return False
     siguiente = await repository.get_oldest_waitlisted(session, evento.organization_id, evento.id)
     if siguiente is None:
         return False
-    ahora = datetime.now(UTC)
-    ventana = timedelta(hours=get_settings().waitlist_promotion_window_hours)
     siguiente.waitlist_promoted_at = ahora
     siguiente.waitlist_promotion_expires_at = ahora + ventana
     confirm_token = await generate_token(
@@ -377,7 +389,7 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
         str(siguiente.organization_id),
         confirm_token,
         cancel_token,
-        (ahora + ventana).strftime("%d/%m/%Y %H:%M"),
+        fecha_y_hora(ahora + ventana, evento.timezone),
     )
     return True
 
@@ -422,10 +434,12 @@ async def _cancelar_inscripcion(
     organization_id: uuid.UUID,
     event_id: uuid.UUID,
     inscripcion: EventRegistration,
+    reembolsada: bool = False,
 ) -> bool:
-    """Núcleo compartido de la cancelación: por el organizador o por
-    autocancelación pública. Marca `cancelled`, envía el email y, si liberaba
-    una plaza reservada, promueve a la lista de espera.
+    """Núcleo compartido de la cancelación: por el organizador, por
+    autocancelación pública o por un reembolso total ya hecho (`reembolsada`).
+    Marca `cancelled`, envía el email y, si liberaba una plaza reservada,
+    promueve a la lista de espera.
 
     Devuelve `False` sin hacer nada si ya estaba `cancelled`/`rejected` — el
     llamador decide si eso es un 409 (panel) o un no-op silencioso (enlace
@@ -442,11 +456,17 @@ async def _cancelar_inscripcion(
     if inscripcion.status in ("cancelled", "rejected"):
         return False
 
-    reembolso = await payments_refunds_service.preparar_reembolso_por_cancelacion(
-        session,
-        organization_id=organization_id,
-        event_id=event_id,
-        registration_id=inscripcion.id,
+    # Si el dinero ya se ha devuelto no queda nada que reembolsar: el correo
+    # lo dice en vez de prometer un reembolso que no va a llegar.
+    reembolso = (
+        "reembolsado"
+        if reembolsada
+        else await payments_refunds_service.preparar_reembolso_por_cancelacion(
+            session,
+            organization_id=organization_id,
+            event_id=event_id,
+            registration_id=inscripcion.id,
+        )
     )
     # `preparar_reembolso_por_cancelacion` solo actúa sobre pagos ya cobrados
     # (`ESTADOS_REEMBOLSABLES`): un pago todavía `pending` (p. ej. una
@@ -480,7 +500,17 @@ async def _cancelar_inscripcion(
     )
     inscripcion.status = "cancelled"
     inscripcion.cancelled_at = datetime.now(UTC)
-    await send_registration_cancelled_email.kiq(inscripcion.email, str(organization_id), reembolso)
+    # Tras el commit: si la transacción se aborta (y la tarea que la llama se
+    # reintenta), nadie recibe un aviso de una cancelación que no ha ocurrido.
+    encolar_tras_commit(
+        session,
+        partial(
+            send_registration_cancelled_email.kiq,
+            inscripcion.email,
+            str(organization_id),
+            reembolso,
+        ),
+    )
 
     if reembolso == "en_curso":
         # Encolado al vuelo (además del cron `*/2 * * * *`): la persona no
@@ -823,6 +853,39 @@ async def cancel_registration(
     return inscripcion
 
 
+async def cancelar_por_reembolso_total(
+    session: AsyncSession,
+    *,
+    organization_id: uuid.UUID,
+    event_id: uuid.UUID,
+    registration_id: uuid.UUID,
+) -> bool:
+    """Cancela la inscripción cuyo pago se ha reembolsado entero, desde el
+    panel o desde el Dashboard de Stripe del organizador: sin pago ni entrada
+    válida no tiene sentido que siga ocupando una plaza.
+
+    No-op si ya estaba cancelada o rechazada (el reembolso de una cancelación
+    llega aquí después de cancelarla) y si el evento está cancelado: esa
+    inscripción la cancela el barrido de la cancelación del evento, que la
+    marca como tal y envía su propio aviso.
+    """
+    inscripcion = await repository.get_registration_for_update(
+        session, organization_id, event_id, registration_id
+    )
+    if inscripcion is None:
+        return False
+    evento = await session.get(Event, event_id)
+    if evento is None or evento.status == "cancelled":
+        return False
+    return await _cancelar_inscripcion(
+        session,
+        organization_id=organization_id,
+        event_id=event_id,
+        inscripcion=inscripcion,
+        reembolsada=True,
+    )
+
+
 async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> None:
     """Autocancelación pública: consume el token de un solo uso (`GETDEL`) y
     aplica la misma cancelación que el panel de organizador.
@@ -830,10 +893,15 @@ async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> 
     Idempotente si la inscripción ya estaba `cancelled`/`rejected` (puede
     haber varios tokens vigentes para la misma inscripción, uno por cada
     email enviado): no es un error, simplemente no hace nada más.
+
+    Una vez empezado el evento ya no se cancela (la plaza no se puede ofrecer
+    a nadie y borraría la ausencia): se comprueba **antes** de consumir el
+    token, para que el enlace no quede gastado por un intento rechazado.
     """
-    bruto = await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
+    invalido = "El enlace de cancelación no es válido o ha caducado."
+    bruto = await peek_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
     if bruto is None:
-        raise ValidationDomainError("El enlace de cancelación no es válido o ha caducado.")
+        raise ValidationDomainError(invalido)
 
     registration_id = uuid.UUID(bruto)
     await _fijar_contexto_por_inscripcion(session, registration_id)
@@ -842,7 +910,22 @@ async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> 
     # inscripción no deben poder promover dos veces un único hueco liberado.
     inscripcion = await session.get(EventRegistration, registration_id, with_for_update=True)
     if inscripcion is None:
+        await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token)
         return
+
+    evento = await session.get(Event, inscripcion.event_id)
+    if (
+        evento is not None
+        and inscripcion.status not in ("cancelled", "rejected")
+        and datetime.now(UTC) >= evento.starts_at
+    ):
+        raise ConflictError(
+            "El evento ya ha empezado: la inscripción ya no se puede cancelar desde el enlace."
+        )
+    # Otra petición con el mismo enlace puede haberlo gastado entre la lectura
+    # y aquí (la fila ya estaba bloqueada, así que no ha cancelado aún).
+    if await consume_token(PROPOSITO_CANCELACION_INSCRIPCION, token) is None:
+        raise ValidationDomainError(invalido)
 
     await _cancelar_inscripcion(
         session,

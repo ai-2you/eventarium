@@ -21,5 +21,6 @@ export interface PublicSponsorDetail {
   theme?: (PublicTheme | null);
   tier_benefits: (string | null);
   tier_name: string;
+  visibility?: 'public' | 'hidden' | 'private';
   website: (string | null);
 }

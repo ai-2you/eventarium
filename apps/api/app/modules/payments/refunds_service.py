@@ -34,6 +34,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,6 +91,61 @@ def evaluar_politica_reembolso_automatico(
     return EvaluacionPolitica(procede=True, motivo=None)
 
 
+async def _evaluar_reembolso_por_cancelacion(
+    session: AsyncSession,
+    *,
+    organization_id: uuid.UUID,
+    event_id: uuid.UUID,
+    registration_id: uuid.UUID,
+) -> tuple[str | None, EventPayment | None, int]:
+    """Qué pasaría con el pago si se cancelara ahora, sin escribir nada:
+    `("en_curso", pago, pendiente)` si procede el reembolso automático,
+    `("sin_reembolso", …)` si la política de plazo lo descarta, o
+    `(None, None, 0)` si no hay nada que reembolsar."""
+    pago = await repository.get_payment_by_registration(session, organization_id, registration_id)
+    if pago is None or pago.status not in ESTADOS_REEMBOLSABLES:
+        return None, None, 0
+    en_curso = await repository.suma_reembolsos_en_curso(session, organization_id, pago.id)
+    pendiente = pago.amount_cents - pago.refunded_cents - en_curso
+    if pendiente <= 0:
+        return None, None, 0
+
+    evento = await session.get(Event, event_id)
+    if evento is None:  # pragma: no cover - la FK de `event_payments` lo impide en la práctica
+        return None, None, 0
+    ticket = await tickets_repository.get_ticket_by_registration(
+        session, organization_id, registration_id
+    )
+    evaluacion = evaluar_politica_reembolso_automatico(
+        evento=evento,
+        ticket_used_at=ticket.used_at if ticket is not None else None,
+        ahora=datetime.now(UTC),
+    )
+    return ("en_curso" if evaluacion.procede else "sin_reembolso"), pago, pendiente
+
+
+async def reembolso_si_se_cancela(
+    session: AsyncSession,
+    *,
+    organization_id: uuid.UUID,
+    event_id: uuid.UUID,
+    registration_id: uuid.UUID,
+) -> Literal["en_curso", "sin_reembolso"] | None:
+    """Para avisar antes de cancelar: `"en_curso"` (se devolvería),
+    `"sin_reembolso"` (hay pago pero no se devolvería) o `None` (sin pago)."""
+    resultado, _, _ = await _evaluar_reembolso_por_cancelacion(
+        session,
+        organization_id=organization_id,
+        event_id=event_id,
+        registration_id=registration_id,
+    )
+    if resultado == "en_curso":
+        return "en_curso"
+    if resultado == "sin_reembolso":
+        return "sin_reembolso"
+    return None
+
+
 async def preparar_reembolso_por_cancelacion(
     session: AsyncSession,
     *,
@@ -105,27 +161,14 @@ async def preparar_reembolso_por_cancelacion(
     descarta, o `None` si no hay nada que reembolsar (evento gratuito, o un
     pago que nunca llegó a cobrarse).
     """
-    pago = await repository.get_payment_by_registration(session, organization_id, registration_id)
-    if pago is None or pago.status not in ESTADOS_REEMBOLSABLES:
-        return None
-    en_curso = await repository.suma_reembolsos_en_curso(session, organization_id, pago.id)
-    pendiente = pago.amount_cents - pago.refunded_cents - en_curso
-    if pendiente <= 0:
-        return None
-
-    evento = await session.get(Event, event_id)
-    if evento is None:  # pragma: no cover - la FK de `event_payments` lo impide en la práctica
-        return None
-    ticket = await tickets_repository.get_ticket_by_registration(
-        session, organization_id, registration_id
+    resultado, pago, pendiente = await _evaluar_reembolso_por_cancelacion(
+        session,
+        organization_id=organization_id,
+        event_id=event_id,
+        registration_id=registration_id,
     )
-    evaluacion = evaluar_politica_reembolso_automatico(
-        evento=evento,
-        ticket_used_at=ticket.used_at if ticket is not None else None,
-        ahora=datetime.now(UTC),
-    )
-    if not evaluacion.procede:
-        return "sin_reembolso"
+    if resultado != "en_curso" or pago is None:
+        return resultado
 
     await repository.crear_intencion_reembolso(
         session,

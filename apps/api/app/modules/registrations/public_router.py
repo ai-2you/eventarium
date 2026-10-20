@@ -25,15 +25,17 @@ from app.core.ratelimit import (
     MIS_EVENTOS_VER_POR_IP,
     PUBLICO_POR_IP,
     VERIFICACION_INSCRIPCION_POR_IP,
+    VISTA_CANCELACION_POR_IP,
     limit_per_ip,
 )
 from app.core.turnstile import require_turnstile
 from app.modules.events.models import Event
 from app.modules.events.public_deps import EVENTO_PARA_INSCRIBIR, ruta_de_evento
 from app.modules.policies import service as policies_service
-from app.modules.registrations import mis_eventos_service, repository, service
+from app.modules.registrations import cancel_preview, mis_eventos_service, repository, service
 from app.modules.registrations.calendar import calendario_de_inscripcion
 from app.modules.registrations.schemas import (
+    CancelPreviewResponse,
     CancelRegistrationRequest,
     CancelRegistrationResponse,
     ConfirmWaitlistPromotionRequest,
@@ -174,11 +176,28 @@ async def confirm_waitlist_promotion(
 
 
 @router.post(
+    "/registrations/cancel/preview",
+    summary="Ver qué se cancelaría con un enlace de autocancelación",
+    description=(
+        "No consume el token: devuelve el evento, si ya ha empezado y si se devolvería "
+        "el pago, para que la persona confirme antes de cancelar."
+    ),
+    response_model=CancelPreviewResponse,
+    dependencies=[limit_per_ip("vista-cancelacion", VISTA_CANCELACION_POR_IP)],
+)
+async def preview_cancel_registration(
+    datos: CancelRegistrationRequest, session: SessionDep
+) -> CancelPreviewResponse:
+    return await cancel_preview.vista_previa_de_cancelacion(session, token=datos.token)
+
+
+@router.post(
     "/registrations/cancel",
     summary="Cancelar una inscripción por autocancelación",
     description=(
         "Consume el token del enlace de cancelación (un solo uso). Si liberaba una "
-        "plaza confirmada, promueve automáticamente a la lista de espera."
+        "plaza confirmada, promueve automáticamente a la lista de espera. Una vez "
+        "empezado el evento responde 409 sin gastar el enlace."
     ),
     response_model=CancelRegistrationResponse,
     dependencies=[limit_per_ip("cancelar-inscripcion", CANCELACION_INSCRIPCION_POR_IP)],

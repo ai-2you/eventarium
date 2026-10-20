@@ -64,6 +64,7 @@ VERIFICACION_INSCRIPCION_POR_IP = 20
 CONFIRMACION_PROMOCION_POR_IP = 20
 # Autocancelación: mismo razonamiento que confirm-waitlist-promotion.
 CANCELACION_INSCRIPCION_POR_IP = 20
+VISTA_CANCELACION_POR_IP = 30
 # Invitación de equipo (fase 2 del plan de invitaciones): mismo razonamiento
 # que verify-email/reset-password, un tope propio para el GET (consulta el
 # estado) y otro para el POST (consume el token).

@@ -205,10 +205,14 @@ async def test_el_detalle_de_un_evento_no_publico_da_404_uniforme(
     privado = await _crear_evento(cliente, cabeceras, slug="privado-2")
     await _publicar(cliente, cabeceras, privado["id"], visibility="private")
 
-    for slug in ("en-borrador", "oculto-2", "privado-2", "no-existe"):
+    for slug in ("en-borrador", "privado-2", "no-existe"):
         respuesta = await cliente.get(f"{EVENTOS_DE_ACME}/{slug}")
         assert respuesta.status_code == 404
         assert respuesta.json()["detail"] == "El evento no existe."
+    # «Solo con enlace»: se abre por su URL, aunque no salga en ningún listado.
+    solo_con_enlace = await cliente.get(f"{EVENTOS_DE_ACME}/oculto-2")
+    assert solo_con_enlace.status_code == 200
+    assert solo_con_enlace.json()["visibility"] == "hidden"
 
 
 async def test_la_resolucion_publica_por_evento_no_filtra_datos_de_otra_organizacion(
@@ -226,7 +230,7 @@ async def test_la_resolucion_publica_por_evento_no_filtra_datos_de_otra_organiza
 
     borrador_a = await _crear_evento(cliente, cabeceras_a, slug="borrador-org-a")
     oculto_b = await _crear_evento(cliente, cabeceras_b, slug="oculto-org-b")
-    await _publicar(cliente, cabeceras_b, oculto_b["id"], visibility="hidden")
+    await _publicar(cliente, cabeceras_b, oculto_b["id"], visibility="private")
 
     for base, slug in (
         (EVENTOS_DE_ACME, "borrador-org-a"),

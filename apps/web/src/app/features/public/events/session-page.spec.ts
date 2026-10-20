@@ -139,6 +139,31 @@ describe('SessionPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('la sesión de un evento «solo con enlace» no se indexa, y la de uno público sí', async () => {
+    const robots = () =>
+      document.querySelector('meta[name="robots"]')?.getAttribute('content') ?? null;
+    for (const [visibility, esperado] of [
+      ['hidden', 'noindex, nofollow'],
+      ['public', null],
+    ] as const) {
+      const fixture = TestBed.createComponent(SessionPage);
+      fixture.componentRef.setInput('org', 'acme');
+      fixture.componentRef.setInput('slug', 'iawic-2026');
+      fixture.componentRef.setInput('sessionId', 's1');
+      fixture.detectChanges();
+      http
+        .expectOne(
+          (peticion) =>
+            peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026/sessions/s1',
+        )
+        .flush({ ...sesionDetalle(), visibility });
+      await avanzar(fixture);
+
+      expect(robots()).toBe(esperado);
+      fixture.destroy();
+    }
+  });
+
   it('marca "no encontrado" cuando la sesión no existe', async () => {
     const fixture = TestBed.createComponent(SessionPage);
     fixture.componentRef.setInput('org', 'acme');

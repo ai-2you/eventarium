@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import set_organization_context
+from app.core.email import EmailAttachment
 from app.modules.auth.verification import PROPOSITO_CANCELACION_INSCRIPCION, peek_token
 from app.modules.events.models import Event
 from app.modules.registrations import repository as registrations_repository
@@ -131,6 +132,19 @@ def generar_imagen_qr(token: str) -> bytes:
     buffer = BytesIO()
     segno.make(token, error="m").save(buffer, kind="png", scale=6, border=2)
     return buffer.getvalue()
+
+
+def adjunto_qr(qr_token: str) -> EmailAttachment:
+    """El QR de la entrada embebido en el cuerpo del correo (por `cid:`), con el
+    mismo `Content-ID` en la confirmación y en el recordatorio."""
+    return EmailAttachment(
+        filename="entrada.png",
+        content=generar_imagen_qr(qr_token),
+        maintype="image",
+        subtype="png",
+        cid="entrada@eventarium",
+        alt="Código QR de tu entrada",
+    )
 
 
 @dataclass(frozen=True, slots=True)

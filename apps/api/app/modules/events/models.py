@@ -81,6 +81,10 @@ class Event(Base, TimestampMixin):
             "payment_checkout_window_minutes BETWEEN 30 AND 1439",
             name="ck_events_payment_checkout_window_minutes_rango",
         ),
+        CheckConstraint(
+            "reminder_hours_before IN (2, 6, 12, 24, 48, 72)",
+            name="ck_events_reminder_hours_before",
+        ),
         # Biblioteca de medios (plan `260918-1944`): FK compuesta, mismo
         # motivo que las demás de este fichero.
         ForeignKeyConstraint(
@@ -158,6 +162,19 @@ class Event(Base, TimestampMixin):
     # evento — ver decisión de validación, sesión 1, del plan de la fase 6.
     payment_checkout_window_minutes: Mapped[int] = mapped_column(
         Integer, nullable=False, default=30
+    )
+    # Recordatorio a los inscritos confirmados antes del evento (activado por
+    # defecto; 48 h en los de pago, a tiempo de cancelar con reembolso).
+    reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    reminder_hours_before: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=24, server_default=text("24")
+    )
+    # Cuándo cerró el organizador la asistencia: solo entonces cuentan las
+    # ausencias del evento (un check-in a medias no marca a nadie).
+    attendance_closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     # Geocodificación de `location_address` con Nominatim (mismo mecanismo que
     # `EventVenue`, ver ahí la justificación completa). `null` mientras no haya
