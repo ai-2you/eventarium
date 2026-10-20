@@ -31,6 +31,42 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
+    version: '0.27.15',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Asignar sesión desde la pantalla de ponentes',
+            descripcion:
+              'Cada ponente tiene «Asignar a sesión»: eliges una sesión de la agenda y el rol sin cambiar de pantalla, y se avisa si ya tiene otra a la misma hora.',
+          },
+          {
+            titulo: 'Mover la agenda al cambiar las fechas del evento',
+            descripcion:
+              'Si cambias las fechas de un evento y alguna sesión quedaría fuera, el panel lo dice y ofrece moverlas todas con el evento (aplazar una semana mueve la agenda entera).',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Sesiones dentro de las fechas del evento',
+            descripcion:
+              'El calendario de una sesión solo deja elegir días y horas del evento, y avisa en el momento si el fin va antes que el inicio.',
+          },
+          {
+            titulo: 'Rol de cada participante en un desplegable',
+            descripcion:
+              'En «Gestionar participantes» el rol se elige de una lista (ponente, moderación, presentación) y se avisa de quien ya está en otra sesión a la misma hora.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.27.11',
     fecha: '2026-10-20',
     secciones: [

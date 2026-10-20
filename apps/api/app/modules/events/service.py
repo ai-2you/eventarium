@@ -243,9 +243,68 @@ async def _resolver_plantilla_del_evento(
     return plantilla_id
 
 
+#: Código del 409 que el formulario del evento reconoce para preguntar si mover
+#: las sesiones con el evento (distinto de otros 409, que no se preguntan).
+CODIGO_SESIONES_FUERA_DE_RANGO = "sesiones_fuera_de_rango"
+_TITULOS_EN_EL_AVISO = 5
+
+
+async def _ajustar_sesiones_al_rango(
+    session: AsyncSession,
+    evento: Event,
+    inicio: datetime,
+    fin: datetime,
+    *,
+    mover: bool,
+) -> None:
+    """Con las fechas nuevas, ninguna sesión puede quedar fuera del evento.
+
+    Con `mover`, todas se desplazan lo mismo que el inicio (aplazar una semana
+    mueve la agenda entera). Si aun así alguna queda fuera (el evento se
+    acortó) o no se pidió mover, 409 con cuántas y cuáles: no se guarda nada,
+    porque la excepción revierte también lo que se haya movido.
+    """
+    sesiones = (
+        (await session.execute(repository.sessions_query(evento.organization_id, evento.id)))
+        .scalars()
+        .all()
+    )
+    if mover:
+        desplazamiento = inicio - evento.starts_at
+        for sesion in sesiones:
+            sesion.starts_at += desplazamiento
+            sesion.ends_at += desplazamiento
+    fuera = [sesion for sesion in sesiones if sesion.starts_at < inicio or sesion.ends_at > fin]
+    if not fuera:
+        return
+    titulos = [sesion.title for sesion in fuera[:_TITULOS_EN_EL_AVISO]]
+    lista = ", ".join(f"«{titulo}»" for titulo in titulos)
+    if len(fuera) > len(titulos):
+        lista += f" y {len(fuera) - len(titulos)} más"
+    cuantas = "1 sesión" if len(fuera) == 1 else f"{len(fuera)} sesiones"
+    quedaria = "quedaría" if len(fuera) == 1 else "quedarían"
+    detalle = (
+        f"Aun moviéndolas con el evento, {cuantas} {quedaria} fuera de sus nuevas fechas: "
+        f"{lista}. Ajústalas en la agenda o amplía el evento."
+        if mover
+        else f"Con las fechas nuevas, {cuantas} de la agenda {quedaria} fuera del evento: {lista}."
+    )
+    raise ConflictError(
+        detalle,
+        extra={
+            "code": CODIGO_SESIONES_FUERA_DE_RANGO,
+            "sesiones_fuera": len(fuera),
+            "titulos": titulos,
+            "movidas": mover,
+        },
+    )
+
+
 async def update_event(
     session: AsyncSession, *, organization_id: uuid.UUID, event_id: uuid.UUID, datos: dict[str, Any]
 ) -> Event:
+    # No es un campo del evento: el `setattr` genérico de más abajo no debe verlo.
+    mover_sesiones = bool(datos.pop("mover_sesiones", False))
     evento = await repository.get_event(session, organization_id, event_id)
     if evento is None:
         raise NotFoundError("El evento no existe.")
@@ -289,6 +348,8 @@ async def update_event(
     fin = datos.get("ends_at", evento.ends_at)
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
+    if inicio != evento.starts_at or fin != evento.ends_at:
+        await _ajustar_sesiones_al_rango(session, evento, inicio, fin, mover=mover_sesiones)
 
     # Se comparan contra el valor actual, no por presencia de la clave: el
     # formulario del panel los envía siempre, y reenviar el mismo valor no es

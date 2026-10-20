@@ -156,6 +156,11 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     """Campos editables de un evento. `status` incluido: así se publica o archiva."""
 
+    # Al cambiar las fechas: mover también las sesiones de la agenda el mismo
+    # intervalo que el inicio. Sin él, si alguna quedara fuera, la API responde
+    # 409 (`sesiones_fuera_de_rango`) para que el panel pregunte.
+    mover_sesiones: bool = False
+
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
     description: DescripcionDeEvento | None = None

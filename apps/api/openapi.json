@@ -15887,6 +15887,11 @@
       },
       "EventUpdate": {
         "properties": {
+          "mover_sesiones": {
+            "type": "boolean",
+            "title": "Mover Sesiones",
+            "default": false
+          },
           "title": {
             "anyOf": [
               {

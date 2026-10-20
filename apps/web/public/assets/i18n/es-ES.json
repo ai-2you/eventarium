@@ -1357,7 +1357,9 @@
         "exito": "Cambios guardados.",
         "error": "No hemos podido guardar los cambios.",
         "direccion": "Dirección",
-        "rotulo": "Datos del evento"
+        "rotulo": "Datos del evento",
+        "moverSesionesPregunta": "¿Las movemos con el evento? Se desplazan todas lo mismo que el inicio, así que la agenda mantiene su orden y sus horas relativas.",
+        "moverSesiones": "Mover las sesiones con el evento"
       },
       "agenda": {
         "titulo": "Agenda",
