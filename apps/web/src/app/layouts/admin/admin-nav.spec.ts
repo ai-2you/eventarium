@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import es from '../../../../public/assets/i18n/es-ES.json';
 import { AuthService } from '../../core/auth/auth.service';
 import { AdminNav, enlacesDeEvento } from './admin-nav';
+import { authConPermisos } from '../../../testing/auth';
 
 /** Solo lo que `AdminNav` lee de `AuthService`: quien monta el panel de
  * plataforma en un test es superadmin por defecto (mismo supuesto que ya
@@ -30,7 +31,7 @@ function configurar(esSuperadmin = true) {
       provideHttpClientTesting(),
       {
         provide: AuthService,
-        useValue: { currentUser: signal({ is_superadmin: esSuperadmin }) },
+        useValue: authConPermisos(undefined, undefined, { is_superadmin: esSuperadmin }),
       },
     ],
   });
@@ -49,9 +50,9 @@ function enlacesDe(raiz: HTMLElement): (string | null)[] {
 }
 
 describe('enlacesDeEvento', () => {
-  it('sin pagos: no incluye entradas ni descuentos', () => {
+  it('sin pagos: incluye entradas para preparar precios, pero no descuentos ni pagos', () => {
     const enlaces = enlacesDeEvento('e1', false);
-    expect(enlaces.some((e) => e.path.includes('entradas'))).toBe(false);
+    expect(enlaces.some((e) => e.path.includes('entradas'))).toBe(true);
     expect(enlaces.some((e) => e.path.includes('descuentos'))).toBe(false);
     expect(enlaces.some((e) => e.path.includes('payments'))).toBe(false);
   });
@@ -160,5 +161,68 @@ describe('AdminNav — panel de plataforma', () => {
     // personal de plataforma — sin `soloSuperadmin` en su entrada de nav.
     const raiz = await montar(true, false);
     expect(enlacesDe(raiz)).toContain('/admin/analitica-externa');
+  });
+});
+
+describe('AdminNav por permisos', () => {
+  async function montarCon(permisos: readonly string[], roles: readonly string[]) {
+    TestBed.configureTestingModule({
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { 'es-ES': es },
+          translocoConfig: { availableLangs: ['es-ES'], defaultLang: 'es-ES' },
+        }),
+      ],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: AuthService, useValue: authConPermisos(permisos, roles) },
+      ],
+    });
+    const fixture = TestBed.createComponent(AdminNav);
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('un ponente no ve ningún enlace de gestión (ni el grupo)', async () => {
+    const raiz = await montarCon(['organizations:read'], ['speaker']);
+    expect(enlacesDe(raiz)).toEqual([]);
+    expect(raiz.querySelector('#admin-nav-organizacion-titulo')).toBeNull();
+  });
+
+  it('un organizador ve lo que puede gestionar, pero no la IA del propietario', async () => {
+    const raiz = await montarCon(
+      ['organizations:read', 'events:read', 'events:write', 'registrations:read', 'members:read'],
+      ['organizer'],
+    );
+    const enlaces = enlacesDe(raiz);
+    expect(enlaces).toContain('/dashboard');
+    expect(enlaces).toContain('/dashboard/events');
+    expect(enlaces).toContain('/dashboard/members');
+    expect(enlaces).not.toContain('/dashboard/ia');
+    expect(enlaces).not.toContain('/dashboard/roles');
+    expect(enlaces).not.toContain('/dashboard/organization');
+  });
+
+  it('mientras no han llegado los permisos no pinta ningún enlace', async () => {
+    TestBed.configureTestingModule({
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { 'es-ES': es },
+          translocoConfig: { availableLangs: ['es-ES'], defaultLang: 'es-ES' },
+        }),
+      ],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: { currentUser: signal(null), permisos: signal(null), roles: signal(null) },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AdminNav);
+    await fixture.whenStable();
+    expect(enlacesDe(fixture.nativeElement as HTMLElement)).toEqual([]);
   });
 });

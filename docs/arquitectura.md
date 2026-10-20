@@ -146,7 +146,7 @@ primer segmento de la URL.
 
 **Categorías y etiquetas.** Cada evento tiene como mucho una categoría
 (`events.category_id`, del catálogo `event_categories` de la instalación) y
-hasta 5 etiquetas (`events.tags`, con índice GIN). El directorio
+hasta 10 etiquetas (`events.tags`, con índice GIN). El directorio
 `GET /public/events` acepta `categoria` y `etiqueta` (hasta 3, combinadas con
 «y») y los aplica **en la consulta de cada organización**
 (`filtrar_por_categoria_y_etiquetas`), no en memoria. La misma función filtra

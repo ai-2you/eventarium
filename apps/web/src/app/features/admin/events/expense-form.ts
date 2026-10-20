@@ -15,6 +15,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Card } from '../../../shared/ui/card';
 import { Select, type SelectOption } from '../../../shared/ui/select';
 import { aCents } from './accounting-types';
@@ -41,7 +42,7 @@ export interface PartidaParaGasto {
 @Component({
   selector: 'app-expense-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Select],
+  imports: [TranslocoDirective, Alert, Button, Card, DatetimePicker, Select],
   template: `
     <ng-container *transloco="let t">
       <app-card [heading]="t('admin.events.accounting.altaGasto.titulo')">
@@ -64,17 +65,12 @@ export interface PartidaParaGasto {
             [options]="opcionesDePartida()"
             [(value)]="partidaId"
           />
-          <div class="campo">
-            <label for="gasto-fecha">{{
-              t('admin.events.accounting.movimientos.columnaFecha')
-            }}</label>
-            <input
-              id="gasto-fecha"
-              type="date"
-              [value]="fecha()"
-              (input)="fecha.set(alTexto($event))"
-            />
-          </div>
+          <app-datetime-picker
+            fieldId="gasto-fecha"
+            [soloFecha]="true"
+            [label]="t('admin.events.accounting.movimientos.columnaFecha')"
+            [(value)]="fecha"
+          />
           <div class="campo">
             <label for="gasto-base">{{ t('admin.events.accounting.altaGasto.base') }}</label>
             <input

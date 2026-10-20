@@ -12,7 +12,8 @@ export interface EventSessionUpdate {
 [key: string]: any;
 }> | null);
   room?: (string | null);
-  session_type?: ('talk' | 'break' | 'service' | 'other' | null);
+  session_type?: ('talk' | 'workshop' | 'break' | 'service' | 'other' | null);
+  session_type_id?: (string | null);
   sort_order?: (number | null);
   starts_at?: (string | null);
   title?: (string | null);

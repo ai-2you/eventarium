@@ -4,7 +4,7 @@
  * normalizan para avisar antes de enviar; la API vuelve a comprobarlas.
  */
 
-export const MAX_ETIQUETAS = 5;
+export const MAX_ETIQUETAS = 10;
 export const LONGITUD_MIN_ETIQUETA = 2;
 export const LONGITUD_MAX_ETIQUETA = 30;
 

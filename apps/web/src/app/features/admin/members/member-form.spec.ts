@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MemberForm } from './member-form';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
+import { elegirEnSelect } from '../../../../testing/select';
 
 const ROLES = [
   { id: 'r1', key: 'owner', name: 'Propietario', profile_fields: [] },
@@ -76,9 +77,7 @@ describe('MemberForm', () => {
 
     expect(fixture.nativeElement.textContent).not.toContain('Biografía');
 
-    const selectorRol = fixture.nativeElement.querySelector('#miembro-rol') as HTMLSelectElement;
-    selectorRol.value = 'r2';
-    selectorRol.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'miembro-rol', 'r2');
     await avanzar(fixture);
 
     expect(fixture.nativeElement.textContent).toContain('Biografía');
@@ -90,9 +89,7 @@ describe('MemberForm', () => {
     http.expectOne('/api/v1/roles').flush(ROLES);
     await avanzar(fixture);
 
-    const selectorRol = fixture.nativeElement.querySelector('#miembro-rol') as HTMLSelectElement;
-    selectorRol.value = 'r2';
-    selectorRol.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'miembro-rol', 'r2');
     await avanzar(fixture);
 
     const campoCorreo = fixture.nativeElement.querySelector('#miembro-correo') as HTMLInputElement;
@@ -123,9 +120,7 @@ describe('MemberForm', () => {
     http.expectOne('/api/v1/roles').flush(ROLES);
     await avanzar(fixture);
 
-    const selectorRol = fixture.nativeElement.querySelector('#miembro-rol') as HTMLSelectElement;
-    selectorRol.value = 'r1';
-    selectorRol.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'miembro-rol', 'r1');
     await avanzar(fixture);
 
     const campoCorreo = fixture.nativeElement.querySelector('#miembro-correo') as HTMLInputElement;

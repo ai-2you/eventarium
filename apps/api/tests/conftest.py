@@ -18,6 +18,7 @@ import sys
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 # Las variables tienen que estar puestas antes de importar nada de `app`: los motores
 # se crean al importar `app.core.database`.
@@ -50,6 +51,23 @@ def _cargar_env_de_tests() -> None:
         if origen in os.environ:
             os.environ[destino] = os.environ[origen]
 
+    # Redis tampoco se comparte: cada test hace `flushdb()` y, sobre el mismo
+    # Redis que el entorno de desarrollo, borraba los refresh tokens de quien
+    # tuviera la sesión abierta en el panel (el siguiente refresco daba 401 y
+    # le echaba). Sin `TEST_REDIS_URL`, la base 15 del mismo servidor.
+    if "TEST_REDIS_URL" in os.environ:
+        os.environ["REDIS_URL"] = os.environ["TEST_REDIS_URL"]
+    elif "REDIS_URL" in os.environ:
+        os.environ["REDIS_URL"] = _redis_de_tests(os.environ["REDIS_URL"])
+
+
+def _redis_de_tests(url: str) -> str:
+    """La misma URL de Redis apuntando a la base 15, la que no usa la app."""
+    partes = urlsplit(url)
+    return urlunsplit(partes._replace(path=f"/{BASE_REDIS_DE_TESTS}"))
+
+
+BASE_REDIS_DE_TESTS = 15
 
 _cargar_env_de_tests()
 
@@ -104,6 +122,7 @@ TABLAS = (
     # test contaminarían al siguiente dentro de la misma suite.
     "sponsor_tiers",
     "sponsors",
+    "session_types",
     "audit_log",
     "cookie_consents",
     # Fase 6 del PRD, fase 1 de trabajo: las cinco tablas de dominio cascadean

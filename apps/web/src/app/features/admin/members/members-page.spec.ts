@@ -6,7 +6,10 @@ import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { emularDialogoNativo } from '../../../../testing/dialog';
 import { MembersPage } from './members-page';
+import { AuthService } from '../../../core/auth/auth.service';
+import { TODOS_LOS_PERMISOS, authConPermisos } from '../../../../testing/auth';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
 
@@ -222,5 +225,159 @@ describe('MembersPage', () => {
     await avanzar(fixture);
 
     expect(fixture.nativeElement.textContent).toContain('Persona De Prueba');
+  });
+});
+
+describe('MembersPage, ficha de un rol', () => {
+  let http: HttpTestingController;
+
+  function configurar(permisos: readonly string[], roles: readonly string[] = ['owner']): void {
+    emularDialogoNativo();
+    TestBed.configureTestingModule({
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { 'es-ES': es },
+          translocoConfig: { availableLangs: ['es-ES'], defaultLang: 'es-ES' },
+        }),
+      ],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AuthService, useValue: authConPermisos(permisos, roles) },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  }
+
+  const PONENTE = {
+    items: [
+      {
+        user_id: 'u3',
+        email: 'ponente@example.com',
+        first_name: 'Pon',
+        last_name: 'Ente',
+        roles: [
+          {
+            id: 'm3',
+            role_id: 'r3',
+            role_key: 'speaker',
+            role_name: 'Ponente',
+            profile_fields: [
+              {
+                key: 'bio',
+                label: 'Biografía',
+                field_type: 'textarea',
+                options: null,
+                is_required: true,
+              },
+            ],
+            profile_data: { bio: 'Antes.' },
+            updated_at: '2026-10-19T10:00:00Z',
+          },
+        ],
+        profile_data: {},
+      },
+    ],
+    total: 1,
+    limit: 20,
+    offset: 0,
+  };
+
+  async function cargar(): Promise<ComponentFixture<MembersPage>> {
+    const fixture = TestBed.createComponent(MembersPage);
+    await avanzar(fixture);
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/organizations/me/members')
+      .flush(PONENTE);
+    await avanzar(fixture);
+    await flushPanelDeInvitaciones(http, fixture);
+    return fixture;
+  }
+
+  function botonEditar(fixture: ComponentFixture<MembersPage>): HTMLButtonElement | undefined {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+    ).find((boton) => boton.textContent?.includes('Editar ficha'));
+  }
+
+  afterEach(() => {
+    http.verify();
+  });
+
+  it('sin permiso para gestionar miembros no se ofrece', async () => {
+    configurar(['members:read']);
+    const fixture = await cargar();
+    expect(botonEditar(fixture)).toBeUndefined();
+  });
+
+  it('el organizador la edita en un diálogo y la lista se recarga', async () => {
+    configurar(TODOS_LOS_PERMISOS);
+    const fixture = await cargar();
+
+    botonEditar(fixture)!.click();
+    await avanzar(fixture);
+    // El último `<dialog>` es el de la ficha; antes va el de revocar invitaciones.
+    const dialogos = (fixture.nativeElement as HTMLElement).querySelectorAll('dialog');
+    const dialogo = dialogos[dialogos.length - 1]!;
+    const area = dialogo.querySelector('textarea') as HTMLTextAreaElement;
+    expect(dialogo.textContent).toContain('Ficha de Pon Ente (Ponente)');
+    expect(area.value).toBe('Antes.');
+
+    area.value = 'Después.';
+    area.dispatchEvent(new Event('input'));
+    (dialogo.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+    const guardar = http.expectOne('/api/v1/organizations/me/members/m3/profile');
+    expect(guardar.request.body).toEqual({
+      profile_data: { bio: 'Después.' },
+      expected_updated_at: '2026-10-19T10:00:00Z',
+    });
+    guardar.flush({ profile_data: { bio: 'Después.' }, updated_at: '2026-10-19T11:00:00Z' });
+    await avanzar(fixture);
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/organizations/me/members')
+      .flush(PONENTE);
+    await avanzar(fixture);
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('el organizador guarda por partes, sin la biografía obligatoria', async () => {
+    configurar(TODOS_LOS_PERMISOS);
+    const fixture = await cargar();
+
+    botonEditar(fixture)!.click();
+    await avanzar(fixture);
+    const dialogos = (fixture.nativeElement as HTMLElement).querySelectorAll('dialog');
+    const dialogo = dialogos[dialogos.length - 1]!;
+    const area = dialogo.querySelector('textarea') as HTMLTextAreaElement;
+    area.value = '';
+    area.dispatchEvent(new Event('input'));
+    area.dispatchEvent(new Event('blur'));
+    (dialogo.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+
+    const guardar = http.expectOne('/api/v1/organizations/me/members/m3/profile');
+    expect(guardar.request.body.profile_data).toEqual({ bio: '' });
+    guardar.flush({ profile_data: {}, updated_at: '2026-10-19T11:00:00Z' });
+    await avanzar(fixture);
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/organizations/me/members')
+      .flush(PONENTE);
+    await avanzar(fixture);
+  });
+
+  it('a quien no es propietario no le ofrece la ficha del propietario', async () => {
+    configurar(TODOS_LOS_PERMISOS, ['organizer']);
+    const fixture = TestBed.createComponent(MembersPage);
+    await avanzar(fixture);
+    const propietario = structuredClone(PONENTE);
+    Object.assign(propietario.items[0]!.roles[0]!, { role_key: 'owner', role_name: 'Propietario' });
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/organizations/me/members')
+      .flush(propietario);
+    await avanzar(fixture);
+    await flushPanelDeInvitaciones(http, fixture);
+
+    expect(botonEditar(fixture)).toBeUndefined();
   });
 });

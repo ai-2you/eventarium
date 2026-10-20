@@ -19,6 +19,8 @@
     "si": "Sí",
     "no": "No",
     "datetime": {
+      "indicaHora": "Indica la hora.",
+      "borrar": "Borrar",
       "elegirFecha": "Elegir fecha",
       "elegirHora": "Elegir hora",
       "mesAnterior": "Mes anterior",
@@ -31,7 +33,24 @@
       "menosUnaHora": "Restar una hora",
       "menosCincoMinutos": "Restar cinco minutos",
       "masCincoMinutos": "Sumar cinco minutos",
-      "masUnaHora": "Sumar una hora"
+      "masUnaHora": "Sumar una hora",
+      "fueraDeRango": "Tiene que estar entre {{desde}} y {{hasta}}."
+    },
+    "editor": {
+      "barra": "Formato del texto",
+      "negrita": "Negrita",
+      "cursiva": "Cursiva",
+      "titulo": "Título",
+      "subtitulo": "Subtítulo",
+      "lista": "Lista",
+      "listaNumerada": "Lista numerada",
+      "enlace": "Enlace",
+      "enlaceTitulo": "Enlace",
+      "enlaceUrl": "Dirección del enlace",
+      "enlaceAyuda": "Empieza por https:// o mailto:.",
+      "enlaceInvalido": "Solo se admiten direcciones web (https://) o de correo (mailto:).",
+      "enlaceAplicar": "Aplicar",
+      "enlaceQuitar": "Quitar enlace"
     },
     "sinResultados": "Sin coincidencias"
   },
@@ -171,6 +190,7 @@
       "sesion": {
         "tipo": {
           "talk": "Charla",
+          "workshop": "Taller",
           "break": "Descanso",
           "service": "Servicio",
           "other": "Otro"
@@ -252,7 +272,9 @@
         "titulo": "Este evento se ha cancelado",
         "sinMotivo": "La organización ha cancelado el evento. Si tenías inscripción, te hemos avisado por correo y, si pagaste, te devolvemos el importe.",
         "inscripcion": "Este evento se ha cancelado y ya no admite inscripciones."
-      }
+      },
+      "vistaPrevia": "Vista previa: así verá el público esta ficha. Si el evento aún no está publicado, solo la ve tu equipo y sus enlaces no funcionarán hasta publicarlo.",
+      "vistaPreviaError": "No se ha podido cargar la vista previa. Comprueba que sigues teniendo acceso y vuelve a intentarlo."
     },
     "accesoMenu": {
       "titulo": "Acceso a la cuenta",
@@ -679,6 +701,7 @@
     "rolesNav": "Roles",
     "miembrosNav": "Miembros",
     "eventsNav": "Eventos",
+    "tiposSesionNav": "Tipos de sesión",
     "catalogoDeComponentes": "Catálogo de componentes",
     "catalogoEstilo": {
       "titulo": "Sistema de diseño",
@@ -1191,7 +1214,16 @@
       },
       "quitarRol": "Quitar el rol «{{rol}}»",
       "cabeceraInicio": "Las personas de la organización,",
-      "cabeceraMarca": "cada una con su rol"
+      "cabeceraMarca": "cada una con su rol",
+      "ficha": {
+        "editar": "Editar ficha",
+        "editarAria": "Editar la ficha de {{rol}} de {{persona}}",
+        "titulo": "Ficha de {{persona}} ({{rol}})",
+        "sinCampos": "Tu rol no tiene ficha que completar.",
+        "guardar": "Guardar ficha",
+        "exito": "Ficha guardada.",
+        "error": "No se ha podido guardar la ficha."
+      }
     },
     "cuenta": {
       "titulo": "Mi cuenta",
@@ -1240,7 +1272,10 @@
       },
       "rotulo": "Tu cuenta",
       "cabeceraInicio": "Tu perfil y tus credenciales,",
-      "cabeceraMarca": "en una sola página"
+      "cabeceraMarca": "en una sola página",
+      "ficha": {
+        "titulo": "Mi ficha de {{rol}}"
+      }
     },
     "events": {
       "titulo": "Eventos",
@@ -1254,6 +1289,9 @@
       "sinEventos": "Todavía no hay eventos.",
       "columnaTitulo": "Título",
       "columnaEstado": "Estado",
+      "columnaInscripcion": "Inscripción",
+      "columnaPrecio": "Precio",
+      "columnaAforo": "Aforo",
       "columnaFecha": "Fecha de inicio",
       "error": "No hemos podido completar la operación.",
       "formulario": {
@@ -1264,10 +1302,12 @@
         "slug": "Identificador (slug)",
         "slugRequerido": "Escribe el identificador.",
         "slugInvalido": "Usa solo minúsculas, números y guiones, p. ej. «mi-evento».",
-        "inicio": "Fecha y hora de inicio",
+        "inicio": "Fecha de inicio",
         "inicioRequerido": "Indica la fecha de inicio.",
-        "fin": "Fecha y hora de fin",
+        "horaInicioRequerida": "Indica la hora de inicio.",
+        "fin": "Fecha de fin",
         "finRequerido": "Indica la fecha de fin.",
+        "horaFinRequerida": "Indica la hora de fin.",
         "finAnteriorAlInicio": "La fecha de fin debe ser posterior a la de inicio.",
         "modalidad": "Modalidad",
         "presencial": "Presencial",
@@ -1285,13 +1325,32 @@
         "sinCategoria": "Sin categoría",
         "categoriaDesactivada": "{{nombre}} (desactivada)",
         "etiquetas": "Etiquetas",
-        "etiquetasAyuda": "Separadas por comas, hasta 5. Minúsculas; letras, números, espacios y guiones (2 a 30 caracteres cada una).",
+        "etiquetasAyuda": "Hasta 10. Escribe y pulsa coma o Intro para añadir cada una; te sugerimos las que ya usas.",
+        "etiquetasPlaceholder": "Añade una etiqueta",
+        "quitarEtiqueta": "Quitar",
         "etiquetaLongitud": "«{{etiqueta}}»: cada etiqueta debe tener entre {{min}} y {{max}} caracteres.",
         "etiquetaCaracteres": "«{{etiqueta}}»: solo letras, números, espacios y guiones.",
         "etiquetasDemasiadas": "Un evento admite como máximo {{max}} etiquetas.",
         "ventanaDePagoAyuda": "Tiempo que tiene un comprador para pagar antes de que su plaza se libere. Solo se aplica a eventos de pago.",
         "ventanaDePagoRequerida": "Indica la ventana de pago.",
         "ventanaDePagoFueraDeRango": "Debe estar entre 30 y 1439 minutos.",
+        "slugAyuda": "Forma parte de la dirección pública del evento. Se rellena con el título; puedes cambiarlo.",
+        "resumen": "Resumen",
+        "resumenAyuda": "Una frase que aparece bajo el título en la ficha y en los listados.",
+        "descripcion": "Descripción",
+        "descripcionLarga": "La descripción no puede superar los {{max}} caracteres.",
+        "modoInscripcion": "Modo de inscripción",
+        "modoLibre": "Gratuita",
+        "modoAprobacion": "Gratuita con aprobación",
+        "modoPago": "De pago",
+        "modoAyuda": {
+          "free": "Cualquiera puede inscribirse hasta completar el aforo.",
+          "approval": "Cada inscripción queda pendiente hasta que la apruebas o la rechazas; se avisa al participante por correo.",
+          "paid": "Se paga con tarjeta al inscribirse. Los precios se definen en la pestaña «Entradas» y publicar exige tener Stripe conectado."
+        },
+        "aforo": "Aforo",
+        "aforoAyuda": "Plazas disponibles. Déjalo vacío para no limitarlas.",
+        "aforoInvalido": "El aforo debe ser un número entero mayor que cero.",
         "estadoActual": "Estado",
         "publicar": "Publicar",
         "archivar": "Archivar",
@@ -1300,7 +1359,9 @@
         "exito": "Cambios guardados.",
         "error": "No hemos podido guardar los cambios.",
         "direccion": "Dirección",
-        "rotulo": "Datos del evento"
+        "rotulo": "Datos del evento",
+        "moverSesionesPregunta": "¿Las movemos con el evento? Se desplazan todas lo mismo que el inicio, así que la agenda mantiene su orden y sus horas relativas.",
+        "moverSesiones": "Mover las sesiones con el evento"
       },
       "agenda": {
         "titulo": "Agenda",
@@ -1311,10 +1372,6 @@
         "eliminar": "Eliminar",
         "guardarCambios": "Guardar cambios",
         "tipo": "Tipo de sesión",
-        "tipoTalk": "Charla",
-        "tipoBreak": "Descanso",
-        "tipoService": "Servicio",
-        "tipoOther": "Otro",
         "tituloSesion": "Título de la sesión",
         "inicio": "Inicio",
         "fin": "Fin",
@@ -1330,14 +1387,19 @@
         "participantes": {
           "gestionar": "Participantes",
           "sinRoster": "Añade primero a alguien al evento en «Participantes del evento».",
-          "rolesAyuda": "Uno o varios roles separados por comas, p. ej. «ponente, moderador». Vacío para quitarla de esta sesión.",
           "guardar": "Guardar participantes",
-          "error": "No hemos podido guardar los participantes."
+          "error": "No hemos podido guardar los participantes.",
+          "noParticipa": "No participa",
+          "solape": "Ojo: a esta hora también está en {{sesiones}}."
         },
         "sede": "Sede",
         "sinSedeEspecifica": "Sin sede específica",
         "cabeceraInicio": "Sesiones y",
-        "cabeceraMarca": "quien las imparte."
+        "cabeceraMarca": "quien las imparte.",
+        "finAntesDeInicio": "El fin tiene que ser posterior al inicio.",
+        "fueraDelEvento": "La sesión tiene que caer dentro de las fechas y horas del evento.",
+        "gestionarTipos": "Añadir o gestionar tipos de sesión",
+        "gestionarTiposAria": "Añadir o gestionar tipos de sesión (se abre en otra pestaña)"
       },
       "design": {
         "titulo": "Diseño",
@@ -1597,7 +1659,7 @@
         "inicioVenta": "Inicio de la venta",
         "finVenta": "Fin de la venta",
         "error": "No hemos podido completar la operación.",
-        "eventoGratuito": "Este evento no acepta pagos: los tipos de entrada solo aplican a eventos con inscripción de pago. Cambia el modo de inscripción del evento a «pago» para gestionarlos.",
+        "eventoGratuito": "Este evento todavía es gratuito. Puedes preparar aquí sus entradas y precios; se cobrarán cuando cambies el modo de inscripción a «De pago» en «Editar datos».",
         "cabeceraInicio": "Los tipos de entrada",
         "cabeceraMarca": "definen el aforo y el precio",
         "cabeceraFin": "de cada sesión."
@@ -1630,7 +1692,7 @@
         "vigenteDesde": "Vigente desde",
         "vigenteHasta": "Vigente hasta",
         "error": "No hemos podido completar la operación.",
-        "eventoGratuito": "Este evento no acepta pagos: los códigos de descuento solo aplican a eventos con inscripción de pago. Cambia el modo de inscripción del evento a «pago» para gestionarlos.",
+        "eventoGratuito": "Este evento no acepta pagos: los códigos de descuento solo aplican a eventos con inscripción de pago. Cambia el modo de inscripción a «De pago» en «Editar datos» del evento para gestionarlos.",
         "cabeceraInicio": "Códigos con",
         "cabeceraMarca": "descuento fijo o porcentaje",
         "cabeceraFin": "para las inscripciones de pago."
@@ -2011,7 +2073,26 @@
           "presenter": "Presentador/a"
         },
         "verPerfilPublico": "Ver el perfil público",
-        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha."
+        "piePerfil": "El perfil vive en la organización: al crear la siguiente edición, quien ya participó aparece con su ficha hecha.",
+        "asignar": {
+          "titulo": "Asignar a {{nombre}} a una sesión",
+          "sinSesiones": "Todavía no hay sesiones en la agenda.",
+          "crearSesion": "Crear una sesión en la agenda",
+          "yaEsta": "Ya está en:",
+          "sesion": "Sesión",
+          "eligeSesion": "Elige una sesión",
+          "rol": "Rol",
+          "guardar": "Asignar",
+          "hecho": "Asignado a «{{sesion}}».",
+          "yaAsignado": "Ya está asignado a esa sesión con ese rol.",
+          "yaNoExiste": "Esa sesión ya no existe; elige otra.",
+          "error": "No hemos podido asignar la sesión."
+        },
+        "verBio": "Ver bio",
+        "verBioDe": "Ver la biografía de {{nombre}} (se abre en otra pestaña)",
+        "bioDe": "Biografía de {{nombre}}",
+        "bioSinPerfil": "No tiene el perfil público activado, así que no hay página que abrir: esta es la biografía de su ficha.",
+        "columnaAcciones": "Acciones"
       },
       "rotulo": "Eventos",
       "cabeceraInicio": "Toda la programación de la organización,",
@@ -2038,7 +2119,17 @@
         "eliminarDialogoTitulo": "¿Eliminar este evento?",
         "eliminarDialogoTexto": "Dejará de aparecer en el panel y en la web pública. Los registros de inscripciones, cobros y contabilidad se conservan. El identificador del evento seguirá reservado.",
         "eliminarConfirmar": "Sí, eliminar el evento"
-      }
+      },
+      "modoLibre": "Acceso libre",
+      "modoAprobacion": "Con aprobación",
+      "modoPago": "De pago",
+      "precioGratis": "Gratis",
+      "precioDesde": "Desde {{precio}}",
+      "precioSinEntradas": "Sin entradas",
+      "sinLimite": "Sin límite",
+      "vistaPrevia": "Vista previa",
+      "vistaPreviaDe": "Vista previa de «{{titulo}}» (se abre en otra pestaña)",
+      "columnaAcciones": "Acciones"
     },
     "sponsorTiersNav": "Niveles de patrocinio",
     "stripeNav": "Pagos con Stripe",
@@ -2627,6 +2718,53 @@
       "faltaHost": "Escribe el servidor SMTP.",
       "faltaUsuario": "Escribe el usuario SMTP.",
       "guardadoSinProbar": "Se ha guardado, pero sin un correo de prueba aceptado con estos mismos datos. Envía uno ahora: si falla, la plataforma se queda sin correo."
+    },
+    "tiposSesion": {
+      "rotulo": "Tipos de sesión",
+      "cabeceraInicio": "Cómo se llaman",
+      "cabeceraMarca": "las sesiones de tu agenda",
+      "intro": "Los tipos clasifican cada sesión de la agenda y se ven en la ficha pública con su color. Puedes renombrar los que vienen de serie, crear los tuyos, ordenarlos y desactivar los que no uses: las sesiones que ya los tienen los conservan.",
+      "nuevo": "Nuevo tipo",
+      "nuevoTitulo": "Nuevo tipo de sesión",
+      "editarTitulo": "Editar tipo de sesión",
+      "editar": "Editar",
+      "nombre": "Nombre",
+      "nombreAyuda": "Por ejemplo: Taller, Mesa redonda, Keynote, Networking o Demo. Es lo que verá el público.",
+      "nombreRequerido": "Ponle un nombre al tipo.",
+      "descripcion": "Descripción (opcional)",
+      "descripcionAyuda": "Una frase que ayude a tu equipo a elegirlo, p. ej. «Sesión práctica con ordenador, plazas limitadas».",
+      "color": "Color",
+      "pausa": "Es una pausa",
+      "pausaAyuda": "Para descansos, comidas o acreditaciones: se pinta apagada en la agenda y no pide ponentes.",
+      "asiSeVera": "Así se verá:",
+      "esPausa": "Pausa",
+      "usos": "{{n}} sesiones",
+      "desactivado": "Desactivado",
+      "desactivar": "Desactivar",
+      "activar": "Activar",
+      "borrar": "Borrar",
+      "subir": "Subir «{{nombre}}»",
+      "bajar": "Bajar «{{nombre}}»",
+      "error": "No hemos podido guardar los tipos de sesión.",
+      "colores": {
+        "azul": "Azul",
+        "violeta": "Violeta",
+        "verde": "Verde",
+        "ambar": "Ámbar",
+        "rosa": "Rosa",
+        "cian": "Cian",
+        "rojo": "Rojo",
+        "gris": "Gris"
+      },
+      "editarTipo": "Editar «{{nombre}}»",
+      "desactivarTipo": "Desactivar «{{nombre}}»",
+      "activarTipo": "Activar «{{nombre}}»",
+      "borrarTipo": "Borrar «{{nombre}}»",
+      "seguro": "¿Seguro? Borrar",
+      "confirmarBorrado": "Confirmar: borrar «{{nombre}}»",
+      "nuevoPuesto": "«{{nombre}}» pasa al puesto {{puesto}} de {{total}}.",
+      "usosUna": "1 sesión",
+      "usosNinguna": "Sin sesiones"
     }
   },
   "miEntrada": {

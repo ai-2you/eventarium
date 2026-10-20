@@ -7,7 +7,14 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.events.categories import normalizar_etiquetas
 from app.modules.organizations.schemas import SLUG_PATTERN, PublicOrganizationRef
@@ -22,7 +29,13 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
-SessionType = Literal["talk", "break", "service", "other"]
+
+# Markdown del editor del panel (o de la API/MCP). El tope protege la ficha
+# pública, que lo convierte y sanea en el navegador de cada visitante, y el
+# propio editor, que lo carga entero.
+LONGITUD_MAXIMA_DESCRIPCION = 20000
+DescripcionDeEvento = Annotated[str, Field(max_length=LONGITUD_MAXIMA_DESCRIPCION)]
+SessionType = Literal["talk", "workshop", "break", "service", "other"]
 VideoPlatform = Literal["youtube", "vimeo", "twitch", "other"]
 
 # Dominios admitidos por plataforma declarada. Para «other» basta con `https`: no
@@ -109,10 +122,10 @@ class EventCreate(BaseModel):
     slug: Annotated[str, Field(min_length=2, max_length=160, pattern=SLUG_PATTERN)]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # Id de una categoría **activa** del catálogo, o `None` (sin categoría).
     category_id: str | None = None
-    # Minúsculas, máx. 5, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
+    # Minúsculas, máx. 10, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
     tags: list[str] = Field(default_factory=list)
     status: EventStatusInput = "draft"
     visibility: EventVisibility = "public"
@@ -150,9 +163,14 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     """Campos editables de un evento. `status` incluido: así se publica o archiva."""
 
+    # Al cambiar las fechas: mover también las sesiones de la agenda el mismo
+    # intervalo que el inicio. Sin él, si alguna quedara fuera, la API responde
+    # 409 (`sesiones_fuera_de_rango`) para que el panel pregunte.
+    mover_sesiones: bool = False
+
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # `null` explícito **quita** la categoría; si el campo no viene, no cambia.
     category_id: str | None = None
     # Si no viene, no cambia; `[]` quita todas. `null` no es válido.
@@ -271,6 +289,18 @@ class EventResponse(BaseModel):
     theme_overrides: dict[str, Any] | None
 
 
+class EventListItem(EventResponse):
+    """Evento en el listado del panel: lo de `EventResponse` más su precio, que
+    el organizador quiere ver en la tabla sin abrir cada evento."""
+
+    # Entrada más barata entre los tipos activos, estén o no a la venta ahora
+    # (al organizador le importa el precio aunque la venta no haya abierto).
+    # `None` en un evento que no es de pago o que aún no tiene entradas.
+    price_from_cents: int | None = None
+    price_currency: str | None = None
+    price_multiple: bool = False
+
+
 class EventVenueCreate(BaseModel):
     """Alta de una sede de un evento multisede."""
 
@@ -302,10 +332,73 @@ class EventVenueResponse(BaseModel):
     geocoded_at: datetime | None
 
 
-class EventSessionCreate(BaseModel):
-    """Alta de una sesión de agenda."""
+ColorDeTipo = Literal["azul", "violeta", "verde", "ambar", "rosa", "cian", "rojo", "gris"]
 
-    session_type: SessionType
+
+class SessionTypeRef(BaseModel):
+    """El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."""
+
+    id: str
+    name: str
+    color: str
+    is_break: bool
+
+
+class SessionTypeOut(SessionTypeRef):
+    """Un tipo de sesión del catálogo de la organización."""
+
+    description: str | None
+    base_key: str | None
+    display_order: int
+    is_active: bool
+    # Sesiones que lo usan: con alguna no se puede borrar, solo desactivar.
+    sesiones: int
+
+
+def _nombre_con_texto(valor: str) -> str:
+    """Sin espacios en los extremos ni dobles; solo espacios no es un nombre."""
+    limpio = " ".join(valor.split())
+    if not limpio:
+        raise ValueError("El tipo de sesión necesita un nombre.")
+    return limpio
+
+
+NombreDeTipo = Annotated[str, Field(min_length=1, max_length=60), AfterValidator(_nombre_con_texto)]
+DescripcionDeTipo = Annotated[str, Field(max_length=200)]
+
+
+class SessionTypeCreate(BaseModel):
+    name: NombreDeTipo
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo = "azul"
+    is_break: bool = False
+
+
+class SessionTypeUpdate(BaseModel):
+    name: NombreDeTipo | None = None
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo | None = None
+    is_break: bool | None = None
+    is_active: bool | None = None
+
+
+class SessionTypeOrder(BaseModel):
+    """Todos los tipos de la organización, en el orden nuevo."""
+
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class EventSessionCreate(BaseModel):
+    """Alta de una sesión de agenda.
+
+    El tipo va por `session_type_id` (el catálogo de la organización). El texto
+    `session_type` se sigue aceptando durante la transición: se traduce al tipo
+    con esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo
+    que no es una pausa.
+    """
+
+    session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)]
     description: str | None = None
     starts_at: datetime
@@ -329,6 +422,7 @@ class EventSessionUpdate(BaseModel):
     """Campos editables de una sesión."""
 
     session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     description: str | None = None
     starts_at: datetime | None = None
@@ -351,7 +445,10 @@ class EventSessionResponse(BaseModel):
     """Sesión de agenda tal y como la ve el panel de administración."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base del tipo, u `other` en los propios), mientras
+    # haya clientes que lo lean. El tipo de verdad es `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime
@@ -419,6 +516,18 @@ class SessionParticipantsUpdate(BaseModel):
     participants: list[SessionParticipantEntry]
 
 
+class SessionParticipationOut(BaseModel):
+    """Una persona del roster en una sesión, con su horario: lo justo para que
+    el panel avise de solapes sin pedir los participantes sesión a sesión."""
+
+    event_member_id: str
+    session_id: str
+    session_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_key: str
+
+
 class SessionParticipantResponse(BaseModel):
     """Participación de una persona en una sesión, con su rol libre."""
 
@@ -444,6 +553,9 @@ class PublicParticipant(BaseModel):
     display_name: str
     role_key: str
     public_slug: str | None
+    # Identificador opaco y estable de la persona en esta organización (nunca su
+    # UUID): deja a la página juntar ponentes de la agenda y del roster sin duplicar.
+    ref: str
 
 
 class PublicEventSummary(BaseModel):
@@ -494,7 +606,9 @@ class PublicEventSession(BaseModel):
     """Sesión de la agenda tal y como se muestra en la página pública del evento."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base); el nombre, color y pausa vienen en `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime
@@ -576,6 +690,8 @@ class PublicEventDetail(BaseModel):
     # el catálogo estuviera vacío, que no es un estado posible hoy.
     theme: PublicTheme | None = None
     sessions: list[PublicEventSession]
+    # Ponentes enlazados al evento, tengan o no sesión en la agenda.
+    speakers: list[PublicParticipant] = Field(default_factory=list)
     # Ordenadas por `display_order`. El frontend decide, a partir de su
     # longitud, si activa la vista de "programa por sede" (2 sedes o más) —
     # decisión de tanda 3, aquí solo se exponen los datos.
@@ -611,6 +727,8 @@ class SpeakerRowOut(BaseModel):
     """Fila de la vista agregada de ponentes de un evento."""
 
     organization_member_id: str
+    # Su entrada en el roster de este evento: la que se asigna a una sesión.
+    event_member_id: str
     user_id: str
     email: str
     first_name: str | None
@@ -618,6 +736,9 @@ class SpeakerRowOut(BaseModel):
     # Titular profesional de su ficha (`profile_data.titular`), para pintar
     # bajo el nombre; `None` si no lo rellenó.
     titular: str | None
+    # Biografía de su ficha, para que el equipo la lea sin salir del panel
+    # (quien ve esta vista ya puede leer los perfiles de los miembros).
+    bio: str | None = None
     sesiones: list[SpeakerSessionOut]
     completitud: SpeakerCompletitudOut
     # Eventos de esta organización donde la persona está en el roster,

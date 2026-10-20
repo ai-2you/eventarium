@@ -14,14 +14,18 @@ from typing import Any
 from sqlalchemy import Select, and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import Permission
 from app.modules.events.models import Event
+from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.registrations.models import (
     EventRegistration,
     EventRegistrationAnswer,
     EventRegistrationConsent,
     EventRegistrationQuestion,
 )
+from app.modules.roles.models import RolePermission
 from app.modules.tickets.models import EventTicket
+from app.modules.users.models import User
 from app.shared.errors import ConflictError
 
 
@@ -71,10 +75,16 @@ async def lock_event_for_capacity(
     este mismo bloqueo). Solo la cancelación de una inscripción pasa
     `exigir_no_cancelado=False`, porque ahí se trata de liberar, no de ocupar.
     """
+    # `populate_existing`: el llamador suele tener ya este `Event` en el mapa
+    # de identidad, leído sin bloqueo. Sin el flag, SQLAlchemy descarta la fila
+    # leída bajo bloqueo y devuelve el objeto con el aforo y el modo de antes
+    # de que otra transacción los cambiara (mismo caso que
+    # `accounting.repository.lock_event_for_budget`).
     evento = await session.scalar(
         select(Event)
         .where(Event.organization_id == organization_id, Event.id == event_id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if evento is None:
         # No debería ocurrir: la existencia del evento ya se validó antes de
@@ -490,3 +500,35 @@ async def guardar_aceptacion_de_politicas(
     if politicas:
         consentimiento.organizer_policies_accepted_at = ahora
         consentimiento.accepted_policy_version_ids = politicas
+
+
+async def correos_que_gestionan_inscripciones(
+    session: AsyncSession, organization_id: uuid.UUID
+) -> list[str]:
+    """A quién avisar de una inscripción nueva: cada persona (una vez, aunque
+    tenga varios roles) con `registrations:write` en la organización, con la
+    cuenta activa y el correo verificado. Si no hay nadie, el correo de
+    contacto de la organización; si tampoco lo hay, nadie."""
+    correos = list(
+        (
+            await session.scalars(
+                select(User.email)
+                .distinct()
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .join(RolePermission, RolePermission.role_id == OrganizationMember.role_id)
+                .where(
+                    OrganizationMember.organization_id == organization_id,
+                    RolePermission.permission == Permission.REGISTRATIONS_WRITE.value,
+                    User.is_active.is_(True),
+                    User.email_verified_at.is_not(None),
+                )
+                .order_by(User.email)
+            )
+        ).all()
+    )
+    if correos:
+        return correos
+    contacto = await session.scalar(
+        select(Organization.contact_email).where(Organization.id == organization_id)
+    )
+    return [contacto] if contacto else []

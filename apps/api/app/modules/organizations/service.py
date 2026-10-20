@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import set_organization_context
 from app.core.storage import get_storage, public_url_versionada
+from app.modules.events import session_types
 from app.modules.media.models import Media
 from app.modules.organizations.models import Organization, OrganizationBranding
 from app.modules.organizations.schemas import (
@@ -26,6 +27,17 @@ from app.modules.organizations.schemas import (
 from app.modules.roles.models import Role, RolePermission, RoleProfileField
 from app.modules.roles.system_roles import SYSTEM_ROLE_TEMPLATES
 from app.shared.errors import ConflictError, NotFoundError
+
+
+async def inicializar_organizacion(
+    session: AsyncSession, organization_id: uuid.UUID
+) -> dict[str, Role]:
+    """Lo que toda organización necesita al nacer: sus roles (clonados de las
+    plantillas) y sus tipos de sesión base. La usan las dos altas (superadmin y
+    autoservicio) para que no puedan divergir."""
+    roles = await clone_system_roles(session, organization_id)
+    await session_types.crear_tipos_base(session, organization_id)
+    return roles
 
 
 async def clone_system_roles(session: AsyncSession, organization_id: uuid.UUID) -> dict[str, Role]:
@@ -109,7 +121,7 @@ async def create_organization(
             social_links=[],
         )
     )
-    await clone_system_roles(session, organizacion.id)
+    await inicializar_organizacion(session, organizacion.id)
     await session.flush()
     return organizacion
 

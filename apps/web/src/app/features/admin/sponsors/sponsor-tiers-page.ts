@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -43,7 +44,7 @@ function vacio(): { name: string; logoSize: LogoSize; benefits: string } {
 @Component({
   selector: 'app-sponsor-tiers-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Input, Textarea, PageHeader],
+  imports: [TranslocoDirective, Alert, Button, Card, Input, Textarea, PageHeader, Select],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.sponsorTiers.titulo')">
@@ -117,16 +118,13 @@ function vacio(): { name: string; logoSize: LogoSize; benefits: string } {
             [(value)]="nombre"
           />
 
-          <div class="campo-select">
-            <label for="nivel-tamano">{{ t('admin.sponsorTiers.tamanoLogoCampo') }}</label>
-            <select id="nivel-tamano" [value]="tamanoLogo()" (change)="alCambiarTamano($event)">
-              @for (opcion of tamanosDisponibles; track opcion) {
-                <option [value]="opcion">
-                  {{ t('admin.sponsorTiers.tamanoLogo' + capitaliza(opcion)) }}
-                </option>
-              }
-            </select>
-          </div>
+          <app-select
+            fieldId="nivel-tamano"
+            [label]="t('admin.sponsorTiers.tamanoLogoCampo')"
+            [options]="opcionesDeTamano()"
+            [value]="tamanoLogo()"
+            (valueChange)="tamanoLogo.set($any($event))"
+          />
 
           <app-textarea
             fieldId="nivel-beneficios"
@@ -190,14 +188,6 @@ function vacio(): { name: string; logoSize: LogoSize; benefits: string } {
       gap: var(--space-md);
       max-width: 34rem;
     }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
-    }
     .acciones-finales {
       display: flex;
       gap: var(--space-md);
@@ -251,9 +241,12 @@ export class SponsorTiersPage {
     }
   }
 
-  protected alCambiarTamano(evento: Event): void {
-    this.tamanoLogo.set((evento.target as HTMLSelectElement).value as LogoSize);
-  }
+  protected readonly opcionesDeTamano = computed<SelectOption[]>(() =>
+    this.tamanosDisponibles.map((opcion) => ({
+      value: opcion,
+      label: this.transloco.translate(`admin.sponsorTiers.tamanoLogo${this.capitaliza(opcion)}`),
+    })),
+  );
 
   protected editar(nivel: SponsorTier): void {
     this.editandoId.set(nivel.id);

@@ -295,6 +295,24 @@ describe('Select', () => {
     Object.defineProperty(window, 'innerHeight', { value: alturaOriginal, configurable: true });
   });
 
+  it('dentro de un contenedor con scroll (un modal) se abre hacia arriba si abajo no cabe', async () => {
+    const contenedor = fixture.nativeElement as HTMLElement;
+    contenedor.style.overflowY = 'auto';
+    contenedor.getBoundingClientRect = () => ({ top: 100, bottom: 420 }) as DOMRect;
+    const rectOriginal = boton.getBoundingClientRect.bind(boton);
+    boton.getBoundingClientRect = () => ({ ...rectOriginal(), top: 360, bottom: 400 }) as DOMRect;
+    const alturaOriginal = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 1000, configurable: true });
+
+    boton.click();
+    await fixture.whenStable();
+
+    const contenedorSel = fixture.nativeElement.querySelector('.sel') as HTMLElement;
+    expect(contenedorSel.className).toContain('sel--up');
+
+    Object.defineProperty(window, 'innerHeight', { value: alturaOriginal, configurable: true });
+  });
+
   it('no violaciones de accesibilidad, cerrado y abierto, en ambos temas', async () => {
     for (const tema of TEMAS) {
       fijarTema(tema);

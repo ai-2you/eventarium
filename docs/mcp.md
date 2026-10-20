@@ -37,7 +37,8 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
 ## Herramientas
 
 - Lectura: `listar_eventos`, `ver_evento`, `cifras_de_inscripcion`,
-  `listar_niveles_de_patrocinio`, `listar_categorias`. `ver_evento` devuelve
+  `listar_niveles_de_patrocinio`, `listar_categorias`, `listar_tipos_de_sesion`.
+  `ver_evento` devuelve
   `enlace_publico` con la URL pública del evento, `/{organización}/{evento}`.
   `listar_eventos` filtra por `estado`, por `categoria` (slug) y por hasta 3
   `etiquetas` (el evento debe tener todas). No hay filtro por organización:
@@ -48,9 +49,18 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
 - Estado: `publicar_evento`, `despublicar_evento` (se niega si hay
   inscripciones vivas) y `cancelar_evento`.
 
+**Tipos de sesión.** Cada organización tiene su catálogo (Charla, Taller, Mesa
+redonda…; ver `listar_tipos_de_sesion`). `anadir_sesion` y `editar_sesion`
+aceptan `tipo` con el nombre (sin distinguir mayúsculas), el id o la clave base
+(`talk`, `workshop`, `break`, `service`, `other`) de un tipo **activo**; sin
+`tipo`, `anadir_sesion` usa el primero activo que no es una pausa. Un tipo
+desconocido se rechaza con la lista de los disponibles. Las sesiones devuelven
+en `tipo` el nombre que le dio la organización. `editar_evento` acepta
+`mover_sesiones=True` para mover la agenda con el evento al cambiar sus fechas.
+
 **Categoría y etiquetas.** `crear_evento` y `editar_evento` aceptan
 `categoria` (el `slug` de una categoría activa, tal como lo devuelve
-`listar_categorias`) y `etiquetas` (hasta 5, de 2 a 30 caracteres, en
+`listar_categorias`) y `etiquetas` (hasta 10, de 2 a 30 caracteres, en
 minúsculas; solo letras, números, espacios y guiones). Una categoría
 inexistente o desactivada se rechaza. En `editar_evento`, omitir el campo no
 cambia nada; `categoria=""` quita la categoría y `etiquetas=[]` las quita todas.

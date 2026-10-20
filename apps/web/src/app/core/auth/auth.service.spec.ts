@@ -2,7 +2,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authInterceptor } from '../api/auth.interceptor';
 import { errorInterceptor } from '../api/error.interceptor';
@@ -10,6 +10,14 @@ import { AuthService } from './auth.service';
 
 const IMPERSONATE = '/api/v1/admin/impersonate';
 const STOP = '/api/v1/admin/impersonate/stop';
+const USUARIO_ACTUAL = '/api/v1/users/me';
+
+/** Cambiar de quién o dónde se es recarga el usuario (sus permisos son otros):
+ * se espera a esa petición y se responde. */
+async function responderUsuario(http: HttpTestingController, permisos: string[] = []) {
+  const peticion = await vi.waitFor(() => http.expectOne(USUARIO_ACTUAL));
+  peticion.flush({ ...USUARIO, permissions: permisos, roles: [] });
+}
 
 const USUARIO = {
   id: 'u-admin',
@@ -250,9 +258,11 @@ describe('AuthService: organización sin dominio', () => {
     expect(peticion.request.body).toEqual({ organization_id: 'org-2' });
     expect(peticion.request.withCredentials).toBe(true);
     peticion.flush({ access_token: 'token-org-2', expires_in: 900 });
+    await responderUsuario(http, ['events:read']);
     await cambio;
 
     expect(servicio.accessToken()).toBe('token-org-2');
+    expect(servicio.permisos()).toEqual(['events:read']);
   });
 
   it('createOrganization activa la sesión con el token de la propia respuesta', async () => {
@@ -279,5 +289,54 @@ describe('AuthService: organización sin dominio', () => {
     await creacion;
 
     expect(servicio.accessToken()).toBe('token-org-nueva');
+  });
+});
+
+describe('AuthService: permisos', () => {
+  let servicio: AuthService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    servicio = TestBed.inject(AuthService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  it('tras el login no hay permisos y asegurarUsuarioCompleto los pide una sola vez', async () => {
+    const login = servicio.login('admin@ejemplo.test', 'secreta');
+    http.expectOne('/api/v1/auth/login').flush({ access_token: 't', user: USUARIO });
+    await login;
+    expect(servicio.permisos()).toBeNull();
+
+    const a = servicio.asegurarUsuarioCompleto();
+    const b = servicio.asegurarUsuarioCompleto();
+    http
+      .expectOne(USUARIO_ACTUAL)
+      .flush({ ...USUARIO, permissions: ['events:read'], roles: ['organizer'] });
+    await Promise.all([a, b]);
+
+    expect(servicio.permisos()).toEqual(['events:read']);
+    expect(servicio.roles()).toEqual(['organizer']);
+    await servicio.asegurarUsuarioCompleto();
+    http.expectNone(USUARIO_ACTUAL);
+  });
+
+  it('una carga de /users/me de antes de cerrar sesión no resucita al usuario', async () => {
+    const login = servicio.login('admin@ejemplo.test', 'secreta');
+    http.expectOne('/api/v1/auth/login').flush({ access_token: 't', user: USUARIO });
+    await login;
+
+    const carga = servicio.loadCurrentUser();
+    servicio.clear();
+    http.expectOne(USUARIO_ACTUAL).flush({ ...USUARIO, permissions: ['events:read'], roles: [] });
+    await carga;
+
+    expect(servicio.permisos()).toBeNull();
   });
 });

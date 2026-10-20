@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.core.database import set_organization_context
 from app.core.permissions import Permission
 from app.core.storage import get_storage, public_url_versionada
-from app.modules.events import categories, repository
+from app.modules.events import categories, repository, session_types
 from app.modules.events import schemas as events_schemas
 from app.modules.events.geocoding import geocode_address
 from app.modules.events.models import (
@@ -30,6 +30,7 @@ from app.modules.events.models import (
     EventSession,
     EventSessionParticipant,
     EventVenue,
+    SessionType,
 )
 from app.modules.media import service as media_service
 from app.modules.media.models import Media
@@ -38,6 +39,9 @@ from app.modules.organizations import service as organizations_service
 from app.modules.organizations.schemas import PublicOrganizationRef
 from app.modules.payments import repository as payments_repository
 from app.modules.payments import service as payments_service
+from app.modules.registrations import modo_y_aforo
+from app.modules.registrations import repository as registrations_repository
+from app.modules.registrations import service as registrations_service
 from app.modules.theme_templates.accent_palette import fusionar_overrides
 from app.modules.theme_templates.models import ThemeTemplate
 from app.modules.theme_templates.schemas import PublicTheme
@@ -240,9 +244,83 @@ async def _resolver_plantilla_del_evento(
     return plantilla_id
 
 
+def _al_minuto(momento: datetime) -> datetime:
+    return momento.replace(second=0, microsecond=0)
+
+
+#: Código del 409 que el formulario del evento reconoce para preguntar si mover
+#: las sesiones con el evento (distinto de otros 409, que no se preguntan).
+CODIGO_SESIONES_FUERA_DE_RANGO = "sesiones_fuera_de_rango"
+_TITULOS_EN_EL_AVISO = 5
+
+
+async def _ajustar_sesiones_al_rango(
+    session: AsyncSession,
+    evento: Event,
+    inicio: datetime,
+    fin: datetime,
+    *,
+    mover: bool,
+) -> None:
+    """Con las fechas nuevas, ninguna sesión puede quedar fuera del evento.
+
+    Con `mover`, todas se desplazan lo mismo que el inicio (aplazar una semana
+    mueve la agenda entera). Si aun así alguna queda fuera (el evento se
+    acortó) o no se pidió mover, 409 con cuántas y cuáles: no se guarda nada,
+    porque la excepción revierte también lo que se haya movido.
+    """
+    sesiones = (
+        (await session.execute(repository.sessions_query(evento.organization_id, evento.id)))
+        .scalars()
+        .all()
+    )
+    # Solo cuentan las que hoy caen dentro: una sesión que ya estaba fuera
+    # (anterior a esta regla) no bloquea cambiar las fechas del evento.
+    dentro_antes = {
+        sesion.id
+        for sesion in sesiones
+        if evento.starts_at <= sesion.starts_at and sesion.ends_at <= evento.ends_at
+    }
+    if mover:
+        desplazamiento = inicio - evento.starts_at
+        for sesion in sesiones:
+            sesion.starts_at += desplazamiento
+            sesion.ends_at += desplazamiento
+    fuera = [
+        sesion
+        for sesion in sesiones
+        if sesion.id in dentro_antes and (sesion.starts_at < inicio or sesion.ends_at > fin)
+    ]
+    if not fuera:
+        return
+    titulos = [sesion.title for sesion in fuera[:_TITULOS_EN_EL_AVISO]]
+    lista = ", ".join(f"«{titulo}»" for titulo in titulos)
+    if len(fuera) > len(titulos):
+        lista += f" y {len(fuera) - len(titulos)} más"
+    cuantas = "1 sesión" if len(fuera) == 1 else f"{len(fuera)} sesiones"
+    quedaria = "quedaría" if len(fuera) == 1 else "quedarían"
+    detalle = (
+        f"Aun moviéndolas con el evento, {cuantas} {quedaria} fuera de sus nuevas fechas: "
+        f"{lista}. Ajústalas en la agenda o amplía el evento."
+        if mover
+        else f"Con las fechas nuevas, {cuantas} de la agenda {quedaria} fuera del evento: {lista}."
+    )
+    raise ConflictError(
+        detalle,
+        extra={
+            "code": CODIGO_SESIONES_FUERA_DE_RANGO,
+            "sesiones_fuera": len(fuera),
+            "titulos": titulos,
+            "movidas": mover,
+        },
+    )
+
+
 async def update_event(
     session: AsyncSession, *, organization_id: uuid.UUID, event_id: uuid.UUID, datos: dict[str, Any]
 ) -> Event:
+    # No es un campo del evento: el `setattr` genérico de más abajo no debe verlo.
+    mover_sesiones = bool(datos.pop("mover_sesiones", False))
     evento = await repository.get_event(session, organization_id, event_id)
     if evento is None:
         raise NotFoundError("El evento no existe.")
@@ -286,6 +364,32 @@ async def update_event(
     fin = datos.get("ends_at", evento.ends_at)
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
+    # Al minuto: el formulario envía las fechas sin segundos, y unos segundos
+    # guardados por la API o el MCP no son un cambio de fechas.
+    if _al_minuto(inicio) != _al_minuto(evento.starts_at) or _al_minuto(fin) != _al_minuto(
+        evento.ends_at
+    ):
+        await _ajustar_sesiones_al_rango(session, evento, inicio, fin, mover=mover_sesiones)
+
+    # Se comparan contra el valor actual, no por presencia de la clave: el
+    # formulario del panel los envía siempre, y reenviar el mismo valor no es
+    # un cambio que haya que validar. Con cambio real se toma el mismo
+    # bloqueo de aforo que las altas, verificaciones y aprobaciones, para que
+    # ninguna se cuele entre el recuento y la escritura.
+    if "registration_mode" in datos and datos["registration_mode"] is None:
+        raise ValidationDomainError("Indica el modo de inscripción.")
+    modo_cambia = (
+        "registration_mode" in datos and datos["registration_mode"] != evento.registration_mode
+    )
+    aforo_cambia = "capacity" in datos and datos["capacity"] != evento.capacity
+    if modo_cambia or aforo_cambia:
+        await registrations_repository.lock_event_for_capacity(session, organization_id, evento.id)
+        if modo_cambia:
+            await modo_y_aforo.asegurar_cambio_de_modo_posible(
+                session, evento, datos["registration_mode"]
+            )
+        if aforo_cambia and datos["capacity"] is not None:
+            await modo_y_aforo.asegurar_aforo_posible(session, evento, datos["capacity"])
 
     direccion_anterior = evento.location_address
 
@@ -324,6 +428,10 @@ async def update_event(
         await session.flush()
     except IntegrityError as exc:
         raise ConflictError(f"Ya existe un evento con el identificador «{nuevo_slug}».") from exc
+    # Solo un evento publicado tiene a quién avisar: en borrador o archivado
+    # la lista de espera no debe recibir ofertas de plaza.
+    if aforo_cambia and evento.status == "published":
+        await registrations_service.promover_lista_de_espera_hasta_llenar(session, evento)
     if categoria_cambiada:
         await session.refresh(evento, ["category"])
     return evento
@@ -393,10 +501,53 @@ async def create_session(
     if datos.get("venue_id") is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 
-    sesion = EventSession(event_id=event_id, organization_id=organization_id, **datos)
+    tipo = await _tipo_pedido(session, organization_id, datos)
+    sesion = EventSession(
+        event_id=event_id,
+        organization_id=organization_id,
+        session_type_id=tipo.id,
+        session_type=session_types.clave_heredada(tipo),
+        **datos,
+    )
     session.add(sesion)
-    await session.flush()
+    await _guardar_sesion(session)
+    await session.refresh(sesion, ["tipo"])
     return sesion
+
+
+async def _guardar_sesion(session: AsyncSession) -> None:
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # El tipo se borró entre elegirlo y guardar (la FK compuesta lo impide).
+        if "fk_event_sessions_session_type_id_organization_id" in str(exc.orig):
+            raise ConflictError(
+                "Ese tipo de sesión acaba de borrarse: elige otro y vuelve a guardar."
+            ) from exc
+        raise
+
+
+async def _tipo_pedido(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    datos: dict[str, Any],
+    *,
+    actual: uuid.UUID | None = None,
+) -> SessionType:
+    """Saca de `datos` el tipo pedido (por id o por clave heredada) y lo resuelve."""
+    tipo_id = datos.pop("session_type_id", None)
+    clave = datos.pop("session_type", None)
+    try:
+        id_pedido = uuid.UUID(tipo_id) if tipo_id else None
+    except ValueError as exc:
+        raise ValidationDomainError("Ese tipo de sesión no es válido.") from exc
+    return await session_types.resolver_para_sesion(
+        session,
+        organization_id,
+        tipo_id=id_pedido,
+        clave=clave,
+        actual=actual,
+    )
 
 
 async def update_session(
@@ -418,7 +569,11 @@ async def update_session(
     fin = datos.get("ends_at", sesion.ends_at)
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
-    _validar_sesion_dentro_del_evento(evento, inicio, fin)
+    # El rango se comprueba solo si las fechas cambian (comparando valores: el
+    # formulario siempre las reenvía): una sesión que ya quedó fuera de rango
+    # antes de existir esta regla se tiene que poder seguir editando.
+    if inicio != sesion.starts_at or fin != sesion.ends_at:
+        _validar_sesion_dentro_del_evento(evento, inicio, fin)
     if "venue_id" in datos and datos["venue_id"] is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 
@@ -435,9 +590,19 @@ async def update_session(
     except ValueError as exc:
         raise ValidationDomainError(str(exc)) from exc
 
+    pide_tipo = datos.get("session_type_id") is not None or (
+        datos.get("session_type") is not None and datos["session_type"] != sesion.session_type
+    )
+    if pide_tipo:
+        tipo = await _tipo_pedido(session, organization_id, datos, actual=sesion.session_type_id)
+        sesion.session_type_id = tipo.id
+        sesion.session_type = session_types.clave_heredada(tipo)
+    datos.pop("session_type_id", None)
+    datos.pop("session_type", None)
     for campo, valor in datos.items():
         setattr(sesion, campo, valor)
-    await session.flush()
+    await _guardar_sesion(session)
+    await session.refresh(sesion, ["tipo"])
     return sesion
 
 

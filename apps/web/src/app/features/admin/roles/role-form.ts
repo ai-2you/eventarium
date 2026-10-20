@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -93,6 +94,7 @@ function campoDesdeApi(campo: RoleField): CampoDeFormulario {
     Input,
     Textarea,
     PageHeader,
+    Select,
   ],
   template: `
     <ng-container *transloco="let t">
@@ -136,19 +138,13 @@ function campoDesdeApi(campo: RoleField): CampoDeFormulario {
             />
 
             @if (!esEdicion() && plantillas().length > 0) {
-              <div class="campo-select">
-                <label for="rol-plantilla">{{ t('admin.roles.formulario.plantilla') }}</label>
-                <select
-                  id="rol-plantilla"
-                  [value]="fromTemplate()"
-                  (change)="alElegirPlantilla($event)"
-                >
-                  <option value="">{{ t('admin.roles.formulario.plantillaNinguna') }}</option>
-                  @for (plantilla of plantillas(); track plantilla.key) {
-                    <option [value]="plantilla.key">{{ plantilla.name }}</option>
-                  }
-                </select>
-              </div>
+              <app-select
+                fieldId="rol-plantilla"
+                [label]="t('admin.roles.formulario.plantilla')"
+                [options]="opcionesDePlantilla()"
+                [value]="fromTemplate()"
+                (valueChange)="alElegirPlantilla($event)"
+              />
             }
           </app-card>
 
@@ -202,21 +198,13 @@ function campoDesdeApi(campo: RoleField): CampoDeFormulario {
                       (valueChange)="actualizarCampo($index, 'etiqueta', $event)"
                       (blurred)="validarCampo($index)"
                     />
-                    <div class="campo-select">
-                      <label [for]="'campo-tipo-' + $index">{{
-                        t('admin.roles.formulario.campoTipo')
-                      }}</label>
-                      <select
-                        [id]="'campo-tipo-' + $index"
-                        (change)="alCambiarTipoDeCampo($index, $event)"
-                      >
-                        @for (tipo of tiposDeCampos; track tipo) {
-                          <option [value]="tipo" [selected]="tipo === campo.tipo">
-                            {{ t('admin.roles.formulario.tipos.' + tipo) }}
-                          </option>
-                        }
-                      </select>
-                    </div>
+                    <app-select
+                      [fieldId]="'campo-tipo-' + $index"
+                      [label]="t('admin.roles.formulario.campoTipo')"
+                      [options]="opcionesDeTipoDeCampo()"
+                      [value]="campo.tipo"
+                      (valueChange)="alCambiarTipoDeCampo($index, $event)"
+                    />
                     @if (campo.tipo === 'select') {
                       <app-textarea
                         [label]="t('admin.roles.formulario.campoOpciones')"
@@ -270,14 +258,6 @@ function campoDesdeApi(campo: RoleField): CampoDeFormulario {
       gap: var(--space-lg);
       margin-top: var(--space-md);
       max-width: 40rem;
-    }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
     }
     .permisos {
       display: grid;
@@ -407,8 +387,19 @@ export class RoleForm {
     return firstValueFrom(this.http.get<RoleDetail>(this.api.url(`/roles/${id}`)));
   }
 
-  protected alElegirPlantilla(evento: Event): void {
-    const clave = (evento.target as HTMLSelectElement).value;
+  protected readonly opcionesDePlantilla = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('admin.roles.formulario.plantillaNinguna') },
+    ...this.plantillas().map((plantilla) => ({ value: plantilla.key, label: plantilla.name })),
+  ]);
+
+  protected readonly opcionesDeTipoDeCampo = computed<SelectOption[]>(() =>
+    this.tiposDeCampos.map((tipo) => ({
+      value: tipo,
+      label: this.transloco.translate(`admin.roles.formulario.tipos.${tipo}`),
+    })),
+  );
+
+  protected alElegirPlantilla(clave: string): void {
     this.fromTemplate.set(clave);
     const plantilla = this.plantillasCompletas.find((rol) => rol.key === clave);
     if (!plantilla) {
@@ -462,8 +453,8 @@ export class RoleForm {
     );
   }
 
-  protected alCambiarTipoDeCampo(indice: number, evento: Event): void {
-    const tipo = (evento.target as HTMLSelectElement).value as FieldType;
+  protected alCambiarTipoDeCampo(indice: number, valor: string): void {
+    const tipo = valor as FieldType;
     this.profileFields.update((actuales) =>
       actuales.map((campo, i) => (i === indice ? { ...campo, tipo } : campo)),
     );

@@ -30,12 +30,14 @@ from app.modules.organizations.schemas import (
     InvitationCreateResponse,
     InvitationResponse,
     MemberCreate,
+    MemberProfileUpdate,
     MemberResponse,
     MemberRoleOut,
     OrganizationResponse,
     OrganizationUpdate,
 )
 from app.modules.roles.models import Role
+from app.modules.roles.schemas import ProfileFieldResponse
 from app.modules.theme_templates import repository as theme_templates_repository
 from app.modules.theme_templates.schemas import ThemeTemplateCatalogItem
 from app.modules.users.models import User
@@ -265,6 +267,18 @@ async def upload_logo(
     return await _branding_response(session, branding)
 
 
+def _member_role_out(miembro: OrganizationMember, rol: Role) -> MemberRoleOut:
+    return MemberRoleOut(
+        id=str(miembro.id),
+        role_id=str(rol.id),
+        role_key=rol.key,
+        role_name=rol.name,
+        profile_fields=[ProfileFieldResponse.desde_modelo(campo) for campo in rol.profile_fields],
+        profile_data=dict(miembro.profile_data or {}),
+        updated_at=miembro.updated_at,
+    )
+
+
 def _member_response_from_rows(
     persona: User, filas: list[tuple[OrganizationMember, Role]]
 ) -> MemberResponse:
@@ -273,12 +287,7 @@ def _member_response_from_rows(
         email=persona.email,
         first_name=persona.first_name,
         last_name=persona.last_name,
-        roles=[
-            MemberRoleOut(
-                id=str(miembro.id), role_id=str(rol.id), role_key=rol.key, role_name=rol.name
-            )
-            for miembro, rol in filas
-        ],
+        roles=[_member_role_out(miembro, rol) for miembro, rol in filas],
         profile_data=repository.best_profile_data(filas),
     )
 
@@ -350,6 +359,39 @@ async def create_member(
         profile_data=datos.profile_data,
     )
     return await _member_response_for_user(session, usuario.organization_id, miembro.user_id)
+
+
+@router.patch(
+    "/me/members/{organization_member_id}/profile",
+    summary="Editar la ficha de un rol de una persona",
+    description=(
+        "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un "
+        "ponente). Puede hacerlo su titular o quien tenga `members:write` y "
+        "pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por "
+        "otra persona entre medias da 409 en vez de pisarse."
+    ),
+    response_model=MemberRoleOut,
+)
+async def update_member_profile(
+    organization_member_id: uuid.UUID,
+    datos: MemberProfileUpdate,
+    usuario: CurrentUserDep,
+    session: DbDep,
+    permisos: PermissionsDep,
+) -> MemberRoleOut:
+    miembro = await members_service.update_member_profile(
+        session,
+        organization_id=usuario.organization_id,
+        actor_id=usuario.id,
+        actor_permissions=permisos,
+        organization_member_id=organization_member_id,
+        profile_data=datos.profile_data,
+        expected_updated_at=datos.expected_updated_at,
+    )
+    rol = await session.get(Role, miembro.role_id)
+    if rol is None:  # pragma: no cover - garantizado por la FK
+        raise NotFoundError("El rol de esa membresía no existe.")
+    return _member_role_out(miembro, rol)
 
 
 @router.delete(

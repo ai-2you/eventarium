@@ -799,6 +799,60 @@
         }
       }
     },
+    "/api/v1/organizations/me/members/{organization_member_id}/profile": {
+      "patch": {
+        "tags": [
+          "organizaciones"
+        ],
+        "summary": "Editar la ficha de un rol de una persona",
+        "description": "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un ponente). Puede hacerlo su titular o quien tenga `members:write` y pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por otra persona entre medias da 409 en vez de pisarse.",
+        "operationId": "update_member_profile_api_v1_organizations_me_members__organization_member_id__profile_patch",
+        "parameters": [
+          {
+            "name": "organization_member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Member Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberRoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/me/members/{organization_member_id}": {
       "delete": {
         "tags": [
@@ -4142,7 +4196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EventResponse_"
+                  "$ref": "#/components/schemas/Page_EventListItem_"
                 }
               }
             }
@@ -4182,6 +4236,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/tags": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Sugerir etiquetas ya usadas",
+        "description": "Etiquetas de los eventos de la organización que contienen `q` (primero las que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta el autocompletado del campo de etiquetas.",
+        "operationId": "suggest_event_tags_api_v1_events_tags_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Suggest Event Tags Api V1 Events Tags Get"
                 }
               }
             }
@@ -4312,6 +4415,49 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/preview": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Vista previa de la ficha pública de un evento",
+        "description": "La ficha tal y como la verá el público, en cualquier estado (también un\nborrador): para revisarla antes de publicar. Solo para el equipo.",
+        "operationId": "preview_event_api_v1_events__event_id__preview_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEventDetail"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4901,6 +5047,52 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/participations": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Participaciones del roster en las sesiones del evento",
+        "operationId": "list_event_participations_api_v1_events__event_id__participations_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionParticipationOut"
+                  },
+                  "title": "Response List Event Participations Api V1 Events  Event Id  Participations Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -7806,6 +7998,213 @@
             "schema": {
               "type": "string",
               "title": "Tier Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Listar los tipos de sesión de la organización",
+        "operationId": "list_session_types_api_v1_organizations_me_session_types_get",
+        "parameters": [
+          {
+            "name": "activos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Activos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionTypeOut"
+                  },
+                  "title": "Response List Session Types Api V1 Organizations Me Session Types Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Crear un tipo de sesión",
+        "operationId": "create_session_type_api_v1_organizations_me_session_types_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/order": {
+      "put": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Reordenar los tipos de sesión",
+        "description": "Recibe **todos** los tipos en el orden nuevo; si cambiaron entretanto, 409.",
+        "operationId": "reorder_session_types_api_v1_organizations_me_session_types_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/{tipo_id}": {
+      "patch": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Editar un tipo de sesión",
+        "operationId": "update_session_type_api_v1_organizations_me_session_types__tipo_id__patch",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Borrar un tipo de sesión que no se usa",
+        "description": "Con sesiones que lo usan responde 409: hay que desactivarlo.",
+        "operationId": "delete_session_type_api_v1_organizations_me_session_types__tipo_id__delete",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
             }
           }
         ],
@@ -13623,6 +14022,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -13632,7 +14057,7 @@
           "role_name"
         ],
         "title": "EligibleMembershipResponse",
-        "description": "Membresía propia cuyo rol declara al menos un campo publicable."
+        "description": "Membresía propia cuyo rol declara al menos un campo publicable, con su\nficha: es desde donde la persona (p. ej. un ponente) la completa."
       },
       "EmailSettingsIn": {
         "properties": {
@@ -14222,7 +14647,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -14425,6 +14851,359 @@
         ],
         "title": "EventInvitationCreate",
         "description": "Invitación de ponente desde el evento (fase 3 del plan de invitaciones).\n\nSin `role_id`, el rol es `speaker` — el flujo por defecto. Se puede\nindicar otro (p. ej. un moderador) si el organizador lo necesita."
+      },
+      "EventListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCategoryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "in_person",
+              "online",
+              "hybrid"
+            ],
+            "title": "Location Mode"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "location_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "online_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Url"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "registration_mode": {
+            "type": "string",
+            "enum": [
+              "free",
+              "approval",
+              "paid"
+            ],
+            "title": "Registration Mode"
+          },
+          "registration_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Opens At"
+          },
+          "email_verification_required": {
+            "type": "boolean",
+            "title": "Email Verification Required"
+          },
+          "payment_checkout_window_minutes": {
+            "type": "integer",
+            "title": "Payment Checkout Window Minutes"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "contingency_fund_percent": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Contingency Fund Percent"
+          },
+          "budget_approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Approved At"
+          },
+          "contingency_fund_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contingency Fund Cents"
+          },
+          "accounting_currency": {
+            "type": "string",
+            "title": "Accounting Currency"
+          },
+          "theme_template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Template Id"
+          },
+          "theme_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Overrides"
+          },
+          "price_from_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price From Cents"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_multiple": {
+            "type": "boolean",
+            "title": "Price Multiple",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "description",
+          "cover_url",
+          "status",
+          "visibility",
+          "timezone",
+          "starts_at",
+          "ends_at",
+          "location_mode",
+          "location_name",
+          "location_address",
+          "city",
+          "online_url",
+          "capacity",
+          "registration_mode",
+          "registration_opens_at",
+          "email_verification_required",
+          "payment_checkout_window_minutes",
+          "latitude",
+          "longitude",
+          "contingency_fund_percent",
+          "budget_approved_at",
+          "contingency_fund_cents",
+          "accounting_currency",
+          "theme_template_id",
+          "theme_overrides"
+        ],
+        "title": "EventListItem",
+        "description": "Evento en el listado del panel: lo de `EventResponse` más su precio, que\nel organizador quiere ver en la tabla sin abrir cada evento."
       },
       "EventMemberCreate": {
         "properties": {
@@ -14901,14 +15680,33 @@
       "EventSessionCreate": {
         "properties": {
           "session_type": {
-            "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "talk",
+                  "workshop",
+                  "break",
+                  "service",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "type": "string",
@@ -15005,13 +15803,12 @@
         },
         "type": "object",
         "required": [
-          "session_type",
           "title",
           "starts_at",
           "ends_at"
         ],
         "title": "EventSessionCreate",
-        "description": "Alta de una sesión de agenda."
+        "description": "Alta de una sesión de agenda.\n\nEl tipo va por `session_type_id` (el catálogo de la organización). El texto\n`session_type` se sigue aceptando durante la transición: se traduce al tipo\ncon esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo\nque no es una pausa."
       },
       "EventSessionResponse": {
         "properties": {
@@ -15021,13 +15818,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -15126,6 +15920,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -15149,6 +15944,7 @@
                 "type": "string",
                 "enum": [
                   "talk",
+                  "workshop",
                   "break",
                   "service",
                   "other"
@@ -15159,6 +15955,17 @@
               }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "anyOf": [
@@ -15315,6 +16122,11 @@
       },
       "EventUpdate": {
         "properties": {
+          "mover_sesiones": {
+            "type": "boolean",
+            "title": "Mover Sesiones",
+            "default": false
+          },
           "title": {
             "anyOf": [
               {
@@ -15342,7 +16154,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -17313,6 +18126,33 @@
         "title": "MemberCreate",
         "description": "Alta de un miembro por correo electrónico."
       },
+      "MemberProfileUpdate": {
+        "properties": {
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data"
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_data"
+        ],
+        "title": "MemberProfileUpdate",
+        "description": "Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de\nlos campos actuales del rol), así se puede vaciar un campo opcional."
+      },
       "MemberResponse": {
         "properties": {
           "user_id": {
@@ -17387,6 +18227,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -18404,11 +19270,11 @@
         ],
         "title": "Page[AuditLogEntry]"
       },
-      "Page_EventResponse_": {
+      "Page_EventListItem_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/EventResponse"
+              "$ref": "#/components/schemas/EventListItem"
             },
             "type": "array",
             "title": "Items"
@@ -18433,7 +19299,7 @@
           "limit",
           "offset"
         ],
-        "title": "Page[EventResponse]"
+        "title": "Page[EventListItem]"
       },
       "Page_MediaResponse_": {
         "properties": {
@@ -20490,6 +21356,13 @@
             "type": "array",
             "title": "Sessions"
           },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicParticipant"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
           "venues": {
             "items": {
               "$ref": "#/components/schemas/PublicVenue"
@@ -20574,13 +21447,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -20677,6 +21547,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -20999,13 +21870,18 @@
               }
             ],
             "title": "Public Slug"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
           }
         },
         "type": "object",
         "required": [
           "display_name",
           "role_key",
-          "public_slug"
+          "public_slug",
+          "ref"
         ],
         "title": "PublicParticipant",
         "description": "Participante tal y como se muestra en las páginas públicas.\n\nNunca lleva el correo — a diferencia de `SessionParticipantResponse`, que es\npara el panel de administración. `public_slug` solo está presente si esa\npersona activó su perfil público; si no, es `None` y la página no enlaza a\nningún sitio."
@@ -21112,13 +21988,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -21236,6 +22109,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -23196,6 +24070,284 @@
         "title": "SessionParticipantsUpdate",
         "description": "Reemplazo completo de la lista de participantes de una sesión.\n\n`expected_updated_at` es el `updated_at` de la sesión que el cliente tenía\ncargado: si no coincide con el actual, la petición falla con 409 en vez de\nsobrescribir en silencio el trabajo de otra persona."
       },
+      "SessionParticipationOut": {
+        "properties": {
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "session_title": {
+            "type": "string",
+            "title": "Session Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "role_key": {
+            "type": "string",
+            "title": "Role Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_member_id",
+          "session_id",
+          "session_title",
+          "starts_at",
+          "ends_at",
+          "role_key"
+        ],
+        "title": "SessionParticipationOut",
+        "description": "Una persona del roster en una sesión, con su horario: lo justo para que\nel panel avise de solapes sin pedir los participantes sesión a sesión."
+      },
+      "SessionTypeCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "azul",
+              "violeta",
+              "verde",
+              "ambar",
+              "rosa",
+              "cian",
+              "rojo",
+              "gris"
+            ],
+            "title": "Color",
+            "default": "azul"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SessionTypeCreate"
+      },
+      "SessionTypeOrder": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "SessionTypeOrder",
+        "description": "Todos los tipos de la organización, en el orden nuevo."
+      },
+      "SessionTypeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "base_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Key"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "sesiones": {
+            "type": "integer",
+            "title": "Sesiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break",
+          "description",
+          "base_key",
+          "display_order",
+          "is_active",
+          "sesiones"
+        ],
+        "title": "SessionTypeOut",
+        "description": "Un tipo de sesión del catálogo de la organización."
+      },
+      "SessionTypeRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break"
+        ],
+        "title": "SessionTypeRef",
+        "description": "El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."
+      },
+      "SessionTypeUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "azul",
+                  "violeta",
+                  "verde",
+                  "ambar",
+                  "rosa",
+                  "cian",
+                  "rojo",
+                  "gris"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "is_break": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Break"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "SessionTypeUpdate"
+      },
       "SocialLinkInput": {
         "properties": {
           "kind": {
@@ -23397,6 +24549,10 @@
             "type": "string",
             "title": "Organization Member Id"
           },
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
           "user_id": {
             "type": "string",
             "title": "User Id"
@@ -23438,6 +24594,17 @@
             ],
             "title": "Titular"
           },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
           "sesiones": {
             "items": {
               "$ref": "#/components/schemas/SpeakerSessionOut"
@@ -23467,6 +24634,7 @@
         "type": "object",
         "required": [
           "organization_member_id",
+          "event_member_id",
           "user_id",
           "email",
           "first_name",

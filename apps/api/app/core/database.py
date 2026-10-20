@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.config import get_settings
+from app.core.tras_commit import despachar_tras_commit
 
 # Nombres deterministas para que Alembic genere migraciones estables.
 NAMING_CONVENTION = {
@@ -121,3 +122,4 @@ async def maintenance_session() -> AsyncIterator[AsyncSession]:
         except Exception:
             await session.rollback()
             raise
+        await despachar_tras_commit(session)

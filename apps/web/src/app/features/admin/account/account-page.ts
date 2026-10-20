@@ -1,5 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DOCUMENT,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 
 import { ApiError } from '../../../core/api/error.interceptor';
 import {
@@ -15,6 +25,7 @@ import { Checkbox } from '../../../shared/ui/checkbox';
 import { Input } from '../../../shared/ui/input';
 import { PasswordStrength, isPasswordValid } from '../../../shared/ui/password-strength';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { MemberProfileForm } from '../members/member-profile-form';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
@@ -28,13 +39,40 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
 @Component({
   selector: 'app-account-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, Checkbox, Input, PasswordStrength, PageHeader],
+  imports: [
+    TranslocoDirective,
+    Alert,
+    Button,
+    Card,
+    Checkbox,
+    Input,
+    PasswordStrength,
+    PageHeader,
+    Select,
+    MemberProfileForm,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.cuenta.rotulo')">
         {{ t('admin.cuenta.cabeceraInicio') }}
         <span class="mark">{{ t('admin.cuenta.cabeceraMarca') }}</span>
       </app-page-header>
+
+      @if (membresiasPublicables().length > 0) {
+        <section id="ficha">
+          @for (membresia of membresiasPublicables(); track membresia.organization_member_id) {
+            <app-card [heading]="t('admin.cuenta.ficha.titulo', { rol: membresia.role_name })">
+              <app-member-profile-form
+                [organizationMemberId]="membresia.organization_member_id"
+                [prefijo]="'ficha-' + membresia.organization_member_id"
+                [campos]="membresia.profile_fields ?? []"
+                [datos]="membresia.profile_data ?? {}"
+                [updatedAt]="membresia.updated_at ?? null"
+              />
+            </app-card>
+          }
+        </section>
+      }
 
       <app-card [heading]="t('admin.cuenta.perfil.titulo')">
         <form (submit)="guardarPerfil($event)" novalidate>
@@ -150,25 +188,12 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
         <app-card [heading]="t('admin.cuenta.perfilPublico.titulo')">
           <p>{{ t('admin.cuenta.perfilPublico.descripcion') }}</p>
           <form (submit)="guardarPerfilPublico($event)" novalidate>
-            <div class="campo-select">
-              <label for="perfil-publico-membresia">
-                {{ t('admin.cuenta.perfilPublico.membresia') }}
-              </label>
-              <select
-                id="perfil-publico-membresia"
-                [value]="membresiaElegida()"
-                (change)="alCambiarMembresia($event)"
-              >
-                @for (
-                  membresia of membresiasPublicables();
-                  track membresia.organization_member_id
-                ) {
-                  <option [value]="membresia.organization_member_id">
-                    {{ membresia.role_name }}
-                  </option>
-                }
-              </select>
-            </div>
+            <app-select
+              fieldId="perfil-publico-membresia"
+              [label]="t('admin.cuenta.perfilPublico.membresia')"
+              [options]="opcionesDeMembresia()"
+              [(value)]="membresiaElegida"
+            />
             <app-input
               [label]="t('admin.cuenta.perfilPublico.slug')"
               [hint]="t('admin.cuenta.perfilPublico.slugAyuda')"
@@ -224,14 +249,9 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
       gap: var(--space-md);
       max-width: 26rem;
     }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
+    app-select {
+      display: block;
       max-width: 26rem;
-    }
-    .campo-select select {
-      /* La pintura del control la da la regla compartida de styles.css. */
-      width: 100%;
     }
     .acciones-perfil-publico {
       display: flex;
@@ -242,6 +262,8 @@ const TIPOS_DE_ENLACE = ['twitter', 'linkedin', 'instagram', 'web'] as const;
 export class AccountPage {
   protected readonly auth = inject(AuthService);
   private readonly transloco = inject(TranslocoService);
+  private readonly documento = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   protected readonly nombreDe = displayName;
   protected readonly tiposDeEnlace = TIPOS_DE_ENLACE;
 
@@ -398,12 +420,26 @@ export class AccountPage {
       );
     } finally {
       this.cargandoPerfilPublico.set(false);
+      this.irALaFichaSiSePide();
     }
   }
 
-  protected alCambiarMembresia(evento: Event): void {
-    this.membresiaElegida.set((evento.target as HTMLSelectElement).value);
+  /** El correo que pide la biografía enlaza a `#ficha`, que se pinta tras cargar:
+   * el anclaje del router ya ha pasado y no la encontró. */
+  private irALaFichaSiSePide(): void {
+    if (this.documento.defaultView?.location.hash !== '#ficha') return;
+    afterNextRender(
+      () => this.documento.getElementById('ficha')?.scrollIntoView?.({ block: 'start' }),
+      { injector: this.injector },
+    );
   }
+
+  protected readonly opcionesDeMembresia = computed<SelectOption[]>(() =>
+    this.membresiasPublicables().map((membresia) => ({
+      value: membresia.organization_member_id,
+      label: membresia.role_name,
+    })),
+  );
 
   protected async comprobarSlug(): Promise<void> {
     const slug = this.slugPublico().trim();

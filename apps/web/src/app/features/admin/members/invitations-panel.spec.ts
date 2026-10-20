@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvitationsPanel } from './invitations-panel';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
+import { emularDialogoNativo, pulsarEnDialogo } from '../../../../testing/dialog';
+import { elegirEnSelect } from '../../../../testing/select';
 
 const ROLES = [{ id: 'r1', key: 'organizer', name: 'Organizador' }];
 
@@ -61,7 +63,7 @@ describe('InvitationsPanel', () => {
       ],
     });
     http = TestBed.inject(HttpTestingController);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    emularDialogoNativo();
   });
 
   afterEach(() => {
@@ -102,9 +104,7 @@ describe('InvitationsPanel', () => {
     const email = fixture.nativeElement.querySelector('#invitacion-email') as HTMLInputElement;
     email.value = 'nueva@example.com';
     email.dispatchEvent(new Event('input'));
-    const select = fixture.nativeElement.querySelector('#invitacion-rol') as HTMLSelectElement;
-    select.value = 'r1';
-    select.dispatchEvent(new Event('change'));
+    elegirEnSelect(fixture, 'invitacion-rol', 'r1');
     await avanzar(fixture);
 
     fixture.nativeElement.querySelector('.formulario-invitar').dispatchEvent(new Event('submit'));
@@ -122,7 +122,7 @@ describe('InvitationsPanel', () => {
     expect(fixture.nativeElement.textContent).toContain('Invitación enviada');
   });
 
-  it('revocar pide confirmación y, si se acepta, llama al endpoint y recarga', async () => {
+  it('revocar pide confirmación en un modal y, si se acepta, llama al endpoint y recarga', async () => {
     const fixture = await crearYCargar(http, [INVITACION]);
 
     const botones = Array.from(
@@ -132,7 +132,12 @@ describe('InvitationsPanel', () => {
     revocar?.click();
     await avanzar(fixture);
 
-    expect(window.confirm).toHaveBeenCalled();
+    http.expectNone('/api/v1/organizations/me/invitations/i1');
+    expect(fixture.nativeElement.querySelector('dialog[open]')?.textContent).toContain(
+      '¿Revocar esta invitación?',
+    );
+    pulsarEnDialogo(fixture, 'Revocar');
+    await avanzar(fixture);
     http.expectOne('/api/v1/organizations/me/invitations/i1').flush(null);
     await avanzar(fixture);
 

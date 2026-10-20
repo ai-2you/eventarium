@@ -1,6 +1,14 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Dialog } from '../../../shared/ui/dialog';
 import { firstValueFrom } from 'rxjs';
 
 import { version as VERSION_WEB } from '../../../../../package.json';
@@ -8,6 +16,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Card } from '../../../shared/ui/card';
 import { Chip, ChipTone } from '../../../shared/ui/chip';
 import { DataTable, DataTableColumn } from '../../../shared/ui/data-table';
@@ -64,6 +73,8 @@ const AUDIT_LOG_URL = '/admin/audit-log';
     ChangelogPanel,
     Chip,
     DataTable,
+    DatetimePicker,
+    Dialog,
     Input,
     KpiCard,
     PageHeader,
@@ -144,24 +155,16 @@ const AUDIT_LOG_URL = '/admin/audit-log';
             [label]="t('admin.superadmin.auditoria.accion')"
             [(value)]="filtroAccion"
           />
-          <div class="campo-fecha">
-            <label for="auditoria-desde">{{ t('admin.superadmin.auditoria.desde') }}</label>
-            <input
-              id="auditoria-desde"
-              type="datetime-local"
-              [value]="filtroDesde()"
-              (change)="filtroDesde.set(alValorDe($event))"
-            />
-          </div>
-          <div class="campo-fecha">
-            <label for="auditoria-hasta">{{ t('admin.superadmin.auditoria.hasta') }}</label>
-            <input
-              id="auditoria-hasta"
-              type="datetime-local"
-              [value]="filtroHasta()"
-              (change)="filtroHasta.set(alValorDe($event))"
-            />
-          </div>
+          <app-datetime-picker
+            fieldId="auditoria-desde"
+            [label]="t('admin.superadmin.auditoria.desde')"
+            [(value)]="filtroDesde"
+          />
+          <app-datetime-picker
+            fieldId="auditoria-hasta"
+            [label]="t('admin.superadmin.auditoria.hasta')"
+            [(value)]="filtroHasta"
+          />
           <app-button type="submit" [loading]="cargandoAuditoria()">
             {{ t('admin.superadmin.auditoria.filtrar') }}
           </app-button>
@@ -292,6 +295,28 @@ const AUDIT_LOG_URL = '/admin/audit-log';
       }
 
       <app-changelog-panel class="bloque" [versiones]="changelog" />
+
+      <app-dialog #dialogoBorrar>
+        <p>{{ t('admin.superadmin.borrar.confirmar') }}</p>
+        <app-button
+          pie
+          variant="secundario"
+          type="button"
+          [disabled]="borrando()"
+          (pulsado)="dialogoBorrar.cerrar()"
+        >
+          {{ t('comun.cancelar') }}
+        </app-button>
+        <app-button
+          pie
+          variant="peligro"
+          type="button"
+          [loading]="borrando()"
+          (pulsado)="confirmarBorrado()"
+        >
+          {{ t('admin.superadmin.borrar.boton') }}
+        </app-button>
+      </app-dialog>
     </ng-container>
   `,
   styles: `
@@ -304,19 +329,6 @@ const AUDIT_LOG_URL = '/admin/audit-log';
       align-items: end;
       gap: var(--space-md);
       margin-bottom: var(--space-md);
-    }
-    .campo-fecha {
-      display: grid;
-      gap: var(--space-xs);
-    }
-    .campo-fecha input {
-      padding: 0.625rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background-color: var(--surface);
-      color: var(--fg);
-      font: inherit;
-      min-height: 2.75rem;
     }
     .formulario {
       display: grid;
@@ -547,10 +559,6 @@ export class SuperadminPage {
     return `${tipo} · ${id.slice(0, 8)}…`;
   }
 
-  protected alValorDe(evento: Event): string {
-    return (evento.target as HTMLInputElement).value;
-  }
-
   /** El detalle como pares «clave: valor» sin llaves ni comillas: sigue siendo
    * exactamente lo que registró el backend (los importes siguen como
    * [redactado]), pero sin la sintaxis JSON por delante. */
@@ -633,15 +641,18 @@ export class SuperadminPage {
     }
   }
 
-  protected async borrar(evento: Event): Promise<void> {
+  private readonly dialogoBorrar = viewChild.required<Dialog>('dialogoBorrar');
+
+  /** Pide confirmación con el modal del sistema de diseño, nunca con un
+   * diálogo nativo del navegador. */
+  protected borrar(evento: Event): void {
     evento.preventDefault();
-    if (typeof window !== 'undefined') {
-      const confirmado = window.confirm(
-        this.transloco.translate('admin.superadmin.borrar.confirmar'),
-      );
-      if (!confirmado) {
-        return;
-      }
+    this.dialogoBorrar().abrir();
+  }
+
+  protected async confirmarBorrado(): Promise<void> {
+    if (this.borrando()) {
+      return;
     }
     this.errorBorrar.set(null);
     this.borrarOk.set(false);
@@ -667,6 +678,7 @@ export class SuperadminPage {
       );
     } finally {
       this.borrando.set(false);
+      this.dialogoBorrar().cerrar();
     }
   }
 }

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.events.models import EventCategory
 from app.shared.errors import ValidationDomainError
 
-MAX_ETIQUETAS = 5
+MAX_ETIQUETAS = 10
 MAX_ETIQUETAS_EN_UN_FILTRO = 3
 LONGITUD_MIN_ETIQUETA = 2
 LONGITUD_MAX_ETIQUETA = 30

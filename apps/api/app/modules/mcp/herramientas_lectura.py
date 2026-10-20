@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.ratelimit import TooManyRequestsError, consumir_por_conexion_mcp
 from app.modules.events import categories as events_categories
 from app.modules.events import repository as events_repository
+from app.modules.events import session_types
 from app.modules.events.models import Event
 from app.modules.mcp import schemas
 from app.modules.mcp.contexto import ContextoMcp, ErrorDeHerramienta, contexto_actual, sesion
@@ -127,6 +128,26 @@ def registrar(mcp: MCPServer) -> None:
             return [_resumen(evento) for evento in eventos]
 
     @mcp.tool(annotations=LECTURA)
+    async def listar_tipos_de_sesion() -> list[schemas.TipoDeSesion]:
+        """Tipos de sesión activos de la organización (Charla, Taller, Mesa
+        redonda…), para usar su nombre como `tipo` al añadir o editar sesiones.
+        Las pausas (descanso, comida…) no piden ponentes."""
+        contexto = await preparar()
+        contexto.exigir_ambito(Ambito.EVENTOS_LEER)
+        async with sesion(contexto) as session:
+            filas = await session_types.listar(session, contexto.organization_id, solo_activos=True)
+            return [
+                schemas.TipoDeSesion(
+                    id=str(tipo.id),
+                    nombre=tipo.name,
+                    descripcion=tipo.description,
+                    es_pausa=tipo.is_break,
+                    clave_base=tipo.base_key,
+                )
+                for tipo, _ in filas
+            ]
+
+    @mcp.tool(annotations=LECTURA)
     async def listar_categorias() -> list[schemas.Categoria]:
         """Categorías activas del catálogo de la plataforma, para usar su
         `slug` como `categoria` al crear o editar un evento o al filtrar."""
@@ -183,7 +204,7 @@ def registrar(mcp: MCPServer) -> None:
                     schemas.Sesion(
                         id=str(s.id),
                         titulo=s.title,
-                        tipo=s.session_type,
+                        tipo=s.tipo.name,
                         inicio=s.starts_at,
                         fin=s.ends_at,
                         sala=s.room,

@@ -16,6 +16,7 @@ import { esperarSinViolacionesDeAccesibilidad } from '../../testing/axe';
 import { brandingDePrueba } from '../../testing/branding.fixture';
 import es from '../../../public/assets/i18n/es-ES.json';
 import { themingDePrueba } from '../../testing/theming.fixture';
+import { TODOS_LOS_PERMISOS } from '../../testing/auth';
 
 /**
  * Los shells contienen los landmarks, el enlace de salto y la navegación: son la parte
@@ -43,6 +44,8 @@ describe('shells', () => {
         is_superadmin: esSuperadmin,
       }),
       isAuthenticated: signal(true),
+      permisos: signal(TODOS_LOS_PERMISOS),
+      roles: signal(['owner']),
       cierreFueDeliberado: signal(false),
       refresh: vi.fn().mockResolvedValue(false),
       logout: vi.fn(),
@@ -155,7 +158,11 @@ describe('shells', () => {
     // Sin sesión: el menú (que ahora reacciona al estado real) muestra las
     // opciones de invitado.
     TestBed.overrideProvider(AuthService, {
-      useValue: { ...configurarAuth(false), currentUser: signal(null), isAuthenticated: signal(false) },
+      useValue: {
+        ...configurarAuth(false),
+        currentUser: signal(null),
+        isAuthenticated: signal(false),
+      },
     });
     const fixture = TestBed.createComponent(PublicShell);
     await fixture.whenStable();

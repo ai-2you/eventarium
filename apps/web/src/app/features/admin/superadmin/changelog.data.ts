@@ -31,6 +31,164 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
+    version: '0.27.25',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Tipos de sesión propios de cada organización',
+            descripcion:
+              'En «Tipos de sesión» cada organización renombra, ordena, colorea y desactiva sus tipos (Charla, Taller, Descanso, Servicio y Otro de serie) y crea los suyos, como Mesa redonda o Keynote. Los que son pausa se pintan apagados y no piden ponentes. La agenda pública muestra el nombre y el color de cada tipo, y el asistente por MCP los usa por su nombre.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Pagar una entrada, sin pasar antes por el correo',
+            descripcion:
+              'En un evento de pago, tras el formulario se va directamente a la pasarela: ya no hace falta abrir antes un enlace de verificación en el correo (pagar ya confirma a la persona).',
+          },
+          {
+            titulo: 'La ficha de un evento con talleres ya no falla',
+            descripcion:
+              'Un evento con sesiones de tipo «Taller» daba error al abrir su ficha pública.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.27.18',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Asignar sesión desde la pantalla de ponentes',
+            descripcion:
+              'Cada ponente tiene «Asignar a sesión»: eliges una sesión de la agenda y el rol sin cambiar de pantalla, y se avisa si ya tiene otra a la misma hora.',
+          },
+          {
+            titulo: 'Mover la agenda al cambiar las fechas del evento',
+            descripcion:
+              'Si cambias las fechas de un evento y alguna sesión quedaría fuera, el panel lo dice y ofrece moverlas todas con el evento (aplazar una semana mueve la agenda entera).',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Ponentes: sus sesiones y su biografía a la vista',
+            descripcion:
+              'La tabla de ponentes lista todas las sesiones de cada persona; «Asignar sesión» solo aparece si no tiene ninguna, y «Pedir bio» pasa a «Ver bio» en cuanto la ha escrito.',
+          },
+          {
+            titulo: 'Editar una sesión, debajo de la sesión',
+            descripcion:
+              'En la agenda, «Editar» abre el formulario justo debajo de la sesión, igual que los participantes, en vez de al final de la página.',
+          },
+          {
+            titulo: 'Sesiones dentro de las fechas del evento',
+            descripcion:
+              'El calendario de una sesión solo deja elegir días y horas del evento, y avisa en el momento si el fin va antes que el inicio.',
+          },
+          {
+            titulo: 'Rol de cada participante en un desplegable',
+            descripcion:
+              'En «Gestionar participantes» el rol se elige de una lista (ponente, moderación, presentación) y se avisa de quien ya está en otra sesión a la misma hora.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.27.11',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Vista previa de los eventos, también en borrador',
+            descripcion:
+              'Desde el listado de eventos, «Vista previa» abre la ficha tal y como la verá el público, aunque el evento aún no esté publicado. Solo la ve el equipo y no aparece en buscadores.',
+          },
+          {
+            titulo: 'Modo, precio y aforo en el listado de eventos',
+            descripcion:
+              'La tabla de eventos del panel muestra si la inscripción es de acceso libre, con aprobación o de pago, cuánto cuesta (o «Desde» si hay varios precios) y el aforo.',
+          },
+          {
+            titulo: 'Aviso al organizador por cada inscripción',
+            descripcion:
+              'Quien gestiona las inscripciones recibe un correo con cada inscripción nueva (confirmada, en lista de espera, pendiente de aprobación o pagada), con enlace a su ficha en el panel. Si nadie del equipo puede recibirlo, va al correo de contacto de la organización.',
+          },
+          {
+            titulo: 'Correo de «pendiente de aprobación» al participante',
+            descripcion:
+              'En los eventos con aprobación, quien se inscribe recibe un correo que le confirma que su solicitud está pendiente, y otro cuando se acepta o se rechaza.',
+          },
+          {
+            titulo: 'Ficha de ponente editable',
+            descripcion:
+              'El ponente completa su biografía y el resto de su ficha desde «Mi cuenta», adonde lleva el correo que se la pide. El organizador también puede completarla desde Miembros.',
+          },
+          {
+            titulo: 'Ponentes enlazados en la ficha pública del evento',
+            descripcion:
+              'Enlazar un ponente al evento basta para que salga en la sección de ponentes, aunque aún no tenga sesión en la agenda. Sin perfil público sale con su nombre y sin enlace.',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Formulario del evento completo',
+            descripcion:
+              'Se pueden poner el resumen, la descripción (con editor de texto enriquecido), el modo de inscripción con sus precios y el aforo. El identificador se genera desde el título, las etiquetas se escriben como píldoras con sugerencias (hasta 10) y la fecha y la hora se piden por separado.',
+          },
+          {
+            titulo: 'Desplegables y avisos modernos en toda la aplicación',
+            descripcion:
+              'Fuera los desplegables nativos y las ventanas del navegador: todo usa los desplegables y los diálogos de la propia aplicación.',
+          },
+          {
+            titulo: 'El panel solo muestra lo que cada rol puede usar',
+            descripcion:
+              'El menú y las pantallas del panel se ajustan a los permisos de cada persona: un ponente solo ve su cuenta y su ficha.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Sin aviso doble al pagar desde la lista de espera',
+            descripcion:
+              'Quien paga su entrada tras salir de la lista de espera o tras ser aprobado ya no genera un segundo aviso al organizador.',
+          },
+          {
+            titulo: 'Las cuentas dadas de baja dejan de anunciarse',
+            descripcion:
+              'Un ponente con la cuenta dada de baja ya no sale en la ficha del evento, ni en la agenda, ni conserva su perfil público.',
+          },
+          {
+            titulo: 'Enlaces internos en los textos legales',
+            descripcion:
+              'Los textos legales y las políticas pueden enlazar a otras páginas del sitio (por ejemplo «/legal/cookies») o a un apartado del propio texto.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.27.0',
     fecha: '2026-10-02',
     secciones: [

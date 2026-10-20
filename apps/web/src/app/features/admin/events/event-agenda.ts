@@ -8,7 +8,6 @@ import {
   inject,
   input,
   signal,
-  viewChild,
 } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -22,6 +21,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { isoAValorLocal } from './datetime-local';
 import { EventRoster, type RosterMember } from './event-roster';
 import { EventVenues } from './event-venues';
+import { SessionTypeChip } from '../../../shared/ui/session-type-chip';
 import { SessionForm, type EventSession } from './session-form';
 import { SessionParticipants } from './session-participants';
 
@@ -52,6 +52,7 @@ interface DiaDeAgenda {
     EventRoster,
     EventVenues,
     SessionForm,
+    SessionTypeChip,
     SessionParticipants,
     PageHeader,
   ],
@@ -84,6 +85,15 @@ interface DiaDeAgenda {
                   <li>
                     <div class="fila">
                       <div>
+                        @if (sesion.type; as tipo) {
+                          <app-session-type-chip
+                            class="tipo"
+                            [nombre]="tipo.name"
+                            [color]="tipo.color"
+                            [pausa]="tipo.is_break"
+                            [compacto]="true"
+                          />
+                        }
                         <strong>{{ sesion.title }}</strong>
                         <span class="detalle">
                           {{ sesion.starts_at | date: 'shortTime' }} –
@@ -110,12 +120,26 @@ interface DiaDeAgenda {
                       </div>
                     </div>
 
+                    @if (sesionEnEdicion()?.id === sesion.id) {
+                      <!-- La edición se abre bajo su sesión, como los participantes. -->
+                      <div class="edicion-en-linea">
+                        <app-session-form
+                          [eventId]="eventId()"
+                          [sesion]="sesion"
+                          (guardada)="alGuardarSesion()"
+                          (cancelada)="sesionEnEdicion.set(null)"
+                        />
+                      </div>
+                    }
+
                     @if (editandoParticipantesId() === sesion.id) {
                       <app-session-participants
                         [eventId]="eventId()"
                         [sessionId]="sesion.id"
                         [updatedAt]="sesion.updated_at"
                         [roster]="roster()"
+                        [inicio]="sesion.starts_at"
+                        [fin]="sesion.ends_at"
                         (guardado)="alGuardarParticipantes()"
                       />
                     }
@@ -125,18 +149,30 @@ interface DiaDeAgenda {
             }
           }
 
-          <app-session-form
-            #formulario
-            [eventId]="eventId()"
-            [sesion]="sesionEnEdicion()"
-            (guardada)="alGuardarSesion()"
-            (cancelada)="sesionEnEdicion.set(null)"
-          />
+          <!-- Alta de sesiones. Mientras se edita una, se oculta: sus campos
+               comparten identificadores con el formulario en línea. -->
+          @if (!sesionEnEdicion()) {
+            <app-session-form
+              [eventId]="eventId()"
+              (guardada)="alGuardarSesion()"
+              (cancelada)="sesionEnEdicion.set(null)"
+            />
+          }
         </app-card>
       </div>
     </ng-container>
   `,
   styles: `
+    .tipo {
+      margin-right: var(--space-sm);
+      vertical-align: 2px;
+    }
+    .edicion-en-linea {
+      margin-top: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background-color: var(--surface-2);
+      border-radius: var(--radius-md);
+    }
     /* \`ng-container\` no genera elemento: cabecera, la fila de sedes+roster y
      * la tarjeta de sesiones son hijos directos de este host. Un componente
      * sin \`display\` propio es \`inline\` por defecto, donde un margen
@@ -204,7 +240,6 @@ export class EventAgenda implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
-  private readonly formulario = viewChild<SessionForm>('formulario');
 
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -234,9 +269,9 @@ export class EventAgenda implements OnInit {
     this.roster.set(roster);
   }
 
+  /** Abre la edición bajo la sesión (y cierra la de otra, si la había). */
   protected editar(sesion: EventSession): void {
-    this.sesionEnEdicion.set(sesion);
-    this.formulario()?.cargarSesion(sesion);
+    this.sesionEnEdicion.set(this.sesionEnEdicion()?.id === sesion.id ? null : sesion);
   }
 
   protected alGuardarSesion(): void {
