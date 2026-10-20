@@ -107,7 +107,11 @@
       "cancelado": "Cancelado",
       "noEncontrada": "Esta organización no tiene página pública.",
       "verEventos": "Ver todos los eventos",
-      "descripcionPorDefecto": "Eventos de {{nombre}}."
+      "descripcionPorDefecto": "Eventos de {{nombre}}.",
+      "web": "Web",
+      "direccion": "Dirección",
+      "redes": "Redes sociales",
+      "redEnlace": "{{red}} (se abre en otra pestaña)"
     },
     "noEncontrada": {
       "mensaje": "No hemos encontrado esa página.",
@@ -1068,7 +1072,20 @@
       "error": "No hemos podido guardar los cambios.",
       "rotulo": "Organización",
       "cabeceraInicio": "Los datos públicos de la organización:",
-      "cabeceraMarca": "lo que verá todo el mundo"
+      "cabeceraMarca": "lo que verá todo el mundo",
+      "codigoPostal": "Código postal",
+      "ciudad": "Ciudad o localidad",
+      "provincia": "Provincia",
+      "direccionPublica": "Mostrar la dirección en la página pública",
+      "direccionPublicaPista": "La dirección se guarda siempre (para facturas y avisos legales); desactívala si no quieres que se vea.",
+      "redes": {
+        "titulo": "Redes sociales",
+        "ayuda": "Pega el enlace de cada red que tengáis; las vacías no se muestran.",
+        "libreNombre": "Otro enlace: nombre",
+        "libreNombreAyuda": "Por ejemplo: Mastodon, Bluesky, Discord.",
+        "libreUrl": "Otro enlace: dirección",
+        "libreIncompleto": "El otro enlace necesita nombre y dirección."
+      }
     },
     "branding": {
       "rotulo": "Marca",
