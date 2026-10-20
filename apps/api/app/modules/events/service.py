@@ -177,6 +177,13 @@ async def create_event(
             ),
         }
 
+    # 48 h en los de pago: con el plazo de reembolso de 24 h, a tiempo de
+    # cancelar con devolución desde el propio recordatorio.
+    if datos.get("reminder_hours_before") is None:
+        datos = {
+            **datos,
+            "reminder_hours_before": 48 if datos.get("registration_mode") == "paid" else 24,
+        }
     evento = Event(organization_id=organization_id, **datos)
     try:
         # Punto de guardado: tras un `IntegrityError` la transacción sigue

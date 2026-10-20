@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
     AfterValidator,
@@ -29,6 +30,9 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
+# Horas antes del inicio a las que sale el recordatorio a los inscritos. Mismo
+# conjunto que el `CHECK` de base de datos, el MCP y el desplegable del panel.
+ReminderHours = Literal[2, 6, 12, 24, 48, 72]
 
 # Markdown del editor del panel (o de la API/MCP). El tope protege la ficha
 # pública, que lo convierte y sanea en el navegador de cada visitante, y el
@@ -116,6 +120,18 @@ def _etiquetas_normalizadas(valor: list[str]) -> list[str]:
     return normalizar_etiquetas(valor)
 
 
+def _zona_horaria_valida(valor: str | None) -> str | None:
+    """Una zona IANA que `zoneinfo` conozca: con otra, las horas de los correos
+    del evento no se podrían calcular."""
+    if valor is None:
+        return None
+    try:
+        ZoneInfo(valor)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError("La zona horaria no es válida: usa una del tipo «Europe/Madrid».") from exc
+    return valor
+
+
 class EventCreate(BaseModel):
     """Alta de un evento."""
 
@@ -148,6 +164,14 @@ class EventCreate(BaseModel):
     # pagar antes de que su plaza reservada caduque. Rango igual al `CHECK` de
     # base de datos, para rechazar el valor en el schema y no solo allí.
     payment_checkout_window_minutes: Annotated[int, Field(ge=30, le=1439)] = 30
+    reminder_enabled: bool = True
+    # Sin valor, el servicio pone 24 h (48 h en eventos de pago).
+    reminder_hours_before: ReminderHours | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _validar_zona(cls, valor: str | None) -> str | None:
+        return _zona_horaria_valida(valor)
 
     @model_validator(mode="after")
     def _validar_fechas(self) -> EventCreate:
@@ -190,6 +214,14 @@ class EventUpdate(BaseModel):
     registration_opens_at: datetime | None = None
     email_verification_required: bool | None = None
     payment_checkout_window_minutes: Annotated[int, Field(ge=30, le=1439)] | None = None
+    reminder_enabled: bool | None = None
+    reminder_hours_before: ReminderHours | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _validar_zona(cls, valor: str | None) -> str | None:
+        return _zona_horaria_valida(valor)
+
     # Único campo de contabilidad editable desde este esquema (plan.md
     # Decisión #6): `budget_approved_at`/`contingency_fund_cents` nunca
     # viajan por aquí, solo por el servicio de `accounting`. El servicio de
@@ -271,6 +303,9 @@ class EventResponse(BaseModel):
     registration_opens_at: datetime | None
     email_verification_required: bool
     payment_checkout_window_minutes: int
+    reminder_enabled: bool
+    reminder_hours_before: int
+    attendance_closed_at: datetime | None = None
     # Resultado de geocodificar `location_address` (Nominatim); nunca los rellena
     # el organizador directamente, ver `EventCreate`/`EventUpdate`.
     latitude: float | None

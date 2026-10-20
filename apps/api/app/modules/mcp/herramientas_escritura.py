@@ -196,12 +196,17 @@ def registrar(mcp: MCPServer) -> None:
         zona_horaria: str = "Europe/Madrid",
         categoria: str | None = None,
         etiquetas: list[str] | None = None,
+        recordatorio: bool | None = None,
+        recordatorio_horas: int | None = None,
     ) -> schemas.EventoResumen:
         """Crea un evento **en borrador**. La persona lo revisa y lo publica
         desde Eventarium (o con `publicar_evento`, si la conexión lo permite).
         `formato`: in_person, online o hybrid. `modo_inscripcion`: free,
         approval o paid. `categoria`: slug de una categoría activa (ver
-        `listar_categorias`). `etiquetas`: hasta 10, de 2 a 30 caracteres."""
+        `listar_categorias`). `etiquetas`: hasta 10, de 2 a 30 caracteres.
+        `recordatorio`: si se avisa a los inscritos antes del evento (por
+        defecto, sí); `recordatorio_horas`: 2, 6, 12, 24, 48 o 72 horas antes
+        (por defecto 24, o 48 en eventos de pago)."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         if contexto.event_ids is not None:
@@ -226,6 +231,8 @@ def registrar(mcp: MCPServer) -> None:
                 description=descripcion,
                 timezone=zona_horaria,
                 tags=etiquetas,
+                reminder_enabled=recordatorio,
+                reminder_hours_before=recordatorio_horas,
             ),
         ).model_dump(exclude_unset=True)
         datos["status"] = "draft"
@@ -258,6 +265,8 @@ def registrar(mcp: MCPServer) -> None:
         categoria: str | None = None,
         etiquetas: list[str] | None = None,
         mover_sesiones: bool = False,
+        recordatorio: bool | None = None,
+        recordatorio_horas: int | None = None,
     ) -> schemas.EventoResumen:
         """Cambia los datos de un evento. No cambia su estado: para eso están
         `publicar_evento`, `despublicar_evento` y `cancelar_evento`.
@@ -267,7 +276,8 @@ def registrar(mcp: MCPServer) -> None:
         mismo intervalo que el inicio (para aplazar un evento). Sin él, si
         alguna sesión quedara fuera de las fechas nuevas, no se guarda nada y
         el error dice cuáles; vuelve a llamar con `mover_sesiones=True` o
-        ajusta antes esas sesiones."""
+        ajusta antes esas sesiones. `recordatorio` y `recordatorio_horas`:
+        como en `crear_evento`."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(
@@ -285,6 +295,8 @@ def registrar(mcp: MCPServer) -> None:
             summary=resumen,
             description=descripcion,
             tags=etiquetas,
+            reminder_enabled=recordatorio,
+            reminder_hours_before=recordatorio_horas,
         )
         if categoria is not None:
             cambios["category_id"] = None  # se resuelve con la sesión abierta
