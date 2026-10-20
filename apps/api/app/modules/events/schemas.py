@@ -662,6 +662,8 @@ class PublicSessionDetail(PublicEventSession):
 
     event_slug: str
     event_title: str
+    # `hidden` = «solo con enlace»: la web lo marca `noindex` en todas sus páginas.
+    visibility: EventVisibility = "public"
     organization: PublicOrganizationRef
     # Plantilla del evento padre, ya resuelta: la página la aplica igual que la
     # ficha del evento para no cambiar de aspecto al navegar dentro de él.
@@ -693,6 +695,8 @@ class PublicEventDetail(BaseModel):
     tags: list[str] = Field(default_factory=list)
     cancelled: bool = False
     cancellation_reason: str | None = None
+    # `hidden` = «solo con enlace»: la web lo marca `noindex` en todas sus páginas.
+    visibility: EventVisibility = "public"
     title: str
     summary: str | None
     description: str | None

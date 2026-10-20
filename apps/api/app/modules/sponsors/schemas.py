@@ -198,6 +198,8 @@ class PublicSponsorDetail(BaseModel):
     tier_benefits: str | None
     event_slug: str
     event_title: str
+    # Visibilidad del evento: `hidden` («solo con enlace») se marca `noindex`.
+    visibility: Literal["public", "hidden", "private"] = "public"
     organization: PublicOrganizationRef
     history: list[PublicSponsorHistoryItem]
     # Plantilla del evento padre, ya resuelta: la página la aplica igual que la

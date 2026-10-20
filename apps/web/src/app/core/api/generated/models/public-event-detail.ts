@@ -47,4 +47,5 @@ export interface PublicEventDetail {
   timezone: string;
   title: string;
   venues?: Array<PublicVenue>;
+  visibility?: 'public' | 'hidden' | 'private';
 }

@@ -356,6 +356,7 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
         )
         precio = precios.get(evento.id)
     return PublicEventDetail(
+        visibility=evento.visibility,  # type: ignore[arg-type]
         slug=evento.slug,
         category=categoria_publica(evento),
         tags=list(evento.tags),
@@ -436,6 +437,7 @@ async def get_public_sponsor(
     ).all()
 
     return PublicSponsorDetail(
+        visibility=evento.visibility,  # type: ignore[arg-type]
         id=str(patrocinador.id),
         name=patrocinador.name,
         logo_url=await _sponsor_logo_url(session, patrocinador),
@@ -512,6 +514,7 @@ async def get_public_session(
     ]
 
     return PublicSessionDetail(
+        visibility=evento.visibility,  # type: ignore[arg-type]
         id=str(sesion.id),
         session_type=sesion.session_type,
         type=SessionTypeRef(**session_types.referencia(sesion.tipo)),

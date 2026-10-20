@@ -21532,6 +21532,16 @@
             ],
             "title": "Cancellation Reason"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -22461,6 +22471,16 @@
             "type": "string",
             "title": "Event Title"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"
           },
@@ -22737,6 +22757,16 @@
           "event_title": {
             "type": "string",
             "title": "Event Title"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
           },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"
