@@ -28,7 +28,7 @@ from app.core.tasks import (
     send_registration_waitlisted_email,
     send_waitlist_promotion_email,
 )
-from app.core.tras_commit import encolar_tras_commit
+from app.core.tras_commit import despachar_tras_commit, encolar_tras_commit
 from app.modules.auth.verification import (
     PROPOSITO_CANCELACION_INSCRIPCION,
     PROPOSITO_PROMOCION_LISTA_ESPERA,
@@ -384,12 +384,18 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
         PROPOSITO_PROMOCION_LISTA_ESPERA, str(siguiente.id), ttl=ventana
     )
     cancel_token = await _generar_token_cancelacion(siguiente.id)
-    await send_waitlist_promotion_email.kiq(
-        siguiente.email,
-        str(siguiente.organization_id),
-        confirm_token,
-        cancel_token,
-        fecha_y_hora(ahora + ventana, evento.timezone),
+    # Tras el commit: si la transacción se aborta, nadie recibe una plaza que
+    # no se ha llegado a guardar.
+    encolar_tras_commit(
+        session,
+        partial(
+            send_waitlist_promotion_email.kiq,
+            siguiente.email,
+            str(siguiente.organization_id),
+            confirm_token,
+            cancel_token,
+            fecha_y_hora(ahora + ventana, evento.timezone),
+        ),
     )
     return True
 
@@ -1004,6 +1010,9 @@ async def expire_waitlist_promotions() -> None:
             # nueva ignoraba el aforo si se había bajado entretanto.
             await promover_lista_de_espera_hasta_llenar(session, evento)
             await session.commit()
+            # Evento a evento: si uno posterior falla, los ya guardados no se
+            # quedan sin su correo.
+            await despachar_tras_commit(session)
 
 
 async def get_registration_stats(

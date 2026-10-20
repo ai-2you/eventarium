@@ -718,6 +718,12 @@ async def replace_session_participants(
     if sesion.updated_at != expected_updated_at:
         raise ConflictError("La agenda cambió desde que la cargaste. Recarga antes de guardar.")
 
+    # Una pausa (descanso, comida…) no lleva ponentes; vaciar su lista sí se permite.
+    if entries and sesion.session_type_id is not None:
+        tipo = await session.get(SessionType, sesion.session_type_id)
+        if tipo is not None and tipo.is_break:
+            raise ValidationDomainError("Una pausa no lleva ponentes.")
+
     ids_del_roster = await repository.event_member_ids(session, organization_id, event_id)
     for entrada in entries:
         if entrada["event_member_id"] not in ids_del_roster:
