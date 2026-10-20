@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import type { PublicEventSession, PublicVenue } from '../event-page.types';
+import { type PublicEventSession, type PublicVenue, esPausa } from '../event-page.types';
 import { estiloDeSede } from '../venue-colors';
 
 /** Franja de la parrilla, en minutos: el prototipo usa 30 (`evento-multisede.html:207`). */
@@ -286,7 +286,7 @@ export class VenueGridSection {
         franjas: Math.max(1, Math.round((fin - inicio) / FRANJA_MINUTOS)),
         horaInicio: hhmm(inicio),
         horaFin: hhmm(fin),
-        esDescanso: sesion.session_type === 'break',
+        esDescanso: esPausa(sesion),
       });
     }
 

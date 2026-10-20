@@ -143,4 +143,26 @@ describe('SpeakerSessionAssign', () => {
     http.expectNone((p) => p.method === 'PUT');
     expect(fixture.nativeElement.textContent).toContain('Ya está asignado a esa sesión');
   });
+
+  it('no ofrece las sesiones de pausa', async () => {
+    const fixture = TestBed.createComponent(SpeakerSessionAssign);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.componentRef.setInput('eventMemberId', 'm1');
+    await avanzar(fixture);
+    http.expectOne(`${BASE}/sessions`).flush([
+      ...SESIONES,
+      {
+        ...sesion('s3', 'Café', '2030-01-01T12:00:00Z', '2030-01-01T12:30:00Z'),
+        type: { id: 'tp', name: 'Descanso', color: 'gris', is_break: true },
+      },
+    ]);
+    http.expectOne(`${BASE}/participations`).flush([]);
+    await avanzar(fixture);
+    await avanzar(fixture);
+
+    const opciones = fixture.nativeElement.querySelectorAll('#asignar-sesion-nativo option');
+    const textos = Array.from(opciones as NodeListOf<HTMLOptionElement>).map((o) => o.textContent);
+    expect(textos.some((texto) => texto?.includes('Café'))).toBe(false);
+    expect(textos.some((texto) => texto?.includes('Mesa redonda'))).toBe(true);
+  });
 });
