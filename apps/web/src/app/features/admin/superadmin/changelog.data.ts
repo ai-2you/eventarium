@@ -31,7 +31,7 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
-    version: '0.27.24',
+    version: '0.27.25',
     fecha: '2026-10-20',
     secciones: [
       {
@@ -47,6 +47,11 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
       {
         categoria: 'corregido',
         items: [
+          {
+            titulo: 'Pagar una entrada, sin pasar antes por el correo',
+            descripcion:
+              'En un evento de pago, tras el formulario se va directamente a la pasarela: ya no hace falta abrir antes un enlace de verificación en el correo (pagar ya confirma a la persona).',
+          },
           {
             titulo: 'La ficha de un evento con talleres ya no falla',
             descripcion:
