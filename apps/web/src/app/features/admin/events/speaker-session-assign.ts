@@ -120,7 +120,10 @@ export class SpeakerSessionAssign implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
-  private readonly fecha = new DatePipe('es-ES');
+  private readonly formatoFecha = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
 
   protected readonly cargando = signal(true);
   protected readonly guardando = signal(false);
@@ -143,7 +146,7 @@ export class SpeakerSessionAssign implements OnInit {
   protected readonly opcionesDeSesion = computed<SelectOption[]>(() =>
     this.sesiones().map((sesion) => ({
       value: sesion.id,
-      label: `${sesion.title} · ${this.fecha.transform(sesion.starts_at, 'short') ?? ''}`,
+      label: `${sesion.title} · ${this.formatoFecha.format(new Date(sesion.starts_at))}`,
     })),
   );
 
