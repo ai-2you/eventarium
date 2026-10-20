@@ -134,17 +134,21 @@ async def test_el_mcp_respeta_los_valores_por_defecto_y_el_conjunto(
     assert invalido.get("isError")
 
 
-@pytest.mark.parametrize("horas", [10, 100])
+@pytest.mark.parametrize(
+    ("horas", "estado", "activado_esperado"),
+    [(10, "published", False), (100, "published", True), (10, "draft", True)],
+    ids=["publicado-en-72h", "publicado-mas-tarde", "borrador-en-72h"],
+)
 async def test_la_migracion_no_lanza_recordatorios_de_los_que_empiezan_en_72_horas(
-    organizacion: OrganizacionDePrueba, horas: int
+    organizacion: OrganizacionDePrueba, horas: int, estado: str, activado_esperado: bool
 ) -> None:
     ahora = datetime.now(UTC)
     async with SessionMaintenance() as session:
         evento = Event(
             organization_id=organizacion.id,
-            slug=f"antes-de-la-migracion-{horas}",
+            slug=f"antes-de-la-migracion-{horas}-{estado}",
             title="Evento anterior a la migración",
-            status="published",
+            status=estado,
             visibility="public",
             starts_at=ahora + timedelta(hours=horas),
             ends_at=ahora + timedelta(hours=horas + 2),
@@ -165,5 +169,59 @@ async def test_la_migracion_no_lanza_recordatorios_de_los_que_empiezan_en_72_hor
                 {"id": evento_id},
             )
         ).one()
-    assert activado is (horas > 72)
+    assert activado is activado_esperado
     assert horas_antes == 48
+
+
+async def test_un_null_explicito_en_los_ajustes_del_recordatorio_da_422(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    creado = (await _crear(cliente, cabeceras, "recordatorio-null")).json()
+    for campo in ("reminder_enabled", "reminder_hours_before"):
+        respuesta = await cliente.patch(
+            f"{EVENTS}/{creado['id']}", headers=cabeceras, json={campo: None}
+        )
+        assert respuesta.status_code == 422, respuesta.text
+
+
+async def test_al_pasar_a_pago_el_recordatorio_por_defecto_sube_a_48_horas(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    por_defecto = (await _crear(cliente, cabeceras, "pasa-a-pago")).json()
+    elegido = (await _crear(cliente, cabeceras, "pasa-a-pago-6h", reminder_hours_before=6)).json()
+
+    for evento in (por_defecto, elegido):
+        respuesta = await cliente.patch(
+            f"{EVENTS}/{evento['id']}", headers=cabeceras, json={"registration_mode": "paid"}
+        )
+        assert respuesta.status_code == 200, respuesta.text
+        evento["despues"] = respuesta.json()["reminder_hours_before"]
+
+    assert por_defecto["despues"] == 48
+    # Si el organizador eligió otro valor, se respeta.
+    assert elegido["despues"] == 6
+
+
+async def test_un_evento_antiguo_con_zona_invalida_se_sigue_pudiendo_editar(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    creado = (await _crear(cliente, cabeceras, "zona-antigua")).json()
+    async with SessionMaintenance() as session:
+        await session.execute(
+            text("UPDATE events SET timezone = 'Madrid' WHERE id = :id"), {"id": creado["id"]}
+        )
+        await session.commit()
+
+    titulo = await cliente.patch(
+        f"{EVENTS}/{creado['id']}", headers=cabeceras, json={"title": "Otro título"}
+    )
+    assert titulo.status_code == 200, titulo.text
+    # El panel envía siempre la zona: con la inválida, el error lo explica.
+    con_zona = await cliente.patch(
+        f"{EVENTS}/{creado['id']}", headers=cabeceras, json={"timezone": "Madrid"}
+    )
+    assert con_zona.status_code == 422
+    assert "Europe/Madrid" in con_zona.text

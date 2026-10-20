@@ -8,8 +8,8 @@ recordatorio, y para qué fecha del evento se envió: si la fecha cambia, vuelve
 a ser elegible.
 
 Eventos existentes: activados a 24 h (48 h los de pago), salvo los que empiezan
-en las 72 h siguientes a esta migración, que quedan desactivados para no lanzar
-una ráfaga de correos nada más desplegar.
+en las 72 h siguientes a esta migración y ya están publicados, que quedan
+desactivados para no lanzar una ráfaga de correos nada más desplegar.
 
 Revision ID: 0064_recordatorio_y_ausencias
 Revises: 0063_tipos_de_sesion
@@ -59,8 +59,8 @@ def upgrade() -> None:
 
     op.execute("UPDATE events SET reminder_hours_before = 48 WHERE registration_mode = 'paid'")
     op.execute(
-        "UPDATE events SET reminder_enabled = false "
-        "WHERE starts_at > now() AND starts_at <= now() + interval '72 hours'"
+        "UPDATE events SET reminder_enabled = false WHERE status = 'published' "
+        "AND starts_at > now() AND starts_at <= now() + interval '72 hours'"
     )
 
 

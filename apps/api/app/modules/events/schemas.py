@@ -265,11 +265,9 @@ class EventUpdate(BaseModel):
         # rompería la constraint `NOT NULL` — y ese `IntegrityError` lo
         # capturaba la rama de conflicto de `slug`, devolviendo un 409 con el
         # mensaje falso "ya existe un evento con el identificador «None»".
-        if (
-            "contingency_fund_percent" in self.model_fields_set
-            and self.contingency_fund_percent is None
-        ):
-            raise ValueError("`contingency_fund_percent` no admite `null`.")
+        for campo in ("contingency_fund_percent", "reminder_enabled", "reminder_hours_before"):
+            if campo in self.model_fields_set and getattr(self, campo) is None:
+                raise ValueError(f"`{campo}` no admite `null`.")
         return self
 
 

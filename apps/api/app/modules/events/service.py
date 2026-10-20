@@ -389,6 +389,15 @@ async def update_event(
         "registration_mode" in datos and datos["registration_mode"] != evento.registration_mode
     )
     aforo_cambia = "capacity" in datos and datos["capacity"] != evento.capacity
+    # Al pasar a pago, el recordatorio por defecto (24 h) llegaría justo al
+    # cerrarse el plazo de reembolso: se adelanta a 48 h si no se ha tocado.
+    if (
+        modo_cambia
+        and datos["registration_mode"] == "paid"
+        and "reminder_hours_before" not in datos
+        and evento.reminder_hours_before == 24
+    ):
+        datos = {**datos, "reminder_hours_before": 48}
     if modo_cambia or aforo_cambia:
         await registrations_repository.lock_event_for_capacity(session, organization_id, evento.id)
         if modo_cambia:
