@@ -67,6 +67,27 @@ describe('EventsPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('marca los eventos «solo con enlace» y privados, no los públicos', async () => {
+    const fixture = TestBed.createComponent(EventsPage);
+    await avanzar(fixture);
+    const [base] = pagina().items;
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/events')
+      .flush({
+        items: [
+          { ...base, id: 'e1', visibility: 'hidden' },
+          { ...base, id: 'e2', title: 'Privado', visibility: 'private' },
+          { ...base, id: 'e3', title: 'Público', visibility: 'public' },
+        ],
+      });
+    await avanzar(fixture);
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('Solo con enlace');
+    expect(texto).toContain('Privado');
+    expect(texto.match(/Solo con enlace|Privado/g)?.length).toBe(3);
+  });
+
   it('muestra el modo de inscripción, el precio y el aforo de cada evento', async () => {
     const fixture = TestBed.createComponent(EventsPage);
     await avanzar(fixture);

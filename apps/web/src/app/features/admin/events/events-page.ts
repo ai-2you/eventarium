@@ -25,6 +25,7 @@ interface EventSummary {
   readonly status: EventStatus;
   readonly starts_at: string;
   readonly registration_mode: RegistrationMode;
+  readonly visibility?: 'public' | 'hidden' | 'private';
   /** `null`: sin límite de plazas. */
   readonly capacity: number | null;
   /** Entrada más barata (solo eventos de pago con entradas definidas). */
@@ -87,6 +88,11 @@ interface Page<T> {
             <tr>
               <td>
                 <a [routerLink]="[evento.id]">{{ evento.title }}</a>
+                @if (evento.visibility && evento.visibility !== 'public') {
+                  <app-chip tone="apagado">{{
+                    t('admin.events.formulario.visibilidadOpcion.' + evento.visibility)
+                  }}</app-chip>
+                }
               </td>
               <td>
                 <app-chip [tone]="tonoDeEstado(evento.status)">{{

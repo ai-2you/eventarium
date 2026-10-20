@@ -40,6 +40,8 @@ interface PublicSponsorHistoryItem {
 }
 
 interface PublicSponsorDetail {
+  /** `hidden` = «solo con enlace»: se marca `noindex`. */
+  readonly visibility?: 'public' | 'hidden' | 'private';
   readonly id: string;
   readonly name: string;
   readonly logo_url: string | null;
@@ -428,6 +430,7 @@ export class SponsorPage implements OnInit {
     this.seo.set({
       title: `${patrocinador.name} · ${patrocinador.event_title}`,
       description: this.transloco.translate('publico.patrocinador.rotulo'),
+      noIndexar: patrocinador.visibility === 'hidden',
       canonica: urlEvento(
         patrocinador.organization.slug,
         patrocinador.event_slug,

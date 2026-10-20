@@ -58,6 +58,10 @@ desconocido se rechaza con la lista de los disponibles. Las sesiones devuelven
 en `tipo` el nombre que le dio la organización. `editar_evento` acepta
 `mover_sesiones=True` para mover la agenda con el evento al cambiar sus fechas.
 
+**Visibilidad.** `editar_evento` acepta `visibilidad`: `public` (sale en listados y
+buscadores), `hidden` («solo con enlace»: se abre por su URL, no sale en ningún listado y
+se marca `noindex`) o `private` (no se abre).
+
 **Recordatorio a los inscritos.** `crear_evento` y `editar_evento` aceptan
 `recordatorio` (si se envía; por defecto, sí) y `recordatorio_horas` (2, 6, 12,
 24, 48 o 72 horas antes; por defecto 24, o 48 en eventos de pago). Otro valor se

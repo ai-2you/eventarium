@@ -26,6 +26,7 @@ function eventoDetalle(overrides: Record<string, unknown> = {}) {
     summary: null,
     description: null,
     registration_mode: 'free',
+    visibility: 'public',
     capacity: null,
     starts_at: '2026-10-01T09:00:00Z',
     ends_at: '2026-10-02T18:00:00Z',
@@ -264,6 +265,24 @@ describe('EventForm', () => {
 
       const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
       expect(peticion.request.body.reminder_hours_before).toBe(48);
+      peticion.flush(eventoDetalle());
+    });
+
+    it('elige la visibilidad y explica la opción elegida', async () => {
+      const fixture = await abrirEdicion();
+      expect(fixture.nativeElement.textContent).toContain(
+        'Aparece en la página de tu organización',
+      );
+      elegirEnSelect(fixture, 'evento-visibilidad', 'hidden');
+      await avanzar(fixture);
+      expect(fixture.nativeElement.textContent).toContain('Lo abre quien tenga el enlace');
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body.visibility).toBe('hidden');
       peticion.flush(eventoDetalle());
     });
 

@@ -699,6 +699,7 @@ export class RegistrationPage implements OnInit {
         title: `${titulo} · ${evento.title}`,
         description: evento.summary ?? this.transloco.translate('publico.eventos.sinResumen'),
         image: evento.cover_url,
+        noIndexar: evento.visibility === 'hidden',
       });
     } catch {
       // Best-effort, igual que `cargarTiposDeEntrada`: sin resumen el

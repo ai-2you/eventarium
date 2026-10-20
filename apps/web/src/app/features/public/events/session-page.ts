@@ -44,6 +44,8 @@ interface PublicParticipant {
 }
 
 interface PublicSessionDetail {
+  /** `hidden` = «solo con enlace»: se marca `noindex`. */
+  readonly visibility?: 'public' | 'hidden' | 'private';
   readonly id: string;
   readonly session_type: string;
   readonly type?: TipoDeSesionPublico;
@@ -584,6 +586,7 @@ export class SessionPage implements OnInit {
     this.seo.set({
       title: `${sesion.title} · ${sesion.event_title}`,
       description: sesion.description ?? this.transloco.translate('publico.eventos.sinResumen'),
+      noIndexar: sesion.visibility === 'hidden',
     });
   }
 }
