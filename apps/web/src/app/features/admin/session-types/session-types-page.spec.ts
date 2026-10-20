@@ -5,6 +5,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { emularDialogoNativo } from '../../../../testing/dialog';
 import { SessionTypesPage, type TipoDeSesion } from './session-types-page';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
 import es from '../../../../../public/assets/i18n/es-ES.json';
@@ -52,11 +53,7 @@ describe('SessionTypesPage', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
-    if (!HTMLDialogElement.prototype.showModal) {
-      HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      };
-    }
+    emularDialogoNativo();
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
