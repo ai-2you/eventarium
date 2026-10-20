@@ -7,7 +7,14 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.events.categories import normalizar_etiquetas
 from app.modules.organizations.schemas import SLUG_PATTERN, PublicOrganizationRef
@@ -348,7 +355,15 @@ class SessionTypeOut(SessionTypeRef):
     sesiones: int
 
 
-NombreDeTipo = Annotated[str, Field(min_length=1, max_length=60)]
+def _nombre_con_texto(valor: str) -> str:
+    """Sin espacios en los extremos ni dobles; solo espacios no es un nombre."""
+    limpio = " ".join(valor.split())
+    if not limpio:
+        raise ValueError("El tipo de sesión necesita un nombre.")
+    return limpio
+
+
+NombreDeTipo = Annotated[str, Field(min_length=1, max_length=60), AfterValidator(_nombre_con_texto)]
 DescripcionDeTipo = Annotated[str, Field(max_length=200)]
 
 

@@ -197,7 +197,7 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                           variant="secundario"
                           type="button"
                           [compacto]="true"
-                          [attr.aria-label]="
+                          [ariaLabel]="
                             fila.public_slug
                               ? t('admin.events.speakers.verBioDe', { nombre: nombre(fila) })
                               : null

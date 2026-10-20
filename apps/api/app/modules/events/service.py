@@ -510,9 +510,21 @@ async def create_session(
         **datos,
     )
     session.add(sesion)
-    await session.flush()
+    await _guardar_sesion(session)
     await session.refresh(sesion, ["tipo"])
     return sesion
+
+
+async def _guardar_sesion(session: AsyncSession) -> None:
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # El tipo se borró entre elegirlo y guardar (la FK compuesta lo impide).
+        if "fk_event_sessions_session_type_id_organization_id" in str(exc.orig):
+            raise ConflictError(
+                "Ese tipo de sesión acaba de borrarse: elige otro y vuelve a guardar."
+            ) from exc
+        raise
 
 
 async def _tipo_pedido(

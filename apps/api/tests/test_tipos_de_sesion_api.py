@@ -216,3 +216,33 @@ async def test_una_organizacion_sin_tipos_los_recibe_al_crear_una_sesion(
 
     assert sesion["type"]["name"] == "Taller"
     assert len(await _tipos(cliente, cabeceras)) == 5
+
+
+async def test_renombrar_a_un_nombre_que_ya_existe_da_409_y_solo_espacios_422(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    tipos = {t["base_key"]: t for t in await _tipos(cliente, cabeceras)}
+
+    repetido = await cliente.patch(
+        f"{TIPOS}/{tipos['other']['id']}",
+        headers=cabeceras,
+        json={"name": "taller", "is_active": False},
+    )
+    en_blanco = await cliente.post(TIPOS, headers=cabeceras, json={"name": "   "})
+
+    assert repetido.status_code == 409, repetido.text
+    assert en_blanco.status_code == 422
+
+
+async def test_por_clave_un_tipo_desactivado_no_se_asigna(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    charla = next(t for t in await _tipos(cliente, cabeceras) if t["base_key"] == "talk")
+    await cliente.patch(f"{TIPOS}/{charla['id']}", headers=cabeceras, json={"is_active": False})
+    evento = await _crear_evento(cliente, cabeceras, slug="charla-desactivada")
+
+    sesion = await _sesion(cliente, cabeceras, evento, session_type="talk")
+
+    assert sesion["type"]["name"] == "Taller"

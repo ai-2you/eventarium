@@ -36,7 +36,8 @@ _RUTAS_DE_LA_APLICACION = frozenset(
         "identidad", "inscripciones", "invitacion", "legal", "legales", "mcp", "members",
         "mi-entrada", "mis-eventos", "oauth", "organization", "pago", "patrocinadores",
         "payments", "plantillas", "politicas", "ponentes", "recuperar-contrasena",
-        "registrations", "registro", "roles", "servicios", "sponsor-tiers", "stripe",
+        "registrations", "registro", "roles", "servicios", "session-types", "sponsor-tiers",
+        "stripe",
         "suplantar", "usuarios", "verificar-correo", "verificar-inscripcion", "vista-previa",
     }
 )  # fmt: skip

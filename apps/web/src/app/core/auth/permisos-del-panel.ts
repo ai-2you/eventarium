@@ -66,6 +66,9 @@ export const REQUISITOS_DEL_PANEL = {
   'events/:eventId/politicas': p('events:read'),
   'events/:eventId/inscripciones': p('registrations:read'),
   'sponsor-tiers': p('sponsors:read'),
+  // Gestionarlos: lo mismo que crear sesiones. Leerlos solo hace falta en el
+  // formulario de sesión, que ya exige `events:write`.
+  'session-types': p('events:write'),
   stripe: p('payments:read'),
   ia: { rol: 'owner' },
   account: 'ninguno',

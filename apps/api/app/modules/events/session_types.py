@@ -151,6 +151,8 @@ async def crear(
 async def actualizar(
     session: AsyncSession, organization_id: uuid.UUID, tipo_id: uuid.UUID, datos: dict[str, Any]
 ) -> SessionType:
+    if datos.get("is_active") is False:
+        await _bloquear_catalogo(session, organization_id)
     tipo = await obtener(session, organization_id, tipo_id)
     if "name" in datos and datos["name"] is not None:
         tipo.name = _limpiar_nombre(datos["name"])
@@ -159,10 +161,22 @@ async def actualizar(
     for campo in ("color", "is_break", "is_active"):
         if datos.get(campo) is not None:
             setattr(tipo, campo, datos[campo])
+    # Antes de consultar nada más: el autoflush de esa consulta sacaría el
+    # nombre repetido como un error sin traducir (500 en vez de 409).
+    await _guardar(session)
     if not tipo.is_active and not await _queda_otro_activo(session, organization_id, tipo.id):
         raise ConflictError("Tiene que quedar al menos un tipo de sesión activo.")
-    await _guardar(session)
     return tipo
+
+
+async def _bloquear_catalogo(session: AsyncSession, organization_id: uuid.UUID) -> None:
+    """Bloquea los tipos de la organización: dos desactivaciones o borrados a la
+    vez no pueden dejarla sin ningún tipo activo."""
+    await session.execute(
+        select(SessionType.id)
+        .where(SessionType.organization_id == organization_id)
+        .with_for_update()
+    )
 
 
 async def _queda_otro_activo(
@@ -182,6 +196,7 @@ async def _queda_otro_activo(
 
 async def borrar(session: AsyncSession, organization_id: uuid.UUID, tipo_id: uuid.UUID) -> None:
     """Solo si ninguna sesión lo usa; si no, se desactiva (las sesiones lo conservan)."""
+    await _bloquear_catalogo(session, organization_id)
     tipo = await obtener(session, organization_id, tipo_id)
     en_uso = await session.scalar(
         select(func.count()).where(
@@ -197,7 +212,13 @@ async def borrar(session: AsyncSession, organization_id: uuid.UUID, tipo_id: uui
     if tipo.is_active and not await _queda_otro_activo(session, organization_id, tipo.id):
         raise ConflictError("Tiene que quedar al menos un tipo de sesión activo.")
     await session.delete(tipo)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # Alguien le asignó una sesión entre el recuento y el borrado.
+        raise ConflictError(
+            "Acaban de asignar este tipo a una sesión: desactívalo en vez de borrarlo."
+        ) from exc
 
 
 async def reordenar(
@@ -242,13 +263,20 @@ async def resolver_para_sesion(
         return tipo
     if clave is not None:
         encontrado = await tipo_por_clave_base(session, organization_id, clave)
-        if encontrado is not None:
+        # Por clave (clientes antiguos, MCP) un tipo desactivado no se asigna:
+        # se sigue al tipo por defecto, salvo que sea el que ya tenía la sesión.
+        if encontrado is not None and (encontrado.is_active or encontrado.id == actual):
             return encontrado
     por_defecto = await _primero_activo(session, organization_id)
     if por_defecto is None and not await _tiene_tipos(session, organization_id):
         # Una organización que nació sin tipos (alta durante un despliegue, a
-        # mano, restaurada de una copia antigua) los recibe al necesitarlos.
-        await crear_tipos_base(session, organization_id)
+        # mano, restaurada de una copia antigua) los recibe al necesitarlos. En
+        # un punto de guardado: si otra petición los crea a la vez, se usan esos.
+        try:
+            async with session.begin_nested():
+                await crear_tipos_base(session, organization_id)
+        except IntegrityError:
+            pass
         return await resolver_para_sesion(
             session, organization_id, tipo_id=tipo_id, clave=clave, actual=actual
         )

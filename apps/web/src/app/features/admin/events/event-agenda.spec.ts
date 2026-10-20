@@ -50,7 +50,34 @@ function flushVenues(http: HttpTestingController): void {
   for (const peticion of http.match((p) => p.url === '/api/v1/events/e1')) {
     peticion.flush({ starts_at: '2000-01-01T00:00:00Z', ends_at: '2100-01-01T00:00:00Z' });
   }
+  flushTipos(http);
 }
+
+/** El formulario de sesión pide el catálogo de tipos de la organización. */
+function flushTipos(http: HttpTestingController): void {
+  for (const peticion of http.match((p) => p.url === '/api/v1/organizations/me/session-types')) {
+    peticion.flush(TIPOS);
+  }
+}
+
+const TIPOS = [
+  {
+    id: 't-charla',
+    name: 'Charla',
+    color: 'azul',
+    is_break: false,
+    description: null,
+    is_active: true,
+  },
+  {
+    id: 't-pausa',
+    name: 'Descanso',
+    color: 'gris',
+    is_break: true,
+    description: null,
+    is_active: true,
+  },
+];
 
 describe('EventAgenda', () => {
   let http: HttpTestingController;
@@ -74,6 +101,8 @@ describe('EventAgenda', () => {
   });
 
   afterEach(() => {
+    // Los formularios que se montan durante el test piden también el catálogo.
+    flushTipos(http);
     http.verify();
   });
 
