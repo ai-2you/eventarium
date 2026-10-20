@@ -367,7 +367,7 @@ def registrar(mcp: MCPServer) -> None:
         descripcion: str | None = None,
         sede_id: str | None = None,
     ) -> schemas.Sesion:
-        """Añade una sesión a la agenda. `tipo`: talk, break, service u other.
+        """Añade una sesión a la agenda. `tipo`: talk, workshop, break, service u other.
         Debe caer dentro de las fechas del evento."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)

@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.core.database import SessionMaintenance
 from tests.conftest import OrganizacionDePrueba, iniciar_sesion
-from tests.test_events_public import AHORA, EVENTS, _crear_evento
+from tests.test_events_public import AHORA, EVENTOS_DE_ACME, EVENTS, _crear_evento, _publicar
 
 
 async def _sesion(cliente: AsyncClient, cabeceras: dict[str, str], event_id: str) -> dict:
@@ -66,3 +66,27 @@ async def test_una_sesion_antigua_fuera_de_rango_se_puede_renombrar_pero_no_move
     assert renombrada.json()["title"] == "Charla renombrada"
     assert movida_fuera.status_code == 422
     assert "dentro del rango" in movida_fuera.text
+
+
+async def test_una_sesion_de_taller_no_rompe_la_ficha_publica(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, slug="con-taller")
+    respuesta = await cliente.post(
+        f"{EVENTS}/{evento['id']}/sessions",
+        headers=cabeceras,
+        json={
+            "session_type": "workshop",
+            "title": "Taller práctico",
+            "starts_at": (AHORA + timedelta(hours=1)).isoformat(),
+            "ends_at": (AHORA + timedelta(hours=2)).isoformat(),
+        },
+    )
+    assert respuesta.status_code == 201, respuesta.text
+    await _publicar(cliente, cabeceras, evento["id"])
+
+    ficha = await cliente.get(f"{EVENTOS_DE_ACME}/con-taller")
+
+    assert ficha.status_code == 200, ficha.text
+    assert ficha.json()["sessions"][0]["session_type"] == "workshop"

@@ -190,6 +190,7 @@
       "sesion": {
         "tipo": {
           "talk": "Charla",
+          "workshop": "Taller",
           "break": "Descanso",
           "service": "Servicio",
           "other": "Otro"
@@ -1371,6 +1372,7 @@
         "guardarCambios": "Guardar cambios",
         "tipo": "Tipo de sesión",
         "tipoTalk": "Charla",
+        "tipoWorkshop": "Taller",
         "tipoBreak": "Descanso",
         "tipoService": "Servicio",
         "tipoOther": "Otro",

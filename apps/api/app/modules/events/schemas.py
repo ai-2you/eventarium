@@ -28,7 +28,7 @@ RegistrationMode = Literal["free", "approval", "paid"]
 # propio editor, que lo carga entero.
 LONGITUD_MAXIMA_DESCRIPCION = 20000
 DescripcionDeEvento = Annotated[str, Field(max_length=LONGITUD_MAXIMA_DESCRIPCION)]
-SessionType = Literal["talk", "break", "service", "other"]
+SessionType = Literal["talk", "workshop", "break", "service", "other"]
 VideoPlatform = Literal["youtube", "vimeo", "twitch", "other"]
 
 # Dominios admitidos por plataforma declarada. Para «other» basta con `https`: no
