@@ -20,6 +20,7 @@ import { MediaElegida, MediaPicker } from '../../../shared/ui/media-picker';
 import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
 import { PORTADA_ACEPTADOS } from '../../../shared/uploads/image-upload-constraints';
 import { EventCancelCard } from './event-cancel-card';
+import { EventNearbyPlaces } from './event-nearby-places';
 
 type EventStatus = 'draft' | 'published' | 'archived' | 'cancelled';
 
@@ -44,7 +45,15 @@ interface EventoResumen {
 @Component({
   selector: 'app-event-details',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, MediaPicker, EventCancelCard],
+  imports: [
+    EventNearbyPlaces,
+    TranslocoDirective,
+    Alert,
+    Button,
+    Card,
+    MediaPicker,
+    EventCancelCard,
+  ],
   template: `
     <ng-container *transloco="let t">
       @if (cargando()) {
@@ -96,6 +105,8 @@ interface EventoResumen {
               <app-alert tone="error">{{ mensaje }}</app-alert>
             }
           </app-card>
+
+          <app-event-nearby-places [eventId]="eventId()" />
 
           @if (estadoActual() === 'published' || estadoActual() === 'cancelled') {
             <app-event-cancel-card

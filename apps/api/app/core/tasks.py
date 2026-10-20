@@ -34,6 +34,7 @@ from app.modules.accounting import models as _accounting_models  # noqa: F401
 from app.modules.events import models as _event_models  # noqa: F401
 from app.modules.legal import models as _legal_models  # noqa: F401
 from app.modules.media import models as _media_models  # noqa: F401
+from app.modules.nearby import models as _nearby_models  # noqa: F401
 from app.modules.organizations import models as _organization_models  # noqa: F401
 from app.modules.payments import models as _payment_models  # noqa: F401
 from app.modules.policies import models as _policy_models  # noqa: F401

@@ -40,6 +40,8 @@ import type {
 } from './event-page.types';
 import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-section';
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
+import { DirectionsLink } from '../../../shared/ui/directions-link';
+import { EventNearbySection } from './sections/event-nearby-section';
 
 /** `starts_at` (UTC) al día calendario en la zona del evento, sin arrastrar la
  * zona horaria del entorno de ejecución (navegador o SSR) al agrupar por fecha:
@@ -87,6 +89,8 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
+    DirectionsLink,
+    EventNearbySection,
     RouterLink,
     TranslocoDirective,
     Alert,
@@ -368,55 +372,73 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
             </section>
           }
 
-          @if (evento.location_name || evento.location_address || evento.online_url) {
-            <section class="seccion" aria-labelledby="lugar-h2">
+          @if (
+            evento.location_name ||
+            evento.location_address ||
+            evento.online_url ||
+            (evento.location_mode !== 'online' && evento.nearby_places?.length)
+          ) {
+            <section
+              class="seccion"
+              [attr.aria-labelledby]="
+                evento.location_name || evento.location_address || evento.online_url
+                  ? 'lugar-h2'
+                  : 'cercanos-h2'
+              "
+            >
               <div class="ancho-maximo lugar__grid" appReveal>
-                <div>
-                  <span class="rotulo-seccion">{{ t('publico.eventos.lugar.rotulo') }}</span>
-                  <h2 id="lugar-h2">
-                    {{ evento.location_name || t('publico.eventos.lugar.titulo') }}
-                  </h2>
-                  @if (evento.location_address) {
-                    <p class="lugar__direccion">{{ evento.location_address }}</p>
-                  }
-                  @if (evento.location_mode !== 'in_person' && evento.online_url) {
-                    <p>
-                      <a [href]="evento.online_url" rel="noopener noreferrer" target="_blank">
-                        {{ t('publico.eventos.enlaceOnline') }}
-                      </a>
-                    </p>
-                  }
-                  @if (evento.latitude !== null && evento.longitude !== null) {
-                    <app-venue-map
-                      class="lugar__mapa"
-                      [marcadores]="[
-                        {
-                          lat: evento.latitude,
-                          lng: evento.longitude,
-                          label: evento.location_name,
-                        },
-                      ]"
-                      [ariaLabel]="
-                        t('publico.eventos.lugar.mapaAria', {
-                          lugar: evento.location_name || evento.title,
-                        })
-                      "
-                    />
-                  } @else {
-                    <!-- Sin geocodificar (sin dirección, evento online, o falló):
+                @if (evento.location_name || evento.location_address || evento.online_url) {
+                  <div>
+                    <span class="rotulo-seccion">{{ t('publico.eventos.lugar.rotulo') }}</span>
+                    <h2 id="lugar-h2">
+                      {{ evento.location_name || t('publico.eventos.lugar.titulo') }}
+                    </h2>
+                    @if (evento.location_address) {
+                      <p class="lugar__direccion">{{ evento.location_address }}</p>
+                    }
+                    @if (evento.location_mode !== 'online') {
+                      <app-directions-link
+                        [lugar]="evento.location_name"
+                        [direccion]="evento.location_address"
+                      />
+                    }
+                    @if (evento.location_mode !== 'in_person' && evento.online_url) {
+                      <p>
+                        <a [href]="evento.online_url" rel="noopener noreferrer" target="_blank">
+                          {{ t('publico.eventos.enlaceOnline') }}
+                        </a>
+                      </p>
+                    }
+                    @if (evento.latitude !== null && evento.longitude !== null) {
+                      <app-venue-map
+                        class="lugar__mapa"
+                        [marcadores]="[
+                          {
+                            lat: evento.latitude,
+                            lng: evento.longitude,
+                            label: evento.location_name,
+                          },
+                        ]"
+                        [ariaLabel]="
+                          t('publico.eventos.lugar.mapaAria', {
+                            lugar: evento.location_name || evento.title,
+                          })
+                        "
+                      />
+                    } @else {
+                      <!-- Sin geocodificar (sin dirección, evento online, o falló):
                          no se inventa un mapa ni un esquema con datos de ejemplo. -->
-                    <p class="hint pendiente lugar__mapa">
-                      {{ t('publico.eventos.datoPendiente') }}
-                    </p>
-                  }
-                </div>
-                <div>
-                  <span class="rotulo-seccion">{{ t('publico.eventos.lugar.cercaRotulo') }}</span>
-                  <h2>{{ t('publico.eventos.lugar.cercaTitulo') }}</h2>
-                  <!-- Alojamiento y locales cercanos: sin modelo de datos todavía, se
-                       declara el hueco en vez de rellenarlo con ejemplos. -->
-                  <p class="hint pendiente">{{ t('publico.eventos.lugar.cercaPendiente') }}</p>
-                </div>
+                      <p class="hint pendiente lugar__mapa">
+                        {{ t('publico.eventos.datoPendiente') }}
+                      </p>
+                    }
+                  </div>
+                }
+                @if (evento.location_mode !== 'online' && evento.nearby_places?.length) {
+                  <div>
+                    <app-event-nearby-section [sitios]="evento.nearby_places!" />
+                  </div>
+                }
               </div>
             </section>
           }

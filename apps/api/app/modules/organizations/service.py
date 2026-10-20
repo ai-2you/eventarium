@@ -180,16 +180,24 @@ async def public_profile(
     """El perfil público, construido campo a campo: nada más sale de aquí."""
     branding = await session.get(OrganizationBranding, organizacion.id)
     enlaces = [
-        PublicSocialLink(kind=str(enlace["kind"]), url=str(enlace["url"]))
+        PublicSocialLink(
+            kind=str(enlace["kind"]),
+            url=str(enlace["url"]),
+            label=enlace.get("label") if enlace.get("kind") == "other" else None,
+        )
         for enlace in (branding.social_links if branding else [])
         if enlace.get("kind") and enlace.get("url")
     ]
+    publica = organizacion.address_public
     return PublicOrganizationProfile(
         slug=organizacion.slug,
         name=organizacion.name,
         description=organizacion.description,
         website=organizacion.website,
-        address=organizacion.address,
+        address=organizacion.address if publica else None,
+        postal_code=organizacion.postal_code if publica else None,
+        city=organizacion.city if publica else None,
+        province=organizacion.province if publica else None,
         logo_url=await logo_url(session, branding),
         social_links=enlaces,
     )

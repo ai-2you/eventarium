@@ -93,6 +93,12 @@ async function flushEventDetails(
     .expectOne((peticion) => peticion.url === '/api/v1/events/e1' && peticion.method === 'GET')
     .flush({ cover_url: null, status: 'draft' });
   await avanzar(fixture);
+  // «Qué hay cerca», dentro de EventDetails, carga sus sitios y los demás eventos.
+  http.expectOne('/api/v1/events/e1/nearby-places').flush([]);
+  http
+    .expectOne((peticion) => peticion.url === '/api/v1/events' && peticion.method === 'GET')
+    .flush({ items: [] });
+  await avanzar(fixture);
 }
 
 describe('EventForm', () => {

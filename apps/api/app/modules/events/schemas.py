@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 from app.modules.events.categories import normalizar_etiquetas
+from app.modules.nearby.schemas import PublicNearbyPlace
 from app.modules.organizations.schemas import SLUG_PATTERN, PublicOrganizationRef
 from app.modules.sponsors.schemas import PublicSponsorTier
 from app.modules.theme_templates.schemas import PublicTheme, validar_theme_overrides
@@ -733,6 +734,8 @@ class PublicEventDetail(BaseModel):
     # longitud, si activa la vista de "programa por sede" (2 sedes o más) —
     # decisión de tanda 3, aquí solo se exponen los datos.
     venues: list[PublicVenue] = Field(default_factory=list)
+    # Alojamiento, restaurantes, parking… que el organizador señala cerca del evento.
+    nearby_places: list[PublicNearbyPlace] = Field(default_factory=list)
     sponsor_tiers: list[PublicSponsorTier] = Field(default_factory=list)
 
 

@@ -71,6 +71,8 @@ from app.modules.events.schemas import (
     SessionTypeRef,
 )
 from app.modules.media.models import Media
+from app.modules.nearby import service as nearby_service
+from app.modules.nearby.schemas import PublicNearbyPlace
 from app.modules.organizations import service as organizations_service
 from app.modules.organizations.models import OrganizationMember
 from app.modules.organizations.schemas import SLUG_PATTERN
@@ -343,6 +345,7 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
     contexto RLS de quien la pide, que una resolución pública sobrescribiría."""
     sesiones = await _sesiones_publicas(session, evento.organization_id, evento.id)
     sedes = await _sedes_publicas(session, evento.organization_id, evento.id)
+    cercanos = await nearby_service.listar(session, evento.organization_id, evento.id)
     niveles_con_patrocinadores = await _sponsor_tiers_publicos(
         session, evento.organization_id, evento.id
     )
@@ -358,6 +361,18 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
         precio = precios.get(evento.id)
     return PublicEventDetail(
         visibility=evento.visibility,  # type: ignore[arg-type]
+        nearby_places=[
+            PublicNearbyPlace(
+                kind=sitio.kind,  # type: ignore[arg-type]
+                custom_kind=sitio.custom_kind,
+                name=sitio.name,
+                address=sitio.address,
+                phone=sitio.phone,
+                website=sitio.website,
+                notes=sitio.notes,
+            )
+            for sitio in cercanos
+        ],
         slug=evento.slug,
         category=categoria_publica(evento),
         tags=list(evento.tags),

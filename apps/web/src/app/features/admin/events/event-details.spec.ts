@@ -48,6 +48,13 @@ function flushCargaBase(
     .flush({ cover_url: null, status: 'draft', ...overrides });
 }
 
+/** «Qué hay cerca» (`app-event-nearby-places`) aparece con el evento cargado y pide
+ * sus sitios y los demás eventos. */
+function flushCercanos(http: HttpTestingController): void {
+  http.expectOne('/api/v1/events/e1/nearby-places').flush([]);
+  http.expectOne((peticion) => peticion.url === '/api/v1/events').flush({ items: [] });
+}
+
 describe('EventDetails', () => {
   let http: HttpTestingController;
 
@@ -60,6 +67,8 @@ describe('EventDetails', () => {
     http = TestBed.inject(HttpTestingController);
     const fixture = await crearComponente();
     flushCargaBase(http);
+    await avanzar(fixture);
+    flushCercanos(http);
     await avanzar(fixture);
 
     const raiz = fixture.nativeElement as HTMLElement;
@@ -79,6 +88,8 @@ describe('EventDetails', () => {
     http = TestBed.inject(HttpTestingController);
     const fixture = await crearComponente();
     flushCargaBase(http);
+    await avanzar(fixture);
+    flushCercanos(http);
     await avanzar(fixture);
 
     const raiz = fixture.nativeElement as HTMLElement;
@@ -101,6 +112,8 @@ describe('EventDetails', () => {
     http = TestBed.inject(HttpTestingController);
     const fixture = await crearComponente();
     flushCargaBase(http);
+    await avanzar(fixture);
+    flushCercanos(http);
     await avanzar(fixture);
 
     const raiz = fixture.nativeElement as HTMLElement;

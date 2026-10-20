@@ -71,8 +71,13 @@ describe('OrganizationPublicPage', () => {
     return fixture;
   }
 
-  function responder(proximos: unknown[], pasados: unknown[], totalPasados = pasados.length) {
-    http.expectOne('/api/v1/public/organizations/acme').flush(PERFIL);
+  function responder(
+    proximos: unknown[],
+    pasados: unknown[],
+    totalPasados = pasados.length,
+    perfil: object = PERFIL,
+  ) {
+    http.expectOne('/api/v1/public/organizations/acme').flush(perfil);
     http
       .expectOne((p) => p.url.includes('/events') && p.url.includes('when=upcoming'))
       .flush({ items: proximos, total: proximos.length });
@@ -99,6 +104,39 @@ describe('OrganizationPublicPage', () => {
     );
     expect(enlaces).toEqual(['/acme/proximo', '/acme/viejo']);
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('con logo, lo pone grande a la izquierda y los datos a la derecha, accesible', async () => {
+    const fixture = abrir();
+    fixture.detectChanges();
+    responder([], [], 0, {
+      ...PERFIL,
+      logo_url: 'https://cdn.example/logo.png',
+      address: 'Calle Mayor 1',
+      postal_code: '46001',
+      city: 'Valencia',
+      province: 'Valencia',
+      social_links: [
+        { kind: 'instagram', url: 'https://instagram.com/acme' },
+        { kind: 'other', url: 'https://mastodon.social/@acme', label: 'Mastodon' },
+      ],
+    });
+    await avanzar(fixture);
+    const raiz: HTMLElement = fixture.nativeElement;
+
+    expect(raiz.querySelector('.cabecera__grid--con-logo .cabecera__marco img')).not.toBeNull();
+    const lineas = Array.from(raiz.querySelectorAll('address span')).map((l) => l.textContent);
+    // La provincia igual que la ciudad no se repite.
+    expect(lineas).toEqual(['Calle Mayor 1', '46001 Valencia']);
+    const redes = Array.from(raiz.querySelectorAll('a.red')).map((a) =>
+      a.getAttribute('aria-label'),
+    );
+    expect(redes).toEqual([
+      'Instagram (se abre en otra pestaña)',
+      'Mastodon (se abre en otra pestaña)',
+    ]);
+    expect(raiz.querySelector('.ficha a')?.textContent?.trim()).toBe('acme.example');
+    await esperarSinViolacionesDeAccesibilidad(raiz);
   });
 
   it('un evento cancelado sigue en la lista, marcado como cancelado', async () => {
