@@ -370,6 +370,19 @@ describe('EventPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('en vista previa carga la ficha del panel y avisa de que es una vista previa', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.detectChanges();
+    http.expectOne('/api/v1/events/e1/preview').flush(eventoDetalle());
+    await avanzar(fixture);
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('Vista previa');
+    expect(texto).toContain('IA Week in Cascais 2026');
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
   it('marca "no encontrado" cuando la API responde 404', async () => {
     const fixture = TestBed.createComponent(EventPage);
     fixture.componentRef.setInput('org', 'acme');

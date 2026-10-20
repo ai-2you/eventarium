@@ -15,7 +15,7 @@ from app.core.permissions import Permission
 from app.core.ratelimit import PEDIR_BIO_POR_IP, limit_per_ip
 from app.core.storage import build_object_key, get_storage, public_url_versionada, validate_upload
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
-from app.modules.events import repository, service, speakers_repository
+from app.modules.events import public_router, repository, service, speakers_repository
 from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
 from app.modules.events.models import Event, EventMember, EventSession, EventVenue
 from app.modules.events.schemas import (
@@ -35,6 +35,7 @@ from app.modules.events.schemas import (
     EventVenueCreate,
     EventVenueResponse,
     EventVenueUpdate,
+    PublicEventDetail,
     SessionParticipantResponse,
     SessionParticipantsUpdate,
     SpeakerCompletitudOut,
@@ -178,7 +179,12 @@ def _session_participant_response(fila: Any) -> SessionParticipantResponse:
 
 
 async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_id: str) -> Event:
-    evento = await repository.get_event(session, usuario.organization_id, uuid.UUID(event_id))
+    try:
+        id_evento = uuid.UUID(event_id)
+    except ValueError as exc:
+        # Un enlace mal copiado (p. ej. a la vista previa) no es un error del servidor.
+        raise NotFoundError("El evento no existe.") from exc
+    evento = await repository.get_event(session, usuario.organization_id, id_evento)
     if evento is None:
         raise NotFoundError("El evento no existe.")
     return evento
@@ -285,6 +291,20 @@ async def get_event(
     evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
 ) -> EventResponse:
     return await _event_response(session, evento)
+
+
+@router.get(
+    "/{event_id}/preview",
+    summary="Vista previa de la ficha pública de un evento",
+    response_model=PublicEventDetail,
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def preview_event(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
+) -> PublicEventDetail:
+    """La ficha tal y como la verá el público, en cualquier estado (también un
+    borrador): para revisarla antes de publicar. Solo para el equipo."""
+    return await public_router.detalle_publico(session, evento)
 
 
 @router.patch(

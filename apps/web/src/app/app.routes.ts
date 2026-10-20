@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { guardDe } from './core/auth/permisos-del-panel';
+import { guardDe, requierePermiso } from './core/auth/permisos-del-panel';
 import { authGuard } from './core/auth/auth.guard';
 import { guestGuard } from './core/auth/guest.guard';
 import { personalPlataformaGuard } from './core/auth/personal-plataforma.guard';
@@ -528,6 +528,13 @@ export const routes: Routes = [
         path: 'ponentes/:publicSlug',
         loadComponent: () =>
           import('./features/public/events/speaker-page').then((m) => m.SpeakerPage),
+      },
+      {
+        // Vista previa del panel (también de un borrador): solo para quien
+        // puede ver los eventos; el backend vuelve a exigirlo.
+        path: 'vista-previa/:eventId',
+        canActivate: [authGuard, requierePermiso({ permiso: 'events:read' })],
+        loadComponent: () => import('./features/public/events/event-page').then((m) => m.EventPage),
       },
       {
         path: 'mis-eventos',

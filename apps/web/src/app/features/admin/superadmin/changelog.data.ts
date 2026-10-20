@@ -31,12 +31,17 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
-    version: '0.27.10',
+    version: '0.27.11',
     fecha: '2026-10-20',
     secciones: [
       {
         categoria: 'agregado',
         items: [
+          {
+            titulo: 'Vista previa de los eventos, también en borrador',
+            descripcion:
+              'Desde el listado de eventos, «Vista previa» abre la ficha tal y como la verá el público, aunque el evento aún no esté publicado. Solo la ve el equipo y no aparece en buscadores.',
+          },
           {
             titulo: 'Modo, precio y aforo en el listado de eventos',
             descripcion:

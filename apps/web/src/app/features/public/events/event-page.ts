@@ -103,11 +103,20 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     <ng-container *transloco="let t">
       @if (cargando()) {
         <p class="ancho-maximo">{{ t('comun.cargando') }}</p>
+      } @else if (errorDeVistaPrevia()) {
+        <div class="ancho-maximo">
+          <app-alert tone="error">{{ t('publico.eventos.vistaPreviaError') }}</app-alert>
+        </div>
       } @else if (noEncontrado()) {
         <div class="ancho-maximo">
           <app-alert tone="error">{{ t('publico.eventos.noEncontrado') }}</app-alert>
         </div>
       } @else if (evento(); as evento) {
+        @if (eventId()) {
+          <div class="ancho-maximo aviso-vista-previa">
+            <app-alert tone="info">{{ t('publico.eventos.vistaPrevia') }}</app-alert>
+          </div>
+        }
         <article [attr.data-ambito]="ambitoDelEvento()">
           <section class="hero">
             <div class="ancho-maximo">
@@ -297,7 +306,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
               } @else {
                 <app-event-agenda-section
                   [dias]="dias()"
-                  [org]="org()"
+                  [org]="evento.organization.slug"
                   [eventSlug]="evento.slug"
                   [eventTimezone]="evento.timezone"
                 />
@@ -416,6 +425,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     </ng-container>
   `,
   styles: `
+    .aviso-vista-previa {
+      margin-block: var(--sp-4);
+    }
     .hero {
       padding: var(--sp-8) 0 var(--sp-7);
       border-bottom: 1px solid var(--border);
@@ -664,8 +676,12 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   `,
 })
 export class EventPage implements OnInit {
-  readonly org = input.required<string>();
-  readonly slug = input.required<string>();
+  // Sin valor en la vista previa, que llega por `eventId` (`/vista-previa/:eventId`).
+  readonly org = input<string | undefined>('');
+  readonly slug = input<string | undefined>('');
+  /** Vista previa del panel: la ficha de cualquier evento de la organización,
+   * también un borrador, desde `GET /events/{id}/preview` y solo en el navegador. */
+  readonly eventId = input<string | undefined>(undefined);
 
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
@@ -682,6 +698,9 @@ export class EventPage implements OnInit {
   protected readonly evento = signal<PublicEventDetail | null>(null);
   protected readonly cargando = signal(true);
   protected readonly noEncontrado = signal(false);
+  /** En la vista previa, un fallo que no es «no existe» (permiso retirado, red,
+   * servidor): quien revisa debe saber que no es que el evento falte. */
+  protected readonly errorDeVistaPrevia = signal(false);
 
   /** Desplaza al ancla de la URL (p. ej. `#agenda-h2` desde la miga de pan
    * "Programa" de `session-page.ts`/`sponsor-page.ts`) una vez el evento ya
@@ -768,7 +787,12 @@ export class EventPage implements OnInit {
 
   /** Ruta hacia otra página de este mismo evento. */
   protected ruta(...resto: string[]): string[] {
-    return rutaEvento(this.org(), this.slug(), ...resto);
+    const evento = this.evento();
+    return rutaEvento(
+      evento?.organization.slug ?? this.org() ?? '',
+      evento?.slug ?? this.slug() ?? '',
+      ...resto,
+    );
   }
 
   protected readonly formato = computed(() => {
@@ -838,6 +862,11 @@ export class EventPage implements OnInit {
   }
 
   private async cargar(): Promise<void> {
+    const eventId = this.eventId();
+    if (eventId) {
+      await this.cargarVistaPrevia(eventId);
+      return;
+    }
     const clave = makeStateKey<PublicEventDetail>(`public-event:${this.org()}:${this.slug()}`);
     const transferido = this.transferState.get(clave, null);
     if (transferido) {
@@ -849,9 +878,12 @@ export class EventPage implements OnInit {
 
     try {
       const evento = await firstValueFrom(
-        this.http.get<PublicEventDetail>(this.api.url(apiEvento(this.org(), this.slug())), {
-          headers: this.api.serverForwardHeaders(),
-        }),
+        this.http.get<PublicEventDetail>(
+          this.api.url(apiEvento(this.org() ?? '', this.slug() ?? '')),
+          {
+            headers: this.api.serverForwardHeaders(),
+          },
+        ),
       );
       this.aplicar(evento);
       if (this.api.isServer) {
@@ -869,7 +901,26 @@ export class EventPage implements OnInit {
     }
   }
 
-  private aplicar(evento: PublicEventDetail): void {
+  /** Sin `TransferState` ni SSR: la ruta se pinta en el navegador, que es quien
+   * tiene la sesión del equipo. */
+  private async cargarVistaPrevia(eventId: string): Promise<void> {
+    try {
+      const evento = await firstValueFrom(
+        this.http.get<PublicEventDetail>(this.api.url(`/events/${eventId}/preview`)),
+      );
+      this.aplicar(evento, { vistaPrevia: true });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.noEncontrado.set(true);
+      } else {
+        this.errorDeVistaPrevia.set(true);
+      }
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  private aplicar(evento: PublicEventDetail, { vistaPrevia = false } = {}): void {
     this.evento.set(evento);
     // La plantilla del evento se inyecta al llegar el dato, no al construir el
     // componente: en SSR el `document` no existe al construirlo, y quitarla
@@ -880,6 +931,7 @@ export class EventPage implements OnInit {
       description: evento.summary ?? this.transloco.translate('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug),
+      noIndexar: vistaPrevia,
     });
   }
 }

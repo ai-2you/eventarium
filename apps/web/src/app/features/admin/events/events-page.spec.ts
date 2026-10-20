@@ -98,6 +98,11 @@ describe('EventsPage', () => {
         .slice(2, 5)
         .map((celda) => celda.textContent?.replace(/\s+/g, ' ').trim()),
     );
+    const previa = (fixture.nativeElement as HTMLElement).querySelector(
+      'a.vista-previa',
+    ) as HTMLAnchorElement;
+    expect(previa.getAttribute('href')).toBe('/vista-previa/libre');
+    expect(previa.getAttribute('target')).toBe('_blank');
     expect(filas).toEqual([
       ['Acceso libre', 'Gratis', 'Sin límite'],
       ['Con aprobación', 'Gratis', '80'],
@@ -116,7 +121,7 @@ describe('EventsPage', () => {
     expect(contenedor).not.toBeNull();
     const tabla = contenedor!.querySelector('table') as HTMLTableElement;
     expect(tabla.querySelector('caption')?.textContent?.trim()).toBeTruthy();
-    expect(tabla.querySelectorAll('th[scope="col"]').length).toBe(6);
+    expect(tabla.querySelectorAll('th[scope="col"]').length).toBe(7);
 
     const ranura = contenedor!.querySelector('.ranura-scroll') as HTMLElement;
     expect(ranura.getAttribute('tabindex')).toBe('0');
