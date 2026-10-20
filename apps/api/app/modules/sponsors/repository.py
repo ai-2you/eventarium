@@ -86,7 +86,7 @@ def public_sponsors_query(
 ) -> Select[tuple[Sponsor, SponsorTier]]:
     """Patrocinadores de un evento con su nivel, para el bloque público agrupado.
 
-    El filtro de publicación del evento (`published` + `public`) vive en el
+    El filtro de publicación del evento (`published`, `public` o `hidden`) vive en el
     router público, que solo llama aquí tras resolver el evento por esa vía —
     igual que `events/repository.sessions_query` respecto a
     `resolve_public_event_by_slug`."""

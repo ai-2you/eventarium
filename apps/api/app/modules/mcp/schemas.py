@@ -89,7 +89,8 @@ class EventoDetalle(EventoResumen):
     resumen: str | None
     descripcion: str | None
     zona_horaria: str
-    enlace_publico: str
+    # Sin enlace si el evento es privado: no se abre por URL.
+    enlace_publico: str | None
     motivo_cancelacion: str | None
     sedes: list[Sede]
     sesiones: list[Sesion]

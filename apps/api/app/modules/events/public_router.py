@@ -15,7 +15,8 @@ por host, lo que en producción sin dominio por organización eran 404 sin
 más — ver `list_public_events_across_organizations` en `events/service.py`
 para el porqué de la resolución organización a organización).
 
-El filtro de publicación (`published` + `public`) se aplica siempre de forma
+El filtro de publicación (`published` y, por URL, `public` o `hidden`; en listados solo
+`public`) se aplica siempre de forma
 explícita en la propia consulta — nunca se confía en que RLS ya lo hace,
 porque RLS aísla por organización, no por si un evento está publicado: un
 borrador de la propia organización seguiría siendo visible bajo su contexto
@@ -398,7 +399,8 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
     summary="Ver la ficha pública de un patrocinador",
     description=(
         "Anidado bajo el evento, mismo criterio que la sesión: exige "
-        "`published` + `public` además de que el patrocinador pertenezca a "
+        "`published` y visibilidad `public` o `hidden` (solo con enlace) además de que "
+        "el patrocinador pertenezca a "
         "este evento. Nunca lleva el importe de la aportación (ver "
         "`PublicSponsor`)."
     ),
@@ -469,7 +471,7 @@ async def get_public_sponsor(
     "/sessions/{session_id}",
     summary="Ver el detalle de una sesión publicada",
     description=(
-        "Anidado bajo el evento: exige que el evento sea `published` + `public` "
+        "Anidado bajo el evento: exige que el evento sea `published` y `public` o `hidden` "
         "además de que la propia sesión le pertenezca. Sin este anidamiento, un "
         "`id` de sesión (UUIDv7, con entropía reducida frente a un v4 dentro de "
         "una ventana de tiempo conocida) sería enumerable y filtraría agendas de "

@@ -277,7 +277,9 @@ def registrar(mcp: MCPServer) -> None:
         alguna sesión quedara fuera de las fechas nuevas, no se guarda nada y
         el error dice cuáles; vuelve a llamar con `mover_sesiones=True` o
         ajusta antes esas sesiones. `recordatorio` y `recordatorio_horas`:
-        como en `crear_evento`."""
+        como en `crear_evento`. `visibilidad`: `public` (sale en listados y
+        buscadores), `hidden` (solo con enlace: se abre por su URL, no sale en
+        ningún listado ni en buscadores; no es secreto) o `private` (no se abre)."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(

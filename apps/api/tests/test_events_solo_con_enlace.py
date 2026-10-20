@@ -56,3 +56,19 @@ async def test_un_evento_publico_lleva_su_visibilidad_en_la_ficha(
 
     assert ficha.json()["visibility"] == "public"
     assert "publico-normal" in (await cliente.get(PUBLIC_EVENTS)).text
+
+
+async def test_la_sesion_de_un_evento_solo_con_enlace_se_abre_y_lo_indica(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    from tests.test_events_sesiones_rango import _sesion
+
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, slug="sesion-oculta")
+    sesion = await _sesion(cliente, cabeceras, evento["id"])
+    await _publicar(cliente, cabeceras, evento["id"], visibility="hidden")
+
+    respuesta = await cliente.get(f"{EVENTOS_DE_ACME}/sesion-oculta/sessions/{sesion['id']}")
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["visibility"] == "hidden"
