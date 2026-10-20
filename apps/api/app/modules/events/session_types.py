@@ -305,6 +305,24 @@ async def _tiene_tipos(session: AsyncSession, organization_id: uuid.UUID) -> boo
     ) is not None
 
 
+async def por_texto(session: AsyncSession, organization_id: uuid.UUID, texto: str) -> SessionType:
+    """Un tipo activo de la organización por su id, su nombre (sin distinguir
+    mayúsculas) o su clave base (`talk`, `workshop`…), para el MCP."""
+    buscado = texto.strip()
+    candidatos = [tipo for tipo, _ in await listar(session, organization_id, solo_activos=True)]
+    for tipo in candidatos:
+        if (
+            str(tipo.id) == buscado
+            or tipo.name.casefold() == buscado.casefold()
+            or tipo.base_key == buscado.casefold()
+        ):
+            return tipo
+    disponibles = ", ".join(f"«{tipo.name}»" for tipo in candidatos) or "ninguno"
+    raise ValidationDomainError(
+        f"No hay ningún tipo de sesión activo «{buscado}». Disponibles: {disponibles}."
+    )
+
+
 def referencia(tipo: SessionType) -> dict[str, Any]:
     """Lo que pintan el panel y las páginas públicas (`SessionTypeRef`)."""
     return {

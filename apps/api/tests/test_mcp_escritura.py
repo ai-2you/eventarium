@@ -151,6 +151,77 @@ class TestCrearYEditar:
         assert "rango de fechas" in json.dumps(fuera, ensure_ascii=False)
 
 
+class TestTiposDeSesion:
+    async def test_lista_los_tipos_y_acepta_el_nombre_propio_o_la_clave(
+        self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba
+    ) -> None:
+        _, cabeceras = await iniciar_sesion(cliente, organizacion)
+        await cliente.post(
+            "/api/v1/organizations/me/session-types",
+            headers=cabeceras,
+            json={"name": "Mesa redonda", "color": "rosa"},
+        )
+        evento = await _evento(cliente, cabeceras, "mcp-tipos")
+        clave = await _clave(cliente, cabeceras, ["eventos:leer", "eventos:editar"])
+        inicio = datetime.fromisoformat(evento["starts_at"])
+
+        def franja(horas: int) -> dict[str, str]:
+            return {
+                "inicio": (inicio + timedelta(hours=horas)).isoformat(),
+                "fin": (inicio + timedelta(hours=horas + 1)).isoformat(),
+            }
+
+        tipos = _datos(await _herramienta(cliente_mcp, clave, "listar_tipos_de_sesion"))
+        por_nombre = _datos(
+            await _herramienta(
+                cliente_mcp,
+                clave,
+                "anadir_sesion",
+                event_id=evento["id"],
+                titulo="Debate",
+                tipo="mesa REDONDA",
+                **franja(1),
+            )
+        )
+        por_clave = _datos(
+            await _herramienta(
+                cliente_mcp,
+                clave,
+                "anadir_sesion",
+                event_id=evento["id"],
+                titulo="Práctica",
+                tipo="workshop",
+                **franja(2),
+            )
+        )
+        sin_tipo = _datos(
+            await _herramienta(
+                cliente_mcp, clave, "anadir_sesion", event_id=evento["id"], titulo="X", **franja(3)
+            )
+        )
+        desconocido = await _herramienta(
+            cliente_mcp,
+            clave,
+            "anadir_sesion",
+            event_id=evento["id"],
+            titulo="Y",
+            tipo="Concierto",
+            **franja(4),
+        )
+
+        nombres = [
+            tipo["nombre"] for tipo in (tipos if isinstance(tipos, list) else tipos["result"])
+        ]
+        assert "Mesa redonda" in nombres
+        assert (por_nombre["tipo"], por_clave["tipo"], sin_tipo["tipo"]) == (
+            "Mesa redonda",
+            "Taller",
+            "Charla",
+        )
+        assert desconocido["isError"] is True
+        assert "Disponibles" in json.dumps(desconocido, ensure_ascii=False)
+
+
 class TestPortada:
     async def test_asignar_portada_evento_descarga_la_url_y_la_audita(
         self, cliente: AsyncClient, cliente_mcp: AsyncClient, organizacion: OrganizacionDePrueba

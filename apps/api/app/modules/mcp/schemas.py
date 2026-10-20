@@ -46,9 +46,20 @@ class Sede(BaseModel):
     enlace_panel: str | None = None
 
 
+class TipoDeSesion(BaseModel):
+    """Un tipo de sesión de la organización (ver `listar_tipos_de_sesion`)."""
+
+    id: str
+    nombre: str
+    descripcion: str | None
+    es_pausa: bool
+    clave_base: str | None
+
+
 class Sesion(BaseModel):
     id: str
     titulo: str
+    # Nombre del tipo de la organización (p. ej. «Mesa redonda»).
     tipo: str
     inicio: datetime
     fin: datetime
