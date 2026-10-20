@@ -422,10 +422,12 @@ async def _cancelar_inscripcion(
     organization_id: uuid.UUID,
     event_id: uuid.UUID,
     inscripcion: EventRegistration,
+    reembolsada: bool = False,
 ) -> bool:
-    """Núcleo compartido de la cancelación: por el organizador o por
-    autocancelación pública. Marca `cancelled`, envía el email y, si liberaba
-    una plaza reservada, promueve a la lista de espera.
+    """Núcleo compartido de la cancelación: por el organizador, por
+    autocancelación pública o por un reembolso total ya hecho (`reembolsada`).
+    Marca `cancelled`, envía el email y, si liberaba una plaza reservada,
+    promueve a la lista de espera.
 
     Devuelve `False` sin hacer nada si ya estaba `cancelled`/`rejected` — el
     llamador decide si eso es un 409 (panel) o un no-op silencioso (enlace
@@ -442,11 +444,17 @@ async def _cancelar_inscripcion(
     if inscripcion.status in ("cancelled", "rejected"):
         return False
 
-    reembolso = await payments_refunds_service.preparar_reembolso_por_cancelacion(
-        session,
-        organization_id=organization_id,
-        event_id=event_id,
-        registration_id=inscripcion.id,
+    # Si el dinero ya se ha devuelto no queda nada que reembolsar: el correo
+    # lo dice en vez de prometer un reembolso que no va a llegar.
+    reembolso = (
+        "reembolsado"
+        if reembolsada
+        else await payments_refunds_service.preparar_reembolso_por_cancelacion(
+            session,
+            organization_id=organization_id,
+            event_id=event_id,
+            registration_id=inscripcion.id,
+        )
     )
     # `preparar_reembolso_por_cancelacion` solo actúa sobre pagos ya cobrados
     # (`ESTADOS_REEMBOLSABLES`): un pago todavía `pending` (p. ej. una
@@ -480,7 +488,17 @@ async def _cancelar_inscripcion(
     )
     inscripcion.status = "cancelled"
     inscripcion.cancelled_at = datetime.now(UTC)
-    await send_registration_cancelled_email.kiq(inscripcion.email, str(organization_id), reembolso)
+    # Tras el commit: si la transacción se aborta (y la tarea que la llama se
+    # reintenta), nadie recibe un aviso de una cancelación que no ha ocurrido.
+    encolar_tras_commit(
+        session,
+        partial(
+            send_registration_cancelled_email.kiq,
+            inscripcion.email,
+            str(organization_id),
+            reembolso,
+        ),
+    )
 
     if reembolso == "en_curso":
         # Encolado al vuelo (además del cron `*/2 * * * *`): la persona no
@@ -821,6 +839,39 @@ async def cancel_registration(
         session, organization_id=organization_id, event_id=event_id, inscripcion=inscripcion
     )
     return inscripcion
+
+
+async def cancelar_por_reembolso_total(
+    session: AsyncSession,
+    *,
+    organization_id: uuid.UUID,
+    event_id: uuid.UUID,
+    registration_id: uuid.UUID,
+) -> bool:
+    """Cancela la inscripción cuyo pago se ha reembolsado entero, desde el
+    panel o desde el Dashboard de Stripe del organizador: sin pago ni entrada
+    válida no tiene sentido que siga ocupando una plaza.
+
+    No-op si ya estaba cancelada o rechazada (el reembolso de una cancelación
+    llega aquí después de cancelarla) y si el evento está cancelado: esa
+    inscripción la cancela el barrido de la cancelación del evento, que la
+    marca como tal y envía su propio aviso.
+    """
+    inscripcion = await repository.get_registration_for_update(
+        session, organization_id, event_id, registration_id
+    )
+    if inscripcion is None:
+        return False
+    evento = await session.get(Event, event_id)
+    if evento is None or evento.status == "cancelled":
+        return False
+    return await _cancelar_inscripcion(
+        session,
+        organization_id=organization_id,
+        event_id=event_id,
+        inscripcion=inscripcion,
+        reembolsada=True,
+    )
 
 
 async def cancel_registration_by_token(session: AsyncSession, *, token: str) -> None:

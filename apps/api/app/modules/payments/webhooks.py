@@ -32,6 +32,7 @@ from app.core.tras_commit import descartar_tras_commit
 from app.modules.payments import checkout_service, repository
 from app.modules.payments import stripe_client as stripe_gateway
 from app.modules.payments.models import OrganizationStripeAccount, StripeWebhookEvent
+from app.modules.registrations import service as registrations_service
 from app.modules.registrations.models import EventRegistration
 from app.modules.tickets.service import revocar_entrada
 from app.shared.errors import DomainError, ExternalServiceError
@@ -305,5 +306,14 @@ async def _handle_charge_refunded(
     if deberia_revocar and pago.registration_id is not None:
         await revocar_entrada(
             session, organization_id=pago.organization_id, registration_id=pago.registration_id
+        )
+    if es_total and pago.registration_id is not None:
+        # Sin pago ni entrada válida la inscripción no debe seguir ocupando una
+        # plaza: se cancela y la plaza pasa a la lista de espera.
+        await registrations_service.cancelar_por_reembolso_total(
+            session,
+            organization_id=pago.organization_id,
+            event_id=pago.event_id,
+            registration_id=pago.registration_id,
         )
     return "processed"

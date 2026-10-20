@@ -472,6 +472,11 @@ async def send_registration_cancelled_email(
             "\n\nEstamos tramitando el reembolso de tu pago; lo recibirás en los "
             "próximos días en el mismo medio de pago."
         )
+    elif reembolso == "reembolsado":
+        cuerpo += (
+            "\n\nSe te ha devuelto el importe completo de tu pago; lo verás en los "
+            "próximos días en el mismo medio de pago."
+        )
     elif reembolso == "sin_reembolso":
         cuerpo += (
             "\n\nTu pago no se reembolsa automáticamente por la política de plazo de "
