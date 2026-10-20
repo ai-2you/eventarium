@@ -134,6 +134,9 @@ MIS_EVENTOS_SOLICITAR_POR_IP = FORGOT_PASSWORD_POR_IP
 # Consulta del listado: el token tiene entropía de sobra, pero el endpoint
 # necesita su propio tope por ser público, igual que verify-email.
 MIS_EVENTOS_VER_POR_IP = 20
+# El mismo listado con la sesión iniciada: exige cuenta verificada, pero se
+# recarga en cada visita; mismo tope que la consulta por enlace.
+MIS_EVENTOS_MIOS_POR_IP = MIS_EVENTOS_VER_POR_IP
 
 # Servidor MCP: se cuenta **cada uso de herramienta** de una conexión, no
 # cada petición HTTP (una sola petición Streamable HTTP puede llevar varias

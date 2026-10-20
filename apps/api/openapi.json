@@ -7526,6 +7526,28 @@
         }
       }
     },
+    "/api/v1/public/mis-eventos/mios": {
+      "get": {
+        "tags": [
+          "público"
+        ],
+        "summary": "Listar «Mis eventos» con la sesión iniciada",
+        "description": "Las inscripciones del correo de la cuenta, sin enlace mágico. Exige el correo verificado (403 si no) y no se sirve durante una suplantación: el personal de plataforma no debe ver las inscripciones personales de la persona suplantada.",
+        "operationId": "mis_eventos_de_la_cuenta_api_v1_public_mis_eventos_mios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyRegistrationsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/tickets/scan": {
       "post": {
         "tags": [
@@ -19233,6 +19255,25 @@
             "type": "boolean",
             "title": "Event Cancelled",
             "default": false
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "calendar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCalendarInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -19242,7 +19283,9 @@
           "starts_at",
           "organization_name",
           "organization",
-          "status"
+          "status",
+          "ends_at",
+          "timezone"
         ],
         "title": "MyRegistrationItem",
         "description": "Una inscripción tal como la ve el listado de «Mis eventos»."

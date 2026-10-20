@@ -95,7 +95,19 @@
         "Cancelled": "Cancelada",
         "Waitlisted": "Lista de espera"
       },
-      "eventoCancelado": "Evento cancelado por la organización"
+      "eventoCancelado": "Evento cancelado por la organización",
+      "cargando": "Cargando tus inscripciones…",
+      "correoSinVerificar": "Verifica el correo de tu cuenta para ver aquí tus inscripciones sin pedir un enlace. Mientras tanto, puedes pedirlo con el formulario.",
+      "pestanasAria": "Tus eventos",
+      "pestana": {
+        "proximos": "Próximos ({{n}})",
+        "pasados": "Pasados ({{n}})"
+      },
+      "vacio": {
+        "proximos": "No tienes eventos próximos.",
+        "pasados": "Todavía no tienes eventos pasados."
+      },
+      "verEventos": "Ver eventos"
     },
     "organizacion": {
       "rotulo": "Organización",

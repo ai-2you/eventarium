@@ -199,6 +199,12 @@ class MyRegistrationItem(BaseModel):
     # La organización canceló el evento (no confundir con una cancelación de
     # la propia persona).
     event_cancelled: bool = False
+    ends_at: datetime
+    timezone: str
+    # «Añadir a mi calendario», con la misma regla que el resto de respuestas
+    # públicas (`registrations/calendar.py`): solo plaza confirmada y evento
+    # no cancelado. Si no, `None`.
+    calendar: EventCalendarInfo | None = None
 
 
 class MyRegistrationsResponse(BaseModel):
