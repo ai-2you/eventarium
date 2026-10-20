@@ -27,9 +27,13 @@ export function variableDeColor(color: string): string {
 @Component({
   selector: 'app-session-type-chip',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<span class="chip" [class.pausa]="pausa()" [style.--color]="colorCss()">{{
-    nombre()
-  }}</span>`,
+  template: `<span
+    class="chip"
+    [class.pausa]="pausa()"
+    [class.compacto]="compacto()"
+    [style.--color]="colorCss()"
+    >{{ nombre() }}</span
+  >`,
   styles: `
     .chip {
       display: inline-flex;
@@ -46,12 +50,19 @@ export function variableDeColor(color: string): string {
     .pausa {
       border-style: dashed;
     }
+    /* Junto a un título (agenda del panel): acompaña sin competir con él. */
+    .compacto {
+      padding: 0 6px;
+      font-size: 0.6875rem;
+      line-height: 1.45;
+    }
   `,
 })
 export class SessionTypeChip {
   readonly nombre = input.required<string>();
   readonly color = input('gris');
   readonly pausa = input(false);
+  readonly compacto = input(false);
 
   protected readonly colorCss = computed(() => variableDeColor(this.color()));
 }

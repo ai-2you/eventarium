@@ -87,9 +87,11 @@ interface DiaDeAgenda {
                       <div>
                         @if (sesion.type; as tipo) {
                           <app-session-type-chip
+                            class="tipo"
                             [nombre]="tipo.name"
                             [color]="tipo.color"
                             [pausa]="tipo.is_break"
+                            [compacto]="true"
                           />
                         }
                         <strong>{{ sesion.title }}</strong>
@@ -161,6 +163,10 @@ interface DiaDeAgenda {
     </ng-container>
   `,
   styles: `
+    .tipo {
+      margin-right: var(--space-sm);
+      vertical-align: 2px;
+    }
     .edicion-en-linea {
       margin-top: var(--space-sm);
       padding: var(--space-sm) var(--space-md);

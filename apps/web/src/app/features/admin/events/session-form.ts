@@ -20,7 +20,6 @@ import { Button } from '../../../shared/ui/button';
 import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Input } from '../../../shared/ui/input';
 import { Select, type SelectOption } from '../../../shared/ui/select';
-import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
 import { isoAValorLocal } from './datetime-local';
 
 type VideoPlatform = '' | 'youtube' | 'vimeo' | 'twitch' | 'other';
@@ -112,8 +111,14 @@ function vacio(): {
           [hint]="ayudaDeTipo()"
           [(value)]="tipo"
         />
-        <a class="gestionar-tipos" routerLink="/dashboard/session-types">
-          {{ t('admin.events.agenda.gestionarTipos') }}
+        <!-- Otra pestaña: navegar aquí perdería lo escrito en el formulario. -->
+        <a
+          class="gestionar-tipos"
+          routerLink="/dashboard/session-types"
+          target="_blank"
+          [attr.aria-label]="t('admin.events.agenda.gestionarTiposAria')"
+        >
+          <span aria-hidden="true">＋</span> {{ t('admin.events.agenda.gestionarTipos') }}
         </a>
 
         <app-input
@@ -198,10 +203,18 @@ function vacio(): {
     </ng-container>
   `,
   styles: `
+    /* Ámbar suave, como un aviso y no un error: se ve que se puede pulsar. */
     .gestionar-tipos {
       justify-self: start;
       margin-top: calc(-1 * var(--space-sm));
+      color: var(--tipo-ambar);
       font-size: var(--fs-sm);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+    .gestionar-tipos:hover {
+      text-decoration-style: solid;
     }
     .formulario {
       display: grid;
@@ -372,10 +385,6 @@ export class SessionForm implements OnInit {
   protected cancelar(): void {
     this.limpiar();
     this.cancelada.emit();
-  }
-
-  protected capitaliza(valor: string): string {
-    return capitalizarClaveDeTraduccion(valor);
   }
 
   protected alTextarea(evento: Event): string {

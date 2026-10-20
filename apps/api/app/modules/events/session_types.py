@@ -175,6 +175,7 @@ async def _bloquear_catalogo(session: AsyncSession, organization_id: uuid.UUID) 
     await session.execute(
         select(SessionType.id)
         .where(SessionType.organization_id == organization_id)
+        .order_by(SessionType.id)
         .with_for_update()
     )
 
@@ -250,6 +251,7 @@ async def resolver_para_sesion(
     tipo_id: uuid.UUID | None,
     clave: str | None,
     actual: uuid.UUID | None = None,
+    _reparando: bool = False,
 ) -> SessionType:
     """El tipo de una sesión: por id (de la organización y activo, salvo que sea
     el que ya tenía, como la categoría de un evento), por clave heredada o, sin
@@ -268,7 +270,7 @@ async def resolver_para_sesion(
         if encontrado is not None and (encontrado.is_active or encontrado.id == actual):
             return encontrado
     por_defecto = await _primero_activo(session, organization_id)
-    if por_defecto is None and not await _tiene_tipos(session, organization_id):
+    if por_defecto is None and not _reparando and not await _tiene_tipos(session, organization_id):
         # Una organización que nació sin tipos (alta durante un despliegue, a
         # mano, restaurada de una copia antigua) los recibe al necesitarlos. En
         # un punto de guardado: si otra petición los crea a la vez, se usan esos.
@@ -277,8 +279,9 @@ async def resolver_para_sesion(
                 await crear_tipos_base(session, organization_id)
         except IntegrityError:
             pass
+        # Un solo reintento: si los tipos siguen sin existir, no es la carrera.
         return await resolver_para_sesion(
-            session, organization_id, tipo_id=tipo_id, clave=clave, actual=actual
+            session, organization_id, tipo_id=tipo_id, clave=clave, actual=actual, _reparando=True
         )
     if por_defecto is None:
         raise ValidationDomainError(
@@ -309,14 +312,18 @@ async def por_texto(session: AsyncSession, organization_id: uuid.UUID, texto: st
     """Un tipo activo de la organización por su id, su nombre (sin distinguir
     mayúsculas) o su clave base (`talk`, `workshop`…), para el MCP."""
     buscado = texto.strip()
+    plegado = buscado.casefold()
     candidatos = [tipo for tipo, _ in await listar(session, organization_id, solo_activos=True)]
-    for tipo in candidatos:
-        if (
-            str(tipo.id) == buscado
-            or tipo.name.casefold() == buscado.casefold()
-            or tipo.base_key == buscado.casefold()
-        ):
-            return tipo
+    # Por prioridad, no por orden de la lista: un tipo propio llamado «Talk»
+    # gana a la clave base `talk` de «Charla».
+    for coincide in (
+        lambda tipo: str(tipo.id) == plegado,
+        lambda tipo: tipo.name.casefold() == plegado,
+        lambda tipo: tipo.base_key == plegado,
+    ):
+        for tipo in candidatos:
+            if coincide(tipo):
+                return tipo
     disponibles = ", ".join(f"«{tipo.name}»" for tipo in candidatos) or "ninguno"
     raise ValidationDomainError(
         f"No hay ningún tipo de sesión activo «{buscado}». Disponibles: {disponibles}."

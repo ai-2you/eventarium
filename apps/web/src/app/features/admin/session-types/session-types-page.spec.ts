@@ -88,7 +88,8 @@ describe('SessionTypesPage', () => {
     const filas = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('li'));
 
     expect(filas[0]!.textContent).toContain('Charla');
-    expect(filas[0]!.textContent).toContain('4 sesión(es)');
+    expect(filas[0]!.textContent).toContain('4 sesiones');
+    expect(filas[1]!.textContent).toContain('Sin sesiones');
     expect(filas[0]!.textContent).not.toContain('Borrar');
     expect(filas[1]!.textContent).toContain('Pausa');
     expect(filas[1]!.textContent).toContain('Borrar');
@@ -148,6 +149,22 @@ describe('SessionTypesPage', () => {
     orden.flush(null, { status: 204, statusText: 'No Content' });
     await avanzar(fixture);
     http.expectOne(URL).flush([CATALOGO[1], CATALOGO[0]]);
+    await avanzar(fixture);
+  });
+
+  it('borrar pide confirmación antes de enviar nada', async () => {
+    const fixture = await montar();
+    boton(fixture, 'Borrar «Descanso»').click();
+    await avanzar(fixture);
+    http.expectNone((p) => p.method === 'DELETE');
+
+    boton(fixture, 'Confirmar: borrar «Descanso»').click();
+    await avanzar(fixture);
+    http
+      .expectOne((p) => p.url === `${URL}/t2` && p.method === 'DELETE')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await avanzar(fixture);
+    http.expectOne(URL).flush([CATALOGO[0]]);
     await avanzar(fixture);
   });
 });

@@ -601,7 +601,7 @@ async def update_session(
     datos.pop("session_type", None)
     for campo, valor in datos.items():
         setattr(sesion, campo, valor)
-    await session.flush()
+    await _guardar_sesion(session)
     await session.refresh(sesion, ["tipo"])
     return sesion
 

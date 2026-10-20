@@ -1372,11 +1372,6 @@
         "eliminar": "Eliminar",
         "guardarCambios": "Guardar cambios",
         "tipo": "Tipo de sesión",
-        "tipoTalk": "Charla",
-        "tipoWorkshop": "Taller",
-        "tipoBreak": "Descanso",
-        "tipoService": "Servicio",
-        "tipoOther": "Otro",
         "tituloSesion": "Título de la sesión",
         "inicio": "Inicio",
         "fin": "Fin",
@@ -1403,7 +1398,8 @@
         "cabeceraMarca": "quien las imparte.",
         "finAntesDeInicio": "El fin tiene que ser posterior al inicio.",
         "fueraDelEvento": "La sesión tiene que caer dentro de las fechas y horas del evento.",
-        "gestionarTipos": "Gestionar los tipos de sesión"
+        "gestionarTipos": "Añadir o gestionar tipos de sesión",
+        "gestionarTiposAria": "Añadir o gestionar tipos de sesión (se abre en otra pestaña)"
       },
       "design": {
         "titulo": "Diseño",
@@ -2742,7 +2738,7 @@
       "pausaAyuda": "Para descansos, comidas o acreditaciones: se pinta apagada en la agenda y no pide ponentes.",
       "asiSeVera": "Así se verá:",
       "esPausa": "Pausa",
-      "usos": "{{n}} sesión(es)",
+      "usos": "{{n}} sesiones",
       "desactivado": "Desactivado",
       "desactivar": "Desactivar",
       "activar": "Activar",
@@ -2759,7 +2755,16 @@
         "cian": "Cian",
         "rojo": "Rojo",
         "gris": "Gris"
-      }
+      },
+      "editarTipo": "Editar «{{nombre}}»",
+      "desactivarTipo": "Desactivar «{{nombre}}»",
+      "activarTipo": "Activar «{{nombre}}»",
+      "borrarTipo": "Borrar «{{nombre}}»",
+      "seguro": "¿Seguro? Borrar",
+      "confirmarBorrado": "Confirmar: borrar «{{nombre}}»",
+      "nuevoPuesto": "«{{nombre}}» pasa al puesto {{puesto}} de {{total}}.",
+      "usosUna": "1 sesión",
+      "usosNinguna": "Sin sesiones"
     }
   },
   "miEntrada": {

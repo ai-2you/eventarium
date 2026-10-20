@@ -1,5 +1,14 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -73,12 +82,14 @@ const URL = '/organizations/me/session-types';
         <app-alert tone="error">{{ mensaje }}</app-alert>
       }
 
+      <p class="anuncio" aria-live="polite">{{ anuncio() }}</p>
+
       <app-card>
         @if (cargando()) {
           <p>{{ t('comun.cargando') }}</p>
         } @else {
           <ul class="tipos">
-            @for (tipo of tipos(); track tipo.id; let primero = $first; let ultimo = $last) {
+            @for (tipo of tipos(); track tipo.id) {
               <li [class.inactivo]="!tipo.is_active">
                 <div class="datos">
                   <app-session-type-chip
@@ -93,7 +104,7 @@ const URL = '/organizations/me/session-types';
                     @if (tipo.is_break) {
                       {{ t('admin.tiposSesion.esPausa') }} ·
                     }
-                    {{ t('admin.tiposSesion.usos', { n: tipo.sesiones }) }}
+                    {{ textoDeUsos(tipo.sesiones, t) }}
                     @if (!tipo.is_active) {
                       · <strong>{{ t('admin.tiposSesion.desactivado') }}</strong>
                     }
@@ -104,7 +115,6 @@ const URL = '/organizations/me/session-types';
                     variant="terciario"
                     type="button"
                     [compacto]="true"
-                    [disabled]="primero || guardando()"
                     [ariaLabel]="t('admin.tiposSesion.subir', { nombre: tipo.name })"
                     (pulsado)="mover(tipo, -1)"
                     >↑</app-button
@@ -113,7 +123,6 @@ const URL = '/organizations/me/session-types';
                     variant="terciario"
                     type="button"
                     [compacto]="true"
-                    [disabled]="ultimo || guardando()"
                     [ariaLabel]="t('admin.tiposSesion.bajar', { nombre: tipo.name })"
                     (pulsado)="mover(tipo, 1)"
                     >↓</app-button
@@ -122,6 +131,7 @@ const URL = '/organizations/me/session-types';
                     variant="secundario"
                     type="button"
                     [compacto]="true"
+                    [ariaLabel]="t('admin.tiposSesion.editarTipo', { nombre: tipo.name })"
                     (pulsado)="abrirEdicion(tipo)"
                   >
                     {{ t('admin.tiposSesion.editar') }}
@@ -131,6 +141,14 @@ const URL = '/organizations/me/session-types';
                     type="button"
                     [compacto]="true"
                     [disabled]="guardando()"
+                    [ariaLabel]="
+                      t(
+                        tipo.is_active
+                          ? 'admin.tiposSesion.desactivarTipo'
+                          : 'admin.tiposSesion.activarTipo',
+                        { nombre: tipo.name }
+                      )
+                    "
                     (pulsado)="alternarActivo(tipo)"
                   >
                     {{
@@ -140,15 +158,38 @@ const URL = '/organizations/me/session-types';
                     }}
                   </app-button>
                   @if (tipo.sesiones === 0) {
-                    <app-button
-                      variant="peligro"
-                      type="button"
-                      [compacto]="true"
-                      [disabled]="guardando()"
-                      (pulsado)="borrar(tipo)"
-                    >
-                      {{ t('admin.tiposSesion.borrar') }}
-                    </app-button>
+                    @if (confirmandoBorrado() === tipo.id) {
+                      <!-- Borrar no se deshace: segundo paso explícito, como en Roles. -->
+                      <app-button
+                        variant="peligro"
+                        type="button"
+                        [compacto]="true"
+                        [loading]="guardando()"
+                        [ariaLabel]="t('admin.tiposSesion.confirmarBorrado', { nombre: tipo.name })"
+                        (pulsado)="borrar(tipo)"
+                      >
+                        {{ t('admin.tiposSesion.seguro') }}
+                      </app-button>
+                      <app-button
+                        variant="terciario"
+                        type="button"
+                        [compacto]="true"
+                        (pulsado)="confirmandoBorrado.set(null)"
+                      >
+                        {{ t('comun.cancelar') }}
+                      </app-button>
+                    } @else {
+                      <app-button
+                        variant="peligro"
+                        type="button"
+                        [compacto]="true"
+                        [disabled]="guardando()"
+                        [ariaLabel]="t('admin.tiposSesion.borrarTipo', { nombre: tipo.name })"
+                        (pulsado)="confirmandoBorrado.set(tipo.id)"
+                      >
+                        {{ t('admin.tiposSesion.borrar') }}
+                      </app-button>
+                    }
                   }
                 </div>
               </li>
@@ -193,6 +234,7 @@ const URL = '/organizations/me/session-types';
                   (change)="colorElegido.set(color)"
                 />
                 <span class="punto" aria-hidden="true"></span>
+                <span class="marca" aria-hidden="true">✓</span>
                 <span class="nombre-color">{{ t('admin.tiposSesion.colores.' + color) }}</span>
               </label>
             }
@@ -246,9 +288,6 @@ const URL = '/organizations/me/session-types';
     }
     .tipos li:last-child {
       border-bottom: none;
-    }
-    .inactivo .datos {
-      opacity: 0.6;
     }
     .datos {
       display: flex;
@@ -306,6 +345,31 @@ const URL = '/organizations/me/session-types';
       opacity: 0;
       pointer-events: none;
     }
+    /* La elegida lleva ✓ y un borde de 2 px, no solo color: se distingue
+       también con colores forzados del sistema. */
+    .marca {
+      display: none;
+      font-size: var(--fs-sm);
+    }
+    .muestra:has(input:checked) {
+      border-width: 2px;
+    }
+    .muestra:has(input:checked) .marca {
+      display: inline;
+    }
+    @media (forced-colors: active) {
+      .muestra:has(input:checked) {
+        outline: 2px solid CanvasText;
+      }
+    }
+    .anuncio {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
     .punto {
       width: 0.85rem;
       height: 0.85rem;
@@ -329,6 +393,8 @@ export class SessionTypesPage {
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
   private readonly dialogo = viewChild.required<Dialog>('dialogo');
+  private readonly anfitrion = inject(ElementRef<HTMLElement>);
+  private readonly injector = inject(Injector);
 
   protected readonly colores = COLORES_DE_TIPO;
   protected readonly cssDe = variableDeColor;
@@ -337,6 +403,9 @@ export class SessionTypesPage {
   protected readonly guardando = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly tipos = signal<readonly TipoDeSesion[]>([]);
+  protected readonly confirmandoBorrado = signal<string | null>(null);
+  /** Lo que se anuncia a los lectores de pantalla tras reordenar. */
+  protected readonly anuncio = signal('');
 
   /** El tipo del diálogo: `{}` para uno nuevo, el tipo para editarlo. */
   protected readonly editando = signal<Partial<TipoDeSesion> | null>(null);
@@ -428,17 +497,44 @@ export class SessionTypesPage {
   }
 
   protected async borrar(tipo: TipoDeSesion): Promise<void> {
+    this.confirmandoBorrado.set(null);
     await this.ejecutar(() => this.http.delete(this.api.url(`${URL}/${tipo.id}`)));
   }
 
-  /** Sube o baja un puesto y envía el orden completo (la API lo exige entero). */
+  /**
+   * Sube o baja un puesto y envía el orden completo (la API lo exige entero).
+   * Los botones no se desactivan (el foco caería al `<body>`): en los extremos o
+   * mientras se guarda, el clic no hace nada. Después, el foco vuelve a la misma
+   * flecha de esa fila y se anuncia el puesto nuevo.
+   */
   protected async mover(tipo: TipoDeSesion, salto: -1 | 1): Promise<void> {
+    if (this.guardando()) return;
     const ids = this.tipos().map((candidato) => candidato.id);
     const desde = ids.indexOf(tipo.id);
     const hasta = desde + salto;
     if (desde < 0 || hasta < 0 || hasta >= ids.length) return;
     [ids[desde], ids[hasta]] = [ids[hasta]!, ids[desde]!];
     await this.ejecutar(() => this.http.put(this.api.url(`${URL}/order`), { ids }));
+    this.anuncio.set(
+      this.transloco.translate('admin.tiposSesion.nuevoPuesto', {
+        nombre: tipo.name,
+        puesto: hasta + 1,
+        total: ids.length,
+      }),
+    );
+    const etiqueta = this.transloco.translate(
+      salto < 0 ? 'admin.tiposSesion.subir' : 'admin.tiposSesion.bajar',
+      { nombre: tipo.name },
+    );
+    afterNextRender(
+      () =>
+        (
+          this.anfitrion.nativeElement.querySelector(
+            `button[aria-label="${CSS.escape(etiqueta)}"]`,
+          ) as HTMLElement | null
+        )?.focus(),
+      { injector: this.injector },
+    );
   }
 
   private async ejecutar(peticion: () => ReturnType<HttpClient['delete']>): Promise<void> {
@@ -452,6 +548,12 @@ export class SessionTypesPage {
       this.guardando.set(false);
       await this.cargar();
     }
+  }
+
+  protected textoDeUsos(n: number, traducir: (clave: string, p?: object) => string): string {
+    if (n === 0) return traducir('admin.tiposSesion.usosNinguna');
+    if (n === 1) return traducir('admin.tiposSesion.usosUna');
+    return traducir('admin.tiposSesion.usos', { n });
   }
 
   private mensajeDe(error: unknown): string {
