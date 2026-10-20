@@ -5,7 +5,7 @@ reabrir la asistencia de un evento se refleja al momento. Una inscripción
 cuenta como ausencia solo si se cumple todo esto:
 
 - estaba confirmada antes de que empezara el evento y recibió el recordatorio
-  (cada ausencia contada tuvo su aviso);
+  para la fecha en que se celebró (cada ausencia contada tuvo su aviso);
 - el correo estaba verificado o había un pago: nadie puede apuntar ausencias
   a otra persona inscribiéndola con su correo;
 - el evento es presencial, no está borrado ni cancelado, ya terminó, el
@@ -36,7 +36,7 @@ _AUSENCIAS = """
     WHERE r.organization_id = :organization_id
       AND r.status = 'confirmed'
       AND r.confirmed_at < e.starts_at
-      AND r.reminder_sent_at IS NOT NULL
+      AND r.reminder_sent_for_starts_at = date_trunc('minute', e.starts_at)
       AND (
           r.verified_at IS NOT NULL
           OR EXISTS (
@@ -62,7 +62,7 @@ _POR_CORREO = text(
 )
 _DE_UNA_PERSONA = text(
     f"SELECT e.title, e.starts_at {_AUSENCIAS} AND r.email = :correo "  # noqa: S608 — SQL fijo
-    "ORDER BY e.starts_at DESC LIMIT 50"
+    "ORDER BY e.starts_at DESC"
 )
 
 

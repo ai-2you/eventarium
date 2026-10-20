@@ -64,6 +64,7 @@ async def _ausencia(
             confirmed_at=inicio - timedelta(days=5),
             verified_at=inicio - timedelta(days=5),
             reminder_sent_at=inicio - timedelta(days=1),
+            reminder_sent_for_starts_at=inicio.replace(second=0, microsecond=0),
         )
         session.add(inscripcion)
         await session.flush()
@@ -126,7 +127,15 @@ _CAMBIOS = {
     ),
     "entrada-escaneada": "UPDATE event_tickets SET used_at = now() WHERE registration_id = :r",
     "entrada-revocada": "UPDATE event_tickets SET revoked_at = now() WHERE registration_id = :r",
-    "sin-recordatorio": "UPDATE event_registrations SET reminder_sent_at = NULL WHERE id = :r",
+    "sin-recordatorio": (
+        "UPDATE event_registrations SET reminder_sent_at = NULL, "
+        "reminder_sent_for_starts_at = NULL WHERE id = :r"
+    ),
+    "aviso-de-otra-fecha": (
+        "UPDATE event_registrations SET reminder_sent_for_starts_at = "
+        "reminder_sent_for_starts_at - interval '1 day' WHERE id = :r"
+    ),
+    "sin-entrada": "DELETE FROM event_tickets WHERE registration_id = :r",
     "correo-sin-verificar": "UPDATE event_registrations SET verified_at = NULL WHERE id = :r",
     "cancelada": "UPDATE event_registrations SET status = 'cancelled' WHERE id = :r",
     "confirmada-tras-empezar": (
@@ -186,8 +195,9 @@ async def test_no_se_reabre_pasados_7_dias(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba
 ) -> None:
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    # Cerrada ayer, pero el evento terminó hace 10 días: el plazo cuenta desde el fin.
     pasado = await _evento(
-        organizacion, dias=-10, attendance_closed_at=datetime.now(UTC) - timedelta(days=8)
+        organizacion, dias=-10, attendance_closed_at=datetime.now(UTC) - timedelta(days=1)
     )
 
     respuesta = await cliente.post(f"{EVENTS}/{pasado}/attendance/reopen", headers=cabeceras)
@@ -237,3 +247,55 @@ async def test_si_falla_el_historial_el_listado_sigue_sin_la_etiqueta(
     total, detalle = await _ausencias_en_el_panel(cliente, organizacion)
 
     assert (total, detalle) == (0, [])
+
+
+async def test_un_pago_cuenta_aunque_el_correo_no_se_verificara(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    from app.modules.payments.models import EventPayment, EventTicketType
+
+    registration_id = await _ausencia(organizacion)
+    async with SessionMaintenance() as session:
+        inscripcion = await session.get(EventRegistration, registration_id)
+        inscripcion.verified_at = None
+        tipo = EventTicketType(
+            organization_id=organizacion.id,
+            event_id=inscripcion.event_id,
+            name="General",
+            price_cents=1000,
+        )
+        session.add(tipo)
+        await session.flush()
+        session.add(
+            EventPayment(
+                organization_id=organizacion.id,
+                event_id=inscripcion.event_id,
+                registration_id=inscripcion.id,
+                stripe_account_id="acct_prueba",
+                ticket_type_id=tipo.id,
+                amount_cents=1000,
+                currency="eur",
+                status="paid",
+            )
+        )
+        await session.commit()
+
+    total, _ = await _ausencias_en_el_panel(cliente, organizacion)
+
+    assert total == 1
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{"location_mode": "online"}, {"status": "cancelled"}, {"status": "draft"}],
+    ids=["en-linea", "cancelado", "borrador"],
+)
+async def test_no_se_cierra_la_asistencia_de_eventos_que_no_la_tienen(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, extra: dict
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _evento(organizacion, dias=-1, **extra)
+
+    respuesta = await cliente.post(f"{EVENTS}/{evento}/attendance/close", headers=cabeceras)
+
+    assert respuesta.status_code == 409
