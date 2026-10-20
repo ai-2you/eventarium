@@ -15,6 +15,7 @@ cambio del panel en llegar al worker, que es quien envía casi todo.
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import time
 from collections.abc import Sequence
@@ -43,12 +44,18 @@ _cerrojo = asyncio.Lock()
 
 @dataclass(frozen=True, slots=True)
 class EmailAttachment:
-    """Un adjunto binario (fase 4 del PRD: el QR de la entrada en PNG)."""
+    """Un adjunto binario (fase 4 del PRD: el QR de la entrada en PNG).
+
+    Con `cid` va dentro del cuerpo del correo en vez de como adjunto: el HTML
+    lo muestra con `<img src="cid:...">` y `alt` como texto alternativo.
+    """
 
     filename: str
     content: bytes
     maintype: str
     subtype: str
+    cid: str | None = None
+    alt: str = ""
 
 
 class EmailProvider(Protocol):
@@ -273,11 +280,18 @@ async def enviar_con(
         if branding.logo is not None
         else None
     )
+    imagenes_html = "".join(
+        f'<img src="cid:{adjunto.cid}" alt="{html.escape(adjunto.alt)}" width="240" '
+        'height="240" style="display:block;margin:0 auto;width:240px;height:240px;" />'
+        for adjunto in attachments
+        if adjunto.cid is not None
+    )
     html_plantilla = plantilla_html(
         body,
         nombre_marca=branding.nombre,
         logo_html=logo_html,
         base_url=base_url,
+        imagenes_html=imagenes_html,
     )
     texto_con_pie = f"{body}\n\n{pie_texto_plano(base_url=base_url)}"
 
@@ -328,17 +342,33 @@ def _armar_mensaje(
     plano.set_content(texto)
     alternativo.attach(plano)
 
-    if logo is not None and logo_mime is not None:
+    en_el_cuerpo = [adjunto for adjunto in attachments if adjunto.cid is not None]
+    attachments = [adjunto for adjunto in attachments if adjunto.cid is None]
+    tiene_logo = logo is not None and logo_mime is not None
+    if tiene_logo or en_el_cuerpo:
         relacionado = EmailMessage()
         relacionado.set_content(html, subtype="html")
-        principal, secundario = logo_mime.split("/", 1)
-        relacionado.add_related(
-            logo,
-            maintype=principal,
-            subtype=secundario,
-            filename="logo",
-            cid=CID_LOGO,
-        )
+        # `inline` y el `Content-ID` entre ángulos (RFC 2392): sin eso algunos
+        # clientes listan la imagen como adjunto además de mostrarla.
+        if logo is not None and logo_mime is not None:
+            principal, secundario = logo_mime.split("/", 1)
+            relacionado.add_related(
+                logo,
+                maintype=principal,
+                subtype=secundario,
+                filename="logo",
+                cid=f"<{CID_LOGO}>",
+                disposition="inline",
+            )
+        for adjunto in en_el_cuerpo:
+            relacionado.add_related(
+                adjunto.content,
+                maintype=adjunto.maintype,
+                subtype=adjunto.subtype,
+                filename=adjunto.filename,
+                cid=f"<{adjunto.cid}>",
+                disposition="inline",
+            )
         alternativo.attach(relacionado)
     else:
         html_parte = EmailMessage()

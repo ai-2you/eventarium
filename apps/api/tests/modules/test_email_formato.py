@@ -232,3 +232,71 @@ async def test_con_logo_y_adjunto_coexisten_el_embedido_y_el_qr() -> None:
     assert len(pngs) == 2
     assert any("logo@eventarium" in (p.get("Content-ID") or "") for p in pngs)
     assert any(p.get_filename() == "entrada.png" for p in pngs)
+
+
+async def test_un_adjunto_con_cid_va_dentro_del_cuerpo_y_no_como_adjunto() -> None:
+    qr = email.EmailAttachment(
+        filename="entrada.png",
+        content=b"\x89PNG",
+        maintype="image",
+        subtype="png",
+        cid="entrada@eventarium",
+        alt="Código QR de tu entrada",
+    )
+    mensaje = await _enviar("Hola,\n\nConfirmada.", con_logo=True, adjuntos=(qr,))
+    # Sin adjuntos de verdad no hace falta envolver en `multipart/mixed`.
+    assert mensaje.get_content_type() == "multipart/alternative"
+    partes = list(mensaje.walk())
+    html_ = next(p for p in partes if p.get_content_type() == "text/html").get_content()
+    assert 'src="cid:entrada@eventarium"' in html_
+    assert 'alt="Código QR de tu entrada"' in html_
+    # Logo y QR van en la misma parte `related`, los dos `inline` con su Content-ID.
+    pngs = [p for p in partes if p.get_content_type() == "image/png"]
+    assert sorted(p.get("Content-ID") for p in pngs) == [
+        "<entrada@eventarium>",
+        "<logo@eventarium>",
+    ]
+    assert all(p.get_content_disposition() == "inline" for p in pngs)
+
+
+async def test_el_qr_embebido_convive_con_un_adjunto_normal() -> None:
+    qr = email.EmailAttachment(
+        filename="entrada.png", content=b"\x89PNG", maintype="image", subtype="png", cid="qr@x"
+    )
+    otro = email.EmailAttachment(
+        filename="factura.png", content=b"\x89PNG", maintype="image", subtype="png"
+    )
+    mensaje = await _enviar("Hola.", adjuntos=(qr, otro))
+    assert mensaje.get_content_type() == "multipart/mixed"
+    adjuntos = [p for p in mensaje.walk() if p.get_content_disposition() == "attachment"]
+    assert [p.get_filename() for p in adjuntos] == ["factura.png"]
+    relacionado = next(p for p in mensaje.walk() if p.get_content_type() == "multipart/related")
+    embebidas = [p for p in relacionado.walk() if p.get_content_type() == "image/png"]
+    assert [(p.get("Content-ID"), p.get_content_disposition()) for p in embebidas] == [
+        ("<qr@x>", "inline")
+    ]
+
+
+def test_las_imagenes_van_tras_el_primer_parrafo_y_no_detras_de_la_cancelacion() -> None:
+    html_ = email_template.plantilla_html(
+        "Tu entrada es el QR de este correo.\n\nSi no puedes asistir, cancela aquí.",
+        nombre_marca="Eventarium",
+        logo_html=None,
+        base_url=BASE,
+        imagenes_html='<img src="cid:qr" alt="" />',
+    )
+    assert html_.index("QR de este correo") < html_.index("cid:qr") < html_.index("cancela aquí")
+
+
+async def test_el_texto_alternativo_de_la_imagen_se_escapa() -> None:
+    qr = email.EmailAttachment(
+        filename="entrada.png",
+        content=b"\x89PNG",
+        maintype="image",
+        subtype="png",
+        cid="qr@x",
+        alt='Entrada "VIP" <de> Ana & Luis',
+    )
+    mensaje = await _enviar("Hola.", adjuntos=(qr,))
+    html_ = next(p for p in mensaje.walk() if p.get_content_type() == "text/html").get_content()
+    assert 'alt="Entrada &quot;VIP&quot; &lt;de&gt; Ana &amp; Luis"' in html_
