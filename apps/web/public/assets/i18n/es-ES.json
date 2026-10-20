@@ -608,7 +608,16 @@
     "comprobando": "Comprobando el enlace…",
     "exitoTitulo": "Inscripción cancelada",
     "errorTitulo": "El enlace no es válido o ha caducado",
-    "errorDetalle": "Vuelve a la página del evento si necesitas hacer algo más."
+    "errorDetalle": "Vuelve a la página del evento si necesitas hacer algo más.",
+    "pregunta": "Vas a cancelar tu inscripción a",
+    "plaza": "Tu plaza quedará libre y, si hay lista de espera, pasará a otra persona.",
+    "conReembolso": "Se te devolverá el importe de tu entrada en el mismo medio de pago.",
+    "sinReembolso": "Ya ha pasado el plazo de reembolso: si cancelas, no se devuelve el importe.",
+    "confirmar": "Sí, cancelar mi inscripción",
+    "yaCancelada": "Esta inscripción ya estaba cancelada. No tienes que hacer nada más.",
+    "empezadoTitulo": "El evento ya ha empezado",
+    "empezadoDetalle": "Ya no se puede cancelar la inscripción desde este enlace. Si lo necesitas, contacta con la organización.",
+    "noActiva": "Esta inscripción no está activa. No tienes que hacer nada más."
   },
   "recuperarContrasena": {
     "titulo": "Recuperar la contraseña",

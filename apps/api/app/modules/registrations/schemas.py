@@ -142,6 +142,22 @@ class CancelRegistrationRequest(BaseModel):
     token: str
 
 
+class CancelPreviewResponse(BaseModel):
+    """Lo que se va a cancelar, para confirmarlo antes de gastar el enlace.
+
+    `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si hay pago
+    pero la política de plazo no lo devuelve, o nulo si no hay nada que
+    devolver (evento gratuito, o inscripción ya cancelada).
+    """
+
+    status: str
+    event_title: str
+    starts_at: datetime
+    timezone: str
+    already_started: bool
+    refund: Literal["en_curso", "sin_reembolso"] | None = None
+
+
 class CancelRegistrationResponse(BaseModel):
     """Resultado de cancelar una inscripción por autocancelación."""
 

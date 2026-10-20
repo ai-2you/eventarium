@@ -74,6 +74,9 @@ dependencies = [
     # el adaptador de OCR nunca recibe un PDF.
     "pypdfium2>=5.0,<6.0",
     "mcp==2.2.0",
+    # Base de zonas horarias para `zoneinfo`: la imagen `python:*-slim` no trae
+    # `/usr/share/zoneinfo`, y las horas de los correos van en la zona del evento.
+    "tzdata>=2026.5",
 ]
 
 [dependency-groups]
