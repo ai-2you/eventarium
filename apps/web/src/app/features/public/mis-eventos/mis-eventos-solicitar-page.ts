@@ -2,17 +2,33 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 
 import { ApiError } from '../../../core/api/error.interceptor';
-import { RegistrationsService } from '../../../core/registrations/registrations.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import {
+  type MyRegistrationItem,
+  RegistrationsService,
+} from '../../../core/registrations/registrations.service';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { Input } from '../../../shared/ui/input';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { TurnstileWidget } from '../../../shared/ui/turnstile-widget';
+import { MisEventosListado } from './mis-eventos-listado';
+
+/** `comprobando` mientras se averigua si hay sesión; `cuenta`, el listado del
+ * correo de la cuenta; `formulario`, el magic-link de siempre. */
+type Modo = 'comprobando' | 'cuenta' | 'formulario';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Formulario de un campo (email) que pide el magic-link de «Mis eventos».
+ * «Mis eventos». Con la sesión iniciada y el correo verificado, lista
+ * directamente las inscripciones de ese correo. Si no, el formulario de un
+ * campo (email) que pide el magic-link. Solo cliente (`app.routes.server.ts`):
+ * la sesión vive en una cookie que el servidor no maneja, y pintar ahí el
+ * formulario para cambiarlo luego por el listado haría parpadear la página.
+ *
+ * Con sesión pero el correo sin verificar (403 fuera de una suplantación), se
+ * avisa encima del formulario en vez de caer a él sin explicación.
  *
  * La respuesta es siempre la misma exista o no ese email entre las
  * inscripciones (anti-enumeración, igual que `ForgotPasswordPage`): el
@@ -22,17 +38,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 @Component({
   selector: 'app-mis-eventos-solicitar-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Input, Reveal, TurnstileWidget],
+  imports: [TranslocoDirective, Alert, Button, Input, Reveal, TurnstileWidget, MisEventosListado],
   template: `
     <ng-container *transloco="let t">
       <div class="ancho-maximo envoltura" appReveal>
         <h1>{{ t('publico.misEventos.titulo') }}</h1>
 
-        @if (enviado()) {
+        @if (modo() === 'comprobando') {
+          <app-alert tone="info">{{ t('publico.misEventos.cargando') }}</app-alert>
+        } @else if (modo() === 'cuenta') {
+          <app-mis-eventos-listado [inscripciones]="inscripciones()" />
+        } @else if (enviado()) {
           <app-alert tone="exito" [title]="t('publico.misEventos.exitoTitulo')">
             {{ t('publico.misEventos.exitoDetalle') }}
           </app-alert>
         } @else {
+          @if (correoSinVerificar()) {
+            <app-alert tone="info">{{ t('publico.misEventos.correoSinVerificar') }}</app-alert>
+          }
           <form (submit)="enviar($event)" novalidate>
             <p>{{ t('publico.misEventos.instrucciones') }}</p>
             <app-input
@@ -57,10 +80,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   `,
   styles: `
     .envoltura {
+      display: grid;
+      gap: var(--space-md);
       padding: var(--space-lg) 0;
-      max-width: 26rem;
     }
     form {
+      max-width: 26rem;
       display: grid;
       gap: var(--space-md);
     }
@@ -69,6 +94,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export class MisEventosSolicitarPage {
   private readonly registrations = inject(RegistrationsService);
   private readonly transloco = inject(TranslocoService);
+  private readonly auth = inject(AuthService);
+
+  protected readonly modo = signal<Modo>('comprobando');
+  protected readonly inscripciones = signal<readonly MyRegistrationItem[]>([]);
+  protected readonly correoSinVerificar = signal(false);
 
   protected readonly email = signal('');
   protected readonly errorEmail = signal<string | null>(null);
@@ -76,6 +106,27 @@ export class MisEventosSolicitarPage {
   protected readonly enviando = signal(false);
   protected readonly enviado = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  constructor() {
+    void this.cargarDeLaCuenta();
+  }
+
+  private async cargarDeLaCuenta(): Promise<void> {
+    const conSesion = this.auth.isAuthenticated() || (await this.auth.refresh());
+    if (!conSesion) {
+      this.modo.set('formulario');
+      return;
+    }
+    try {
+      this.inscripciones.set(await this.registrations.getMyAccountRegistrations());
+      this.modo.set('cuenta');
+    } catch (error) {
+      this.correoSinVerificar.set(
+        error instanceof ApiError && error.status === 403 && this.auth.suplantando() === null,
+      );
+      this.modo.set('formulario');
+    }
+  }
 
   protected async enviar(evento: Event): Promise<void> {
     evento.preventDefault();

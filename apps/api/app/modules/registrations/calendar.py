@@ -13,6 +13,9 @@ cualquiera de los dos serviría a un ciclo de importación.
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Protocol
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.events.models import Event
@@ -22,7 +25,31 @@ from app.modules.registrations.models import EventRegistration
 from app.modules.registrations.schemas import EventCalendarInfo
 
 
-def _ubicacion(evento: Event) -> str | None:
+class EventoParaCalendario(Protocol):
+    """Lo que el calendario necesita de un evento: el modelo `Event` o la fila
+    de `app_list_registrations_by_email` («Mis eventos») lo cumplen."""
+
+    @property
+    def slug(self) -> str: ...
+    @property
+    def title(self) -> str: ...
+    @property
+    def status(self) -> str: ...
+    @property
+    def starts_at(self) -> datetime: ...
+    @property
+    def ends_at(self) -> datetime: ...
+    @property
+    def timezone(self) -> str: ...
+    @property
+    def location_name(self) -> str | None: ...
+    @property
+    def location_address(self) -> str | None: ...
+    @property
+    def online_url(self) -> str | None: ...
+
+
+def _ubicacion(evento: EventoParaCalendario) -> str | None:
     """Texto de lugar para el calendario: sede y dirección; si el evento es solo
     en línea, el enlace de conexión (que es lo que se necesita para asistir)."""
     partes = [p.strip() for p in (evento.location_name, evento.location_address) if p and p.strip()]
@@ -32,7 +59,7 @@ def _ubicacion(evento: Event) -> str | None:
 
 
 def calendario_de_evento(
-    evento: Event, organizacion: PublicOrganizationRef, *, estado_inscripcion: str
+    evento: EventoParaCalendario, organizacion: PublicOrganizationRef, *, estado_inscripcion: str
 ) -> EventCalendarInfo | None:
     """Parte pura, para quien ya tiene el `Event` cargado (p. ej. la vuelta de pago).
 

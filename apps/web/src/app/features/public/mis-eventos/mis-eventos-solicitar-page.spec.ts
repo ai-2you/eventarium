@@ -5,6 +5,8 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MisEventosSolicitarPage } from './mis-eventos-solicitar-page';
+import { ApiError } from '../../../core/api/error.interceptor';
+import { AuthService } from '../../../core/auth/auth.service';
 import { RegistrationsService } from '../../../core/registrations/registrations.service';
 import { TurnstileWidget } from '../../../shared/ui/turnstile-widget';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
@@ -18,7 +20,20 @@ class TurnstileWidgetFalso {
 }
 
 describe('MisEventosSolicitarPage', () => {
+  let auth: {
+    isAuthenticated: ReturnType<typeof vi.fn>;
+    refresh: ReturnType<typeof vi.fn>;
+    suplantando: ReturnType<typeof vi.fn>;
+  };
+  let getMyAccountRegistrations: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
+    auth = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      refresh: vi.fn().mockResolvedValue(false),
+      suplantando: vi.fn().mockReturnValue(null),
+    };
+    getMyAccountRegistrations = vi.fn().mockResolvedValue([]);
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
@@ -29,10 +44,12 @@ describe('MisEventosSolicitarPage', () => {
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),
+        { provide: AuthService, useValue: auth },
         {
           provide: RegistrationsService,
           useValue: {
             requestMisEventosAccess: vi.fn().mockResolvedValue({ message: 'ok' }),
+            getMyAccountRegistrations,
           },
         },
       ],
@@ -86,5 +103,58 @@ describe('MisEventosSolicitarPage', () => {
     expect(registrations.requestMisEventosAccess).toHaveBeenCalledWith('valido@example.com', '');
     expect(fixture.nativeElement.textContent).toContain('Revisa tu correo');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  describe('con la sesión iniciada', () => {
+    it('lista las inscripciones de la cuenta sin pedir el correo', async () => {
+      auth.isAuthenticated.mockReturnValue(true);
+      getMyAccountRegistrations.mockResolvedValue([]);
+      const fixture = TestBed.createComponent(MisEventosSolicitarPage);
+      await fixture.whenStable();
+
+      expect(getMyAccountRegistrations).toHaveBeenCalledOnce();
+      expect(fixture.nativeElement.querySelector('form')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-mis-eventos-listado')).not.toBeNull();
+    });
+
+    it('recupera la sesión tras una recarga antes de decidir', async () => {
+      auth.refresh.mockResolvedValue(true);
+      const fixture = TestBed.createComponent(MisEventosSolicitarPage);
+      await fixture.whenStable();
+
+      expect(auth.refresh).toHaveBeenCalledOnce();
+      expect(getMyAccountRegistrations).toHaveBeenCalledOnce();
+    });
+
+    it('sin sesión muestra el formulario y no pide el listado', async () => {
+      const fixture = TestBed.createComponent(MisEventosSolicitarPage);
+      await fixture.whenStable();
+
+      expect(getMyAccountRegistrations).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+    });
+
+    it('con el correo sin verificar avisa encima del formulario', async () => {
+      auth.isAuthenticated.mockReturnValue(true);
+      getMyAccountRegistrations.mockRejectedValue(new ApiError(403, 'sin verificar', null));
+      const fixture = TestBed.createComponent(MisEventosSolicitarPage);
+      await fixture.whenStable();
+
+      const texto = fixture.nativeElement.textContent as string;
+      expect(texto).toContain(es.publico.misEventos.correoSinVerificar);
+      expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+    });
+
+    it('durante una suplantación cae al formulario sin el aviso', async () => {
+      auth.isAuthenticated.mockReturnValue(true);
+      auth.suplantando.mockReturnValue({ usuario: 'x' });
+      getMyAccountRegistrations.mockRejectedValue(new ApiError(403, 'suplantación', null));
+      const fixture = TestBed.createComponent(MisEventosSolicitarPage);
+      await fixture.whenStable();
+
+      const texto = fixture.nativeElement.textContent as string;
+      expect(texto).not.toContain(es.publico.misEventos.correoSinVerificar);
+      expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+    });
   });
 });
