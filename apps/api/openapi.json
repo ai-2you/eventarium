@@ -15476,6 +15476,7 @@
             "type": "string",
             "enum": [
               "talk",
+              "workshop",
               "break",
               "service",
               "other"
@@ -15595,6 +15596,7 @@
             "type": "string",
             "enum": [
               "talk",
+              "workshop",
               "break",
               "service",
               "other"
@@ -15721,6 +15723,7 @@
                 "type": "string",
                 "enum": [
                   "talk",
+                  "workshop",
                   "break",
                   "service",
                   "other"
@@ -21214,6 +21217,7 @@
             "type": "string",
             "enum": [
               "talk",
+              "workshop",
               "break",
               "service",
               "other"
@@ -21757,6 +21761,7 @@
             "type": "string",
             "enum": [
               "talk",
+              "workshop",
               "break",
               "service",
               "other"

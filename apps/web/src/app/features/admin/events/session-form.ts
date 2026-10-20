@@ -22,7 +22,7 @@ import { Select, type SelectOption } from '../../../shared/ui/select';
 import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
 import { isoAValorLocal } from './datetime-local';
 
-export type SessionType = 'talk' | 'break' | 'service' | 'other';
+export type SessionType = 'talk' | 'workshop' | 'break' | 'service' | 'other';
 type VideoPlatform = '' | 'youtube' | 'vimeo' | 'twitch' | 'other';
 
 export interface EventSession {
@@ -45,7 +45,7 @@ interface EventVenueOption {
   readonly name: string;
 }
 
-const SESSION_TYPES: readonly SessionType[] = ['talk', 'break', 'service', 'other'];
+const SESSION_TYPES: readonly SessionType[] = ['talk', 'workshop', 'break', 'service', 'other'];
 
 function vacio(): {
   session_type: SessionType;

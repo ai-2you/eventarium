@@ -15,7 +15,7 @@ export interface PublicEventSession {
 }>;
   participants: Array<PublicParticipant>;
   room: (string | null);
-  session_type: 'talk' | 'break' | 'service' | 'other';
+  session_type: 'talk' | 'workshop' | 'break' | 'service' | 'other';
   starts_at: string;
   title: string;
   venue_id: (string | null);

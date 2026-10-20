@@ -114,6 +114,7 @@ export interface PublicEventDetail {
  * campo sí es un enum cerrado, así que se traduce por clave sin fallback humanizado. */
 const CLAVES_TIPO_SESION: Record<string, string> = {
   talk: 'publico.eventos.sesion.tipo.talk',
+  workshop: 'publico.eventos.sesion.tipo.workshop',
   break: 'publico.eventos.sesion.tipo.break',
   service: 'publico.eventos.sesion.tipo.service',
   other: 'publico.eventos.sesion.tipo.other',

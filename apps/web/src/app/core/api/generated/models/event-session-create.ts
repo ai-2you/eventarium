@@ -12,7 +12,7 @@ export interface EventSessionCreate {
 [key: string]: any;
 }>;
   room?: (string | null);
-  session_type: 'talk' | 'break' | 'service' | 'other';
+  session_type: 'talk' | 'workshop' | 'break' | 'service' | 'other';
   sort_order?: number;
   starts_at: string;
   title: string;
