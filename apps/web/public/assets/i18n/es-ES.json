@@ -278,6 +278,22 @@
       "comoLlegar": {
         "texto": "Cómo llegar",
         "aria": "Cómo llegar a {{lugar}} (se abre en otra pestaña)"
+      },
+      "cercanos": {
+        "rotulo": "Alrededor",
+        "titulo": "Qué hay cerca",
+        "tipos": {
+          "hotel": "Hotel",
+          "restaurant": "Restaurante",
+          "bar": "Bar o cafetería",
+          "parking": "Parking",
+          "transport": "Transporte",
+          "pharmacy": "Farmacia",
+          "other": "Otros"
+        },
+        "llamar": "Llamar a {{nombre}}",
+        "web": "Web de {{nombre}} (se abre en otra pestaña)",
+        "mapa": "Ver {{nombre}} en el mapa (se abre en otra pestaña)"
       }
     },
     "accesoMenu": {
@@ -2186,7 +2202,45 @@
       "sinLimite": "Sin límite",
       "vistaPrevia": "Vista previa",
       "vistaPreviaDe": "Vista previa de «{{titulo}}» (se abre en otra pestaña)",
-      "columnaAcciones": "Acciones"
+      "columnaAcciones": "Acciones",
+      "cercanos": {
+        "titulo": "Qué hay cerca",
+        "ayuda": "Sitios útiles cerca del evento: alojamiento, dónde comer, parking, transporte… Salen en la ficha pública, junto a «Cómo llegar».",
+        "cargando": "Cargando…",
+        "vacio": "Todavía no hay sitios cercanos.",
+        "subir": "Subir «{{nombre}}»",
+        "bajar": "Bajar «{{nombre}}»",
+        "editar": "Editar",
+        "quitar": "Quitar",
+        "copiarDe": "Copiar de otro evento",
+        "eligeEvento": "Elige un evento",
+        "copiar": "Copiar sus sitios",
+        "anadirSitio": "Añadir sitio",
+        "editarSitio": "Editar sitio",
+        "guardarCambios": "Guardar cambios",
+        "cancelar": "Cancelar",
+        "tipo": "Tipo",
+        "tipoLibre": "¿Qué tipo de sitio es?",
+        "tipoLibreAyuda": "Por ejemplo: Gimnasio, Museo, Coworking.",
+        "nombre": "Nombre",
+        "direccion": "Dirección",
+        "telefono": "Teléfono",
+        "web": "Web",
+        "webAyuda": "Con https://",
+        "nota": "Nota",
+        "notaAyuda": "Por ejemplo: 10 % de descuento con tu entrada. Hasta 300 caracteres.",
+        "faltaNombre": "Escribe el nombre del sitio.",
+        "error": "No se ha podido guardar. Inténtalo de nuevo.",
+        "tipos": {
+          "hotel": "Hotel",
+          "restaurant": "Restaurante",
+          "bar": "Bar o cafetería",
+          "parking": "Parking",
+          "transport": "Transporte",
+          "pharmacy": "Farmacia",
+          "other": "Otro"
+        }
+      }
     },
     "sponsorTiersNav": "Niveles de patrocinio",
     "stripeNav": "Pagos con Stripe",
