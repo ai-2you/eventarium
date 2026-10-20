@@ -103,6 +103,10 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     <ng-container *transloco="let t">
       @if (cargando()) {
         <p class="ancho-maximo">{{ t('comun.cargando') }}</p>
+      } @else if (errorDeVistaPrevia()) {
+        <div class="ancho-maximo">
+          <app-alert tone="error">{{ t('publico.eventos.vistaPreviaError') }}</app-alert>
+        </div>
       } @else if (noEncontrado()) {
         <div class="ancho-maximo">
           <app-alert tone="error">{{ t('publico.eventos.noEncontrado') }}</app-alert>
@@ -672,9 +676,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   `,
 })
 export class EventPage implements OnInit {
-  // Vacíos en la vista previa, que llega por `eventId` (`/vista-previa/:eventId`).
-  readonly org = input('');
-  readonly slug = input('');
+  // Sin valor en la vista previa, que llega por `eventId` (`/vista-previa/:eventId`).
+  readonly org = input<string | undefined>('');
+  readonly slug = input<string | undefined>('');
   /** Vista previa del panel: la ficha de cualquier evento de la organización,
    * también un borrador, desde `GET /events/{id}/preview` y solo en el navegador. */
   readonly eventId = input<string | undefined>(undefined);
@@ -694,6 +698,9 @@ export class EventPage implements OnInit {
   protected readonly evento = signal<PublicEventDetail | null>(null);
   protected readonly cargando = signal(true);
   protected readonly noEncontrado = signal(false);
+  /** En la vista previa, un fallo que no es «no existe» (permiso retirado, red,
+   * servidor): quien revisa debe saber que no es que el evento falte. */
+  protected readonly errorDeVistaPrevia = signal(false);
 
   /** Desplaza al ancla de la URL (p. ej. `#agenda-h2` desde la miga de pan
    * "Programa" de `session-page.ts`/`sponsor-page.ts`) una vez el evento ya
@@ -782,8 +789,8 @@ export class EventPage implements OnInit {
   protected ruta(...resto: string[]): string[] {
     const evento = this.evento();
     return rutaEvento(
-      evento?.organization.slug ?? this.org(),
-      evento?.slug ?? this.slug(),
+      evento?.organization.slug ?? this.org() ?? '',
+      evento?.slug ?? this.slug() ?? '',
       ...resto,
     );
   }
@@ -871,9 +878,12 @@ export class EventPage implements OnInit {
 
     try {
       const evento = await firstValueFrom(
-        this.http.get<PublicEventDetail>(this.api.url(apiEvento(this.org(), this.slug())), {
-          headers: this.api.serverForwardHeaders(),
-        }),
+        this.http.get<PublicEventDetail>(
+          this.api.url(apiEvento(this.org() ?? '', this.slug() ?? '')),
+          {
+            headers: this.api.serverForwardHeaders(),
+          },
+        ),
       );
       this.aplicar(evento);
       if (this.api.isServer) {
@@ -899,8 +909,12 @@ export class EventPage implements OnInit {
         this.http.get<PublicEventDetail>(this.api.url(`/events/${eventId}/preview`)),
       );
       this.aplicar(evento, { vistaPrevia: true });
-    } catch {
-      this.noEncontrado.set(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.noEncontrado.set(true);
+      } else {
+        this.errorDeVistaPrevia.set(true);
+      }
     } finally {
       this.cargando.set(false);
     }

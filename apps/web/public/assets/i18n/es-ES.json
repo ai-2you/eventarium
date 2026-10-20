@@ -271,7 +271,8 @@
         "sinMotivo": "La organización ha cancelado el evento. Si tenías inscripción, te hemos avisado por correo y, si pagaste, te devolvemos el importe.",
         "inscripcion": "Este evento se ha cancelado y ya no admite inscripciones."
       },
-      "vistaPrevia": "Vista previa: así verá el público esta ficha. Si el evento aún no está publicado, solo la ve tu equipo y sus enlaces no funcionarán hasta publicarlo."
+      "vistaPrevia": "Vista previa: así verá el público esta ficha. Si el evento aún no está publicado, solo la ve tu equipo y sus enlaces no funcionarán hasta publicarlo.",
+      "vistaPreviaError": "No se ha podido cargar la vista previa. Comprueba que sigues teniendo acceso y vuelve a intentarlo."
     },
     "accesoMenu": {
       "titulo": "Acceso a la cuenta",

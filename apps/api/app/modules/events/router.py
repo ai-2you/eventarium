@@ -179,7 +179,12 @@ def _session_participant_response(fila: Any) -> SessionParticipantResponse:
 
 
 async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_id: str) -> Event:
-    evento = await repository.get_event(session, usuario.organization_id, uuid.UUID(event_id))
+    try:
+        id_evento = uuid.UUID(event_id)
+    except ValueError as exc:
+        # Un enlace mal copiado (p. ej. a la vista previa) no es un error del servidor.
+        raise NotFoundError("El evento no existe.") from exc
+    evento = await repository.get_event(session, usuario.organization_id, id_evento)
     if evento is None:
         raise NotFoundError("El evento no existe.")
     return evento

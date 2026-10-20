@@ -37,7 +37,7 @@ _RUTAS_DE_LA_APLICACION = frozenset(
         "mi-entrada", "mis-eventos", "oauth", "organization", "pago", "patrocinadores",
         "payments", "plantillas", "politicas", "ponentes", "recuperar-contrasena",
         "registrations", "registro", "roles", "servicios", "sponsor-tiers", "stripe",
-        "suplantar", "usuarios", "verificar-correo", "verificar-inscripcion",
+        "suplantar", "usuarios", "verificar-correo", "verificar-inscripcion", "vista-previa",
     }
 )  # fmt: skip
 _RUTAS_DEL_PROXY = frozenset({"healthz", ".well-known", "media"})

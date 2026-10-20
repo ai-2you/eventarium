@@ -329,7 +329,9 @@ async def get_public_event(
 async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDetail:
     """La ficha pública de un evento. Quién puede verla lo decide quien llama:
     la ruta pública solo con eventos publicados (`EVENTO_PARA_MOSTRAR`) y la
-    vista previa del panel con cualquiera de la organización."""
+    vista previa del panel con cualquiera de la organización. Recibe el evento
+    ya resuelto y nunca lo resuelve dentro: la vista previa trabaja con el
+    contexto RLS de quien la pide, que una resolución pública sobrescribiría."""
     sesiones = await _sesiones_publicas(session, evento.organization_id, evento.id)
     sedes = await _sedes_publicas(session, evento.organization_id, evento.id)
     niveles_con_patrocinadores = await _sponsor_tiers_publicos(

@@ -46,3 +46,13 @@ async def test_la_vista_previa_exige_ver_eventos_y_ser_de_la_organizacion(
     assert (await cliente.get(url)).status_code == 401
     assert (await cliente.get(url, headers=cabeceras_ponente)).status_code == 403
     assert (await cliente.get(url, headers=cabeceras_ajenas)).status_code == 404
+
+
+async def test_un_identificador_que_no_es_un_evento_da_404(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+
+    respuesta = await cliente.get(f"{EVENTS}/no-es-un-uuid/preview", headers=cabeceras)
+
+    assert respuesta.status_code == 404
