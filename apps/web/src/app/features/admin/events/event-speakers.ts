@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import {
+  DOCUMENT,
   ChangeDetectionStrategy,
   Component,
   type OnInit,
@@ -177,55 +178,54 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                     </span>
                   </td>
                   <td class="numerica">{{ fila.ediciones }}</td>
-                  <td class="acciones">
-                    @if (!fila.bio) {
+                  <td>
+                    <div class="acciones">
+                      @if (!fila.bio) {
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          [loading]="pidiendoBio() === fila.organization_member_id"
+                          (pulsado)="pedirBio(fila)"
+                        >
+                          {{ t('admin.events.speakers.pedirBio') }}
+                        </app-button>
+                      } @else {
+                        <!-- Botón también con perfil público: mismo aspecto que el
+                             resto de acciones; abre el perfil en otra pestaña. -->
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          [attr.aria-label]="
+                            fila.public_slug
+                              ? t('admin.events.speakers.verBioDe', { nombre: nombre(fila) })
+                              : null
+                          "
+                          (pulsado)="verBio(fila)"
+                        >
+                          {{ t('admin.events.speakers.verBio') }}
+                        </app-button>
+                      }
+                      @if (fila.sesiones.length === 0) {
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          (pulsado)="abrirAsignar(fila)"
+                        >
+                          {{ t('admin.events.speakers.asignarSesion') }}
+                        </app-button>
+                      }
                       <app-button
-                        variant="secundario"
+                        variant="terciario"
                         type="button"
                         [compacto]="true"
-                        [loading]="pidiendoBio() === fila.organization_member_id"
-                        (pulsado)="pedirBio(fila)"
+                        (pulsado)="abrirHistorial(fila)"
                       >
-                        {{ t('admin.events.speakers.pedirBio') }}
+                        {{ t('admin.events.speakers.historial') }}
                       </app-button>
-                    } @else if (fila.public_slug) {
-                      <a
-                        class="enlace"
-                        [routerLink]="['/ponentes', fila.public_slug]"
-                        target="_blank"
-                        [attr.aria-label]="
-                          t('admin.events.speakers.verBioDe', { nombre: nombre(fila) })
-                        "
-                        >{{ t('admin.events.speakers.verBio') }}</a
-                      >
-                    } @else {
-                      <app-button
-                        variant="secundario"
-                        type="button"
-                        [compacto]="true"
-                        (pulsado)="abrirBio(fila)"
-                      >
-                        {{ t('admin.events.speakers.verBio') }}
-                      </app-button>
-                    }
-                    @if (fila.sesiones.length === 0) {
-                      <app-button
-                        variant="secundario"
-                        type="button"
-                        [compacto]="true"
-                        (pulsado)="abrirAsignar(fila)"
-                      >
-                        {{ t('admin.events.speakers.asignarSesion') }}
-                      </app-button>
-                    }
-                    <app-button
-                      variant="terciario"
-                      type="button"
-                      [compacto]="true"
-                      (pulsado)="abrirHistorial(fila)"
-                    >
-                      {{ t('admin.events.speakers.historial') }}
-                    </app-button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -318,7 +318,10 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
   styles: `
     .sesiones {
       margin: 0;
-      padding-left: 1.1em;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 2px;
     }
     .bio {
       white-space: pre-line;
@@ -440,6 +443,7 @@ export class EventSpeakers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
+  private readonly documento = inject(DOCUMENT);
   // Por nombre de referencia de plantilla, no por tipo: hay dos `app-dialog` en
   // la plantilla, y `viewChild.required(Dialog)` sin localizador resolvería a
   // uno cualquiera de los dos de forma ambigua.
@@ -450,7 +454,17 @@ export class EventSpeakers implements OnInit {
   /** Ponente cuya biografía se lee en el diálogo (sin perfil público al que llevar). */
   protected readonly bioAbierta = signal<SpeakerRow | null>(null);
 
-  protected abrirBio(fila: SpeakerRow): void {
+  /** Con perfil público, la página del ponente en otra pestaña; sin él no hay
+   * página a la que llevar y la biografía se lee en un diálogo. */
+  protected verBio(fila: SpeakerRow): void {
+    if (fila.public_slug) {
+      this.documento.defaultView?.open(
+        `/ponentes/${encodeURIComponent(fila.public_slug)}`,
+        '_blank',
+        'noopener',
+      );
+      return;
+    }
     this.bioAbierta.set(fila);
     this.dialogoBioRef().abrir();
   }
@@ -550,7 +564,7 @@ export class EventSpeakers implements OnInit {
       { key: 'sesion', label: t('admin.events.speakers.columnaSesion') },
       { key: 'ficha', label: t('admin.events.speakers.columnaFicha') },
       { key: 'ediciones', label: t('admin.events.speakers.columnaEdiciones') },
-      { key: 'acciones', label: '' },
+      { key: 'acciones', label: t('admin.events.speakers.columnaAcciones') },
     ];
   });
 

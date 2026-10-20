@@ -4,7 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import es from '../../../../../public/assets/i18n/es-ES.json';
 import { esperarSinViolacionesDeAccesibilidad } from '../../../../testing/axe';
@@ -230,10 +230,13 @@ describe('EventSpeakers', () => {
     expect(ana.textContent).toContain('Mesa de cierre');
     expect(ana.textContent).not.toContain('Asignar sesión');
     expect(roberto.textContent).toContain('Asignar sesión');
-    const verBio = ana.querySelector('a.enlace') as HTMLAnchorElement;
-    expect(verBio.textContent?.trim()).toBe('Ver bio');
-    expect(verBio.getAttribute('href')).toBe('/ponentes/ana-garcia');
-    expect(verBio.getAttribute('target')).toBe('_blank');
+    const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
+    const verBio = Array.from(ana.querySelectorAll('button')).find(
+      (boton) => boton.textContent?.trim() === 'Ver bio',
+    )!;
+    verBio.click();
+    expect(abrir).toHaveBeenCalledWith('/ponentes/ana-garcia', '_blank', 'noopener');
+    abrir.mockRestore();
     expect(roberto.textContent).toContain('Pedir bio');
   });
 

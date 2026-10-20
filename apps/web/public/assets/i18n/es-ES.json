@@ -2091,7 +2091,8 @@
         "verBio": "Ver bio",
         "verBioDe": "Ver la biografía de {{nombre}} (se abre en otra pestaña)",
         "bioDe": "Biografía de {{nombre}}",
-        "bioSinPerfil": "No tiene el perfil público activado, así que no hay página que abrir: esta es la biografía de su ficha."
+        "bioSinPerfil": "No tiene el perfil público activado, así que no hay página que abrir: esta es la biografía de su ficha.",
+        "columnaAcciones": "Acciones"
       },
       "rotulo": "Eventos",
       "cabeceraInicio": "Toda la programación de la organización,",
