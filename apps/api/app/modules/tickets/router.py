@@ -198,6 +198,24 @@ async def get_ticket_detail(
     )
 
 
+def _asistencia(evento: Event) -> AttendanceOut:
+    return AttendanceOut(
+        attendance_closed_at=evento.attendance_closed_at,
+        ends_at=evento.ends_at,
+        can_close=attendance.admite_cierre(evento),
+    )
+
+
+@router.get(
+    "/attendance",
+    summary="Estado del cierre de asistencia de un evento",
+    response_model=AttendanceOut,
+    dependencies=[require_permission(Permission.TICKETS_WRITE)],
+)
+async def get_attendance(evento: Annotated[Event, Depends(_obtener_evento_o_404)]) -> AttendanceOut:
+    return _asistencia(evento)
+
+
 @router.post(
     "/attendance/close",
     summary="Cerrar la asistencia de un evento terminado",
@@ -213,7 +231,7 @@ async def close_attendance(
     evento: Annotated[Event, Depends(_obtener_evento_o_404)],
 ) -> AttendanceOut:
     attendance.cerrar(evento)
-    return AttendanceOut(attendance_closed_at=evento.attendance_closed_at)
+    return _asistencia(evento)
 
 
 @router.post(
@@ -226,4 +244,4 @@ async def reopen_attendance(
     evento: Annotated[Event, Depends(_obtener_evento_o_404)],
 ) -> AttendanceOut:
     attendance.reabrir(evento)
-    return AttendanceOut(attendance_closed_at=evento.attendance_closed_at)
+    return _asistencia(evento)

@@ -395,6 +395,8 @@ export type { SearchTicketsApiV1EventsEventIdTicketsSearchGet$Params as SearchTi
 export { searchTicketsApiV1EventsEventIdTicketsSearchGet as searchTicketsApiV1EventsEventIdTicketsSearchGet } from './fn/entradas/search-tickets-api-v-1-events-event-id-tickets-search-get';
 export type { GetTicketDetailApiV1EventsEventIdTicketsRegistrationIdGet$Params as GetTicketDetailApiV1EventsEventIdTicketsRegistrationIdGet$Params } from './fn/entradas/get-ticket-detail-api-v-1-events-event-id-tickets-registration-id-get';
 export { getTicketDetailApiV1EventsEventIdTicketsRegistrationIdGet as getTicketDetailApiV1EventsEventIdTicketsRegistrationIdGet } from './fn/entradas/get-ticket-detail-api-v-1-events-event-id-tickets-registration-id-get';
+export type { GetAttendanceApiV1EventsEventIdAttendanceGet$Params as GetAttendanceApiV1EventsEventIdAttendanceGet$Params } from './fn/entradas/get-attendance-api-v-1-events-event-id-attendance-get';
+export { getAttendanceApiV1EventsEventIdAttendanceGet as getAttendanceApiV1EventsEventIdAttendanceGet } from './fn/entradas/get-attendance-api-v-1-events-event-id-attendance-get';
 export type { CloseAttendanceApiV1EventsEventIdAttendanceClosePost$Params as CloseAttendanceApiV1EventsEventIdAttendanceClosePost$Params } from './fn/entradas/close-attendance-api-v-1-events-event-id-attendance-close-post';
 export { closeAttendanceApiV1EventsEventIdAttendanceClosePost as closeAttendanceApiV1EventsEventIdAttendanceClosePost } from './fn/entradas/close-attendance-api-v-1-events-event-id-attendance-close-post';
 export type { ReopenAttendanceApiV1EventsEventIdAttendanceReopenPost$Params as ReopenAttendanceApiV1EventsEventIdAttendanceReopenPost$Params } from './fn/entradas/reopen-attendance-api-v-1-events-event-id-attendance-reopen-post';

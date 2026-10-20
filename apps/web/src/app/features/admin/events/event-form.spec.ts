@@ -253,6 +253,20 @@ describe('EventForm', () => {
       peticion.flush(eventoDetalle());
     });
 
+    it('al pasar a pago sube el recordatorio de 24 a 48 horas si no se eligieron otras', async () => {
+      const fixture = await abrirEdicion();
+      elegirEnSelect(fixture, 'evento-modo-inscripcion', 'paid');
+      await avanzar(fixture);
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      const peticion = http.expectOne((p) => p.url === '/api/v1/events/e1' && p.method === 'PATCH');
+      expect(peticion.request.body.reminder_hours_before).toBe(48);
+      peticion.flush(eventoDetalle());
+    });
+
     it('«Sin categoría» envía null para quitarla', async () => {
       const fixture = await abrirEdicion({ category: CATEGORIAS[0] });
       // El `<select>` nativo del componente es un espejo oculto: se elige por el

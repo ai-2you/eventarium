@@ -260,7 +260,7 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [options]="opcionesDeModoDeInscripcion()"
                 [hint]="t('admin.events.formulario.modoAyuda.' + registrationMode())"
                 [value]="registrationMode()"
-                (valueChange)="registrationMode.set($any($event))"
+                (valueChange)="alCambiarModo($any($event))"
               />
               <div class="campo-numero">
                 <label for="evento-aforo">{{ t('admin.events.formulario.aforo') }}</label>
@@ -291,6 +291,7 @@ function zonasHorariasDisponibles(): readonly string[] {
                 [dePago]="registrationMode() === 'paid'"
                 [(activado)]="reminderEnabled"
                 [(horas)]="reminderHours"
+                [(horasElegidas)]="reminderHoursElegidas"
               />
 
               @if (locationMode() !== 'online') {
@@ -492,6 +493,7 @@ export class EventForm {
   protected readonly reminderEnabled = signal(true);
   /** `null` en un evento nuevo sin elegir: la API decide (24 h, o 48 h si es de pago). */
   protected readonly reminderHours = signal<number | null>(null);
+  protected readonly reminderHoursElegidas = signal(false);
   /** `null` = sin límite de aforo; `NaN` = lo escrito no es un número. */
   protected readonly capacity = signal<number | null>(null);
   protected readonly startsAt = signal('');
@@ -700,6 +702,15 @@ export class EventForm {
     // Al crear, vaciarlo devuelve el control al título; en un evento existente
     // nunca, porque cambiaría su URL pública.
     this.slugManual.set(valor.trim() !== '' || this.esEdicion());
+  }
+
+  /** Al pasar a pago, el recordatorio por defecto (24 h) llegaría con el plazo de
+   * reembolso ya cerrado: sube a 48 h si nadie ha elegido otras horas, como la API. */
+  protected alCambiarModo(modo: RegistrationMode): void {
+    this.registrationMode.set(modo);
+    if (modo === 'paid' && this.reminderHours() === 24 && !this.reminderHoursElegidas()) {
+      this.reminderHours.set(48);
+    }
   }
 
   protected alCambiarAforo(evento: Event): void {

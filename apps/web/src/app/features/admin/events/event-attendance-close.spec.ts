@@ -13,13 +13,7 @@ const HACE_UN_DIA = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 const MANANA = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
 function evento(overrides: Record<string, unknown> = {}) {
-  return {
-    ends_at: HACE_UN_DIA,
-    status: 'published',
-    location_mode: 'in_person',
-    attendance_closed_at: null,
-    ...overrides,
-  };
+  return { ends_at: HACE_UN_DIA, can_close: true, attendance_closed_at: null, ...overrides };
 }
 
 async function avanzar(fixture: ComponentFixture<unknown>): Promise<void> {
@@ -61,7 +55,7 @@ describe('EventAttendanceClose', () => {
     const fixture = TestBed.createComponent(EventAttendanceClose);
     fixture.componentRef.setInput('eventId', 'e1');
     fixture.detectChanges();
-    http.expectOne('/api/v1/events/e1').flush(evento(datos));
+    http.expectOne('/api/v1/events/e1/attendance').flush(evento(datos));
     await avanzar(fixture);
     return fixture;
   }
@@ -71,8 +65,8 @@ describe('EventAttendanceClose', () => {
     expect(fixture.nativeElement.textContent.trim()).toBe('');
   });
 
-  it('en un evento en línea no aparece', async () => {
-    const fixture = await abrir({ location_mode: 'online' });
+  it('si el evento no admite cierre (en línea, híbrido…) no aparece', async () => {
+    const fixture = await abrir({ can_close: false });
     expect(fixture.nativeElement.textContent.trim()).toBe('');
   });
 
@@ -90,7 +84,7 @@ describe('EventAttendanceClose', () => {
     await avanzar(fixture);
     http
       .expectOne((p) => p.url === '/api/v1/events/e1/attendance/close' && p.method === 'POST')
-      .flush({ attendance_closed_at: new Date().toISOString() });
+      .flush(evento({ attendance_closed_at: new Date().toISOString() }));
     await avanzar(fixture);
 
     expect(fixture.nativeElement.textContent).toContain('Asistencia cerrada el');

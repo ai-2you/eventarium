@@ -608,7 +608,6 @@ export class EventRegistrations implements OnInit {
     void this.cargarEstadisticas();
   }
 
-  /** El estado de una inscripción se lee por su texto: el color solo lo refuerza. */
   protected textoDeAusencias(veces: number): string {
     return this.transloco.translate(
       veces === 1
@@ -618,6 +617,7 @@ export class EventRegistrations implements OnInit {
     );
   }
 
+  /** El estado de una inscripción se lee por su texto: el color solo lo refuerza. */
   protected tonoDeEstado(estado: RegistrationStatus): ChipTone {
     switch (estado) {
       case 'confirmed':

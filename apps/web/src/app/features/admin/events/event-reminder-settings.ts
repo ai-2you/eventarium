@@ -32,13 +32,11 @@ export const HORAS_DE_RECORDATORIO = [2, 6, 12, 24, 48, 72] as const;
           [label]="t('cuando')"
           [options]="opciones()"
           [disabled]="!activado()"
+          [hint]="avisoDePago() ? t('avisoPago') : null"
           [value]="valorMostrado()"
-          (valueChange)="horas.set(+$event)"
+          (valueChange)="elegir(+$event)"
         />
         <p id="evento-recordatorio-ayuda" class="ayuda">{{ t('ayuda') }}</p>
-        @if (avisoDePago()) {
-          <p class="aviso" role="note">{{ t('avisoPago') }}</p>
-        }
       </fieldset>
     </ng-container>
   `,
@@ -55,14 +53,10 @@ export const HORAS_DE_RECORDATORIO = [2, 6, 12, 24, 48, 72] as const;
       padding: 0 var(--space-sm);
       font-weight: 600;
     }
-    .ayuda,
-    .aviso {
+    .ayuda {
       margin: 0;
       font-size: 0.875rem;
       color: var(--muted);
-    }
-    .aviso {
-      color: var(--fg);
     }
   `,
 })
@@ -70,6 +64,8 @@ export class EventReminderSettings {
   readonly activado = model(true);
   readonly horas = model<number | null>(null);
   readonly dePago = input(false);
+  /** El organizador ha elegido unas horas en el desplegable (no son las de por defecto). */
+  readonly horasElegidas = model(false);
 
   private readonly transloco = inject(TranslocoService);
 
@@ -82,6 +78,11 @@ export class EventReminderSettings {
       label: this.transloco.translate(`admin.events.formulario.recordatorio.horas.${horas}`),
     })),
   );
+
+  protected elegir(horas: number): void {
+    this.horas.set(horas);
+    this.horasElegidas.set(true);
+  }
 
   /** Con el plazo de reembolso de 24 h, un recordatorio a 24 h o menos llega
    * cuando ya no se devuelve el importe al cancelar. */

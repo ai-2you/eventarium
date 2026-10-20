@@ -48,13 +48,8 @@ async function crearComponente(eventId = 'e1'): Promise<ComponentFixture<EventCh
 function silenciarCargaInicial(http: HttpTestingController): void {
   // El bloque de cierre de asistencia pide el evento: uno futuro, que no lo muestra.
   http
-    .expectOne((peticion) => peticion.url === '/api/v1/events/e1' && peticion.method === 'GET')
-    .flush({
-      ends_at: '2999-01-01T00:00:00Z',
-      status: 'published',
-      location_mode: 'in_person',
-      attendance_closed_at: null,
-    });
+    .expectOne((peticion) => peticion.url === '/api/v1/events/e1/attendance')
+    .flush({ ends_at: '2999-01-01T00:00:00Z', can_close: true, attendance_closed_at: null });
   http
     .expectOne((peticion) => peticion.url === '/api/v1/events/e1/registrations/stats')
     .flush({

@@ -4,10 +4,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   type OnInit,
+  type ElementRef,
   computed,
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -17,10 +19,10 @@ import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 
-interface EstadoDelEvento {
+/** `GET /events/{id}/attendance`: con el mismo permiso que el check-in. */
+interface EstadoDeAsistencia {
   readonly ends_at: string;
-  readonly status: string;
-  readonly location_mode: string;
+  readonly can_close: boolean;
   readonly attendance_closed_at: string | null;
 }
 
@@ -28,7 +30,7 @@ const PLAZO_PARA_REABRIR_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Cierre de la asistencia en la pantalla de check-in. Solo aparece cuando un
- * evento presencial o híbrido, publicado o archivado, ha terminado: cerrarla declara completo el check-in, y desde entonces
+ * evento presencial, publicado o archivado, ha terminado: cerrarla declara completo el check-in, y desde entonces
  * quien estaba confirmado y no se escaneó cuenta como ausencia. Pide una
  * confirmación en línea y se puede reabrir hasta 7 días después del evento.
  */
@@ -39,10 +41,10 @@ const PLAZO_PARA_REABRIR_MS = 7 * 24 * 60 * 60 * 1000;
   template: `
     <ng-container *transloco="let t; read: 'admin.events.checkIn.asistencia'">
       @if (terminado()) {
-        <section class="asistencia" aria-labelledby="asistencia-titulo" aria-live="polite">
-          <h2 id="asistencia-titulo">{{ t('titulo') }}</h2>
+        <section class="asistencia" aria-labelledby="asistencia-titulo">
+          <h2 id="asistencia-titulo" tabindex="-1" #titulo>{{ t('titulo') }}</h2>
           @if (cerradaEl(); as fecha) {
-            <p>{{ t('cerrada', { fecha: (fecha | date: 'medium') }) }}</p>
+            <p role="status">{{ t('cerrada', { fecha: (fecha | date: 'medium') }) }}</p>
             @if (puedeReabrir()) {
               <app-button variant="secundario" [loading]="guardando()" (pulsado)="reabrir()">
                 {{ t('reabrir') }}
@@ -54,13 +56,13 @@ const PLAZO_PARA_REABRIR_MS = 7 * 24 * 60 * 60 * 1000;
               <app-button [loading]="guardando()" (pulsado)="cerrar()">
                 {{ t('confirmar') }}
               </app-button>
-              <app-button variant="terciario" (pulsado)="confirmando.set(false)">
+              <app-button variant="terciario" (pulsado)="confirmar(false)">
                 {{ t('volver') }}
               </app-button>
             </div>
           } @else {
             <p>{{ t('sugerencia') }}</p>
-            <app-button variant="secundario" (pulsado)="confirmando.set(true)">
+            <app-button variant="secundario" (pulsado)="confirmar(true)">
               {{ t('cerrar') }}
             </app-button>
           }
@@ -86,6 +88,9 @@ const PLAZO_PARA_REABRIR_MS = 7 * 24 * 60 * 60 * 1000;
       margin: 0;
       font-size: 1rem;
     }
+    h2:focus {
+      outline: none;
+    }
     p {
       margin: 0;
       color: var(--muted);
@@ -104,19 +109,15 @@ export class EventAttendanceClose implements OnInit {
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
 
-  private readonly estado = signal<EstadoDelEvento | null>(null);
+  private readonly estado = signal<EstadoDeAsistencia | null>(null);
+  private readonly titulo = viewChild<ElementRef<HTMLElement>>('titulo');
   protected readonly confirmando = signal(false);
   protected readonly guardando = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected readonly terminado = computed(() => {
     const estado = this.estado();
-    return (
-      estado !== null &&
-      (estado.status === 'published' || estado.status === 'archived') &&
-      estado.location_mode !== 'online' &&
-      Date.now() >= new Date(estado.ends_at).getTime()
-    );
+    return estado !== null && estado.can_close && Date.now() >= new Date(estado.ends_at).getTime();
   });
   protected readonly cerradaEl = computed(() => this.estado()?.attendance_closed_at ?? null);
   protected readonly puedeReabrir = computed(() => {
@@ -135,12 +136,22 @@ export class EventAttendanceClose implements OnInit {
     try {
       this.estado.set(
         await firstValueFrom(
-          this.http.get<EstadoDelEvento>(this.api.url(`/events/${this.eventId()}`)),
+          this.http.get<EstadoDeAsistencia>(this.api.url(`/events/${this.eventId()}/attendance`)),
         ),
       );
     } catch {
       // Sin el estado del evento no se ofrece el cierre: el check-in sigue igual.
     }
+  }
+
+  /** Cada paso sustituye al botón pulsado: el foco vuelve al título del bloque. */
+  protected confirmar(si: boolean): void {
+    this.confirmando.set(si);
+    this.enfocar();
+  }
+
+  private enfocar(): void {
+    setTimeout(() => this.titulo()?.nativeElement.focus());
   }
 
   protected cerrar(): Promise<void> {
@@ -156,16 +167,14 @@ export class EventAttendanceClose implements OnInit {
     this.guardando.set(true);
     try {
       const respuesta = await firstValueFrom(
-        this.http.post<{ attendance_closed_at: string | null }>(
+        this.http.post<EstadoDeAsistencia>(
           this.api.url(`/events/${this.eventId()}/attendance/${accion}`),
           {},
         ),
       );
-      const estado = this.estado();
-      if (estado) {
-        this.estado.set({ ...estado, attendance_closed_at: respuesta.attendance_closed_at });
-      }
+      this.estado.set(respuesta);
       this.confirmando.set(false);
+      this.enfocar();
     } catch (error) {
       this.error.set(
         error instanceof ApiError
