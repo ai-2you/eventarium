@@ -302,9 +302,10 @@ async def send_registration_confirmed_email(
         to=to_email,
         subject="Tu inscripción está confirmada",
         body=_cuerpo_con_cancelacion(
-            "Tu inscripción ha quedado confirmada. ¡Te esperamos! Adjuntamos tu "
-            "entrada con el código QR: muéstrala en la puerta el día del evento.\n\n"
-            f"Si pierdes este correo, puedes volver a verla aquí:\n{enlace_mi_entrada}",
+            "Tu inscripción ha quedado confirmada. ¡Te esperamos! Tu entrada es el "
+            "código QR de este correo: muéstrala en la puerta el día del evento.\n\n"
+            "Si pierdes este correo o no ves la imagen, puedes volver a verla aquí:\n"
+            f"{enlace_mi_entrada}",
             enlace_cancelacion,
         ),
         attachments=(
@@ -314,6 +315,8 @@ async def send_registration_confirmed_email(
                     content=generar_imagen_qr(qr_token),
                     maintype="image",
                     subtype="png",
+                    cid="entrada@eventarium",
+                    alt="Código QR de tu entrada",
                 )
             ]
             if qr_token is not None

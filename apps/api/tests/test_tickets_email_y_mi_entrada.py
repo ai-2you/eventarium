@@ -151,6 +151,9 @@ async def test_send_registration_confirmed_email_adjunta_un_png() -> None:
     assert isinstance(adjunto, EmailAttachment)
     assert adjunto.filename == "entrada.png"
     assert adjunto.content.startswith(b"\x89PNG")
+    # Dentro del cuerpo del correo, no como un adjunto que haya que abrir.
+    assert adjunto.cid == "entrada@eventarium"
+    assert adjunto.alt
     assert "mi-entrada?token=cancel-token" in kwargs["body"]
 
 
