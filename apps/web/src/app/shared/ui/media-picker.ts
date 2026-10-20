@@ -46,7 +46,7 @@ export type { MediaElegida, MediaKind };
             </app-button>
             @if (permitirQuitar()) {
               <app-button
-                variant="secundario"
+                variant="peligro"
                 type="button"
                 [loading]="quitando()"
                 (pulsado)="quitado.emit()"
