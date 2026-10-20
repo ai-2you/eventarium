@@ -56,5 +56,5 @@ async def vista_previa_de_cancelacion(
         starts_at=evento.starts_at,
         timezone=evento.timezone,
         already_started=datetime.now(UTC) >= evento.starts_at,
-        refund=reembolso,  # type: ignore[arg-type]
+        refund=reembolso,
     )

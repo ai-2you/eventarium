@@ -34,6 +34,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -129,7 +130,7 @@ async def reembolso_si_se_cancela(
     organization_id: uuid.UUID,
     event_id: uuid.UUID,
     registration_id: uuid.UUID,
-) -> str | None:
+) -> Literal["en_curso", "sin_reembolso"] | None:
     """Para avisar antes de cancelar: `"en_curso"` (se devolvería),
     `"sin_reembolso"` (hay pago pero no se devolvería) o `None` (sin pago)."""
     resultado, _, _ = await _evaluar_reembolso_por_cancelacion(
@@ -138,7 +139,11 @@ async def reembolso_si_se_cancela(
         event_id=event_id,
         registration_id=registration_id,
     )
-    return resultado
+    if resultado == "en_curso":
+        return "en_curso"
+    if resultado == "sin_reembolso":
+        return "sin_reembolso"
+    return None
 
 
 async def preparar_reembolso_por_cancelacion(

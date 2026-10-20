@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import maintenance_session, set_organization_context
+from app.core.fechas import fecha_y_hora
 from app.core.tasks import (
     process_refunds_task,
     send_registration_cancelled_email,
@@ -354,6 +355,9 @@ async def _reservar_ventana_de_pago(
     inscripcion.payment_expires_at = datetime.now(UTC) + ventana
 
 
+_VENTANA_MINIMA_DE_PROMOCION = timedelta(minutes=15)
+
+
 async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool:
     """Promueve a la primera persona en lista de espera, si hay alguna.
 
@@ -363,16 +367,17 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
     alguien a quien promover.
     """
     ahora = datetime.now(UTC)
-    # Con el evento ya empezado nadie puede aprovechar la plaza; y la ventana
-    # para confirmarla nunca pasa del inicio.
-    if ahora >= evento.starts_at:
+    # La ventana para confirmar nunca pasa del inicio del evento; si ya no
+    # quedan ni unos minutos, ofrecer la plaza sería un correo imposible de
+    # cumplir (y con el evento empezado nadie puede aprovecharla).
+    ventana = min(
+        timedelta(hours=get_settings().waitlist_promotion_window_hours), evento.starts_at - ahora
+    )
+    if ventana < _VENTANA_MINIMA_DE_PROMOCION:
         return False
     siguiente = await repository.get_oldest_waitlisted(session, evento.organization_id, evento.id)
     if siguiente is None:
         return False
-    ventana = min(
-        timedelta(hours=get_settings().waitlist_promotion_window_hours), evento.starts_at - ahora
-    )
     siguiente.waitlist_promoted_at = ahora
     siguiente.waitlist_promotion_expires_at = ahora + ventana
     confirm_token = await generate_token(
@@ -384,7 +389,7 @@ async def _promote_next_waitlisted(session: AsyncSession, evento: Event) -> bool
         str(siguiente.organization_id),
         confirm_token,
         cancel_token,
-        (ahora + ventana).strftime("%d/%m/%Y %H:%M"),
+        fecha_y_hora(ahora + ventana, evento.timezone),
     )
     return True
 

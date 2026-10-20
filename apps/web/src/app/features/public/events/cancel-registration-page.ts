@@ -3,9 +3,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   PLATFORM_ID,
+  type ElementRef,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
@@ -38,7 +40,7 @@ type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 
       <app-auth-frame [titulo]="t('cancelarInscripcion.titulo')">
         <div class="envoltura" appReveal>
           <app-card [heading]="t('cancelarInscripcion.titulo')">
-            <div aria-live="polite">
+            <div aria-live="polite" tabindex="-1" #resultado class="resultado">
               @switch (estado()) {
                 @case ('comprobando') {
                   <app-alert tone="info">{{ t('cancelarInscripcion.comprobando') }}</app-alert>
@@ -50,7 +52,9 @@ type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 
                       <strong>{{ vista()?.event_title }}</strong>
                       <span class="fecha">{{ fecha() }}</span>
                     </p>
-                    <p>{{ t('cancelarInscripcion.plaza') }}</p>
+                    @if (vista()?.status === 'confirmed') {
+                      <p>{{ t('cancelarInscripcion.plaza') }}</p>
+                    }
                     @if (vista()?.refund === 'en_curso') {
                       <app-alert tone="info">{{ t('cancelarInscripcion.conReembolso') }}</app-alert>
                     } @else if (vista()?.refund === 'sin_reembolso') {
@@ -62,7 +66,11 @@ type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 
                   </div>
                 }
                 @case ('ya-cancelada') {
-                  <app-alert tone="info">{{ t('cancelarInscripcion.yaCancelada') }}</app-alert>
+                  <app-alert tone="info">{{
+                    vista()?.status === 'rejected'
+                      ? t('cancelarInscripcion.noActiva')
+                      : t('cancelarInscripcion.yaCancelada')
+                  }}</app-alert>
                 }
                 @case ('empezado') {
                   <app-alert tone="info" [title]="t('cancelarInscripcion.empezadoTitulo')">
@@ -90,6 +98,9 @@ type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 
     .envoltura {
       width: min(26rem, 100%);
     }
+    .resultado:focus {
+      outline: none;
+    }
     .confirmar {
       display: grid;
       gap: var(--space-md);
@@ -115,6 +126,7 @@ export class CancelRegistrationPage {
   protected readonly mensaje = signal('');
   protected readonly vista = signal<VistaPreviaCancelacion | null>(null);
   protected readonly cancelando = signal(false);
+  private readonly resultado = viewChild<ElementRef<HTMLElement>>('resultado');
 
   /** En la zona horaria del evento, que es la que la persona tiene en su entrada. */
   protected readonly fecha = computed(() => {
@@ -178,5 +190,8 @@ export class CancelRegistrationPage {
     } finally {
       this.cancelando.set(false);
     }
+    // El botón desaparece con el resultado: el foco pasa al aviso para que
+    // quien navega con teclado o lector no lo pierda.
+    setTimeout(() => this.resultado()?.nativeElement.focus());
   }
 }

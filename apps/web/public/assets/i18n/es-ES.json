@@ -616,7 +616,8 @@
     "confirmar": "Sí, cancelar mi inscripción",
     "yaCancelada": "Esta inscripción ya estaba cancelada. No tienes que hacer nada más.",
     "empezadoTitulo": "El evento ya ha empezado",
-    "empezadoDetalle": "Ya no se puede cancelar la inscripción desde este enlace. Si lo necesitas, contacta con la organización."
+    "empezadoDetalle": "Ya no se puede cancelar la inscripción desde este enlace. Si lo necesitas, contacta con la organización.",
+    "noActiva": "Esta inscripción no está activa. No tienes que hacer nada más."
   },
   "recuperarContrasena": {
     "titulo": "Recuperar la contraseña",

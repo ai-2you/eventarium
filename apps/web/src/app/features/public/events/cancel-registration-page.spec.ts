@@ -176,4 +176,68 @@ describe('CancelRegistrationPage', () => {
     expect(zonaAnuncio?.textContent).toContain('no es válido o ha caducado');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
+
+  it('si al confirmar el evento ya ha empezado lo dice y mueve el foco al aviso', async () => {
+    const { ApiError } = await import('../../../core/api/error.interceptor');
+    const cancel = vi.fn().mockRejectedValue(new ApiError(409, 'Ya ha empezado', null));
+    configurar(
+      { cancel, previewCancel: vi.fn().mockResolvedValue(VISTA) },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    (fixture.nativeElement.querySelector('app-button button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    await new Promise((resolver) => setTimeout(resolver));
+
+    expect(fixture.nativeElement.textContent).toContain('El evento ya ha empezado');
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.resultado'));
+  });
+
+  it('si al confirmar falla otra cosa muestra el error genérico', async () => {
+    configurar(
+      {
+        cancel: vi.fn().mockRejectedValue(new Error('red')),
+        previewCancel: vi.fn().mockResolvedValue(VISTA),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    (fixture.nativeElement.querySelector('app-button button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('no es válido o ha caducado');
+  });
+
+  it('anuncia que se devolverá el pago cuando procede', async () => {
+    configurar(
+      {
+        cancel: vi.fn(),
+        previewCancel: vi.fn().mockResolvedValue({ ...VISTA, refund: 'en_curso' }),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('Se te devolverá el importe');
+  });
+
+  it('en lista de espera no habla de liberar una plaza que no tiene', async () => {
+    configurar(
+      {
+        cancel: vi.fn(),
+        previewCancel: vi.fn().mockResolvedValue({ ...VISTA, status: 'waitlisted' }),
+      },
+      rutaConToken('token-valido'),
+    );
+    const fixture = TestBed.createComponent(CancelRegistrationPage);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Tu plaza quedará libre');
+    expect(fixture.nativeElement.textContent).toContain('Sí, cancelar mi inscripción');
+  });
 });

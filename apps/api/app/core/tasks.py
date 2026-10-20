@@ -726,7 +726,7 @@ async def send_waitlist_promotion_email(
         body=(
             "Hola,\n\n"
             "Se ha liberado una plaza y te toca a ti. Confirma tu inscripción antes "
-            f"de {expira_el} desde este enlace:\n{enlace_confirmar}\n\n"
+            f"del {expira_el} (hora del evento) desde este enlace:\n{enlace_confirmar}\n\n"
             "Si no confirmas a tiempo, pasaremos a la siguiente persona en la lista "
             "de espera.\n\n"
             f"Si ya no quieres asistir, cancela tu inscripción aquí:\n{enlace_cancelacion}"

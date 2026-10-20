@@ -72,13 +72,6 @@ export interface MyRegistrationItem {
   readonly event_cancelled?: boolean;
 }
 
-/**
- * Formulario público de inscripción a un evento (fase 3 del PRD).
- *
- * CSR, como `AuthService`: son llamadas transaccionales, no contenido a
- * indexar. La respuesta de `submit` es siempre la misma exista o no ya el
- * email inscrito — el componente no debe intentar distinguir ambos casos.
- */
 /** `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si no, nulo sin pago. */
 export interface VistaPreviaCancelacion {
   readonly status: string;
@@ -89,6 +82,13 @@ export interface VistaPreviaCancelacion {
   readonly refund?: 'en_curso' | 'sin_reembolso' | null;
 }
 
+/**
+ * Formulario público de inscripción a un evento (fase 3 del PRD).
+ *
+ * CSR, como `AuthService`: son llamadas transaccionales, no contenido a
+ * indexar. La respuesta de `submit` es siempre la misma exista o no ya el
+ * email inscrito — el componente no debe intentar distinguir ambos casos.
+ */
 @Injectable({ providedIn: 'root' })
 export class RegistrationsService {
   private readonly http = inject(HttpClient);

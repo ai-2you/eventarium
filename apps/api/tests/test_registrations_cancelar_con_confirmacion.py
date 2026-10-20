@@ -170,3 +170,73 @@ async def test_la_vista_previa_dice_si_se_devolveria_el_pago(
 
     assert vista.status_code == 200, vista.text
     assert vista.json()["refund"] == esperado
+
+
+async def test_la_vista_previa_de_una_ya_cancelada_no_ofrece_reembolso(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, correos
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_y_publicar_evento(cliente, cabeceras, "ya-cancelada", **_inicio(5))
+    registration_id = await _crear_inscripcion(
+        organizacion, evento, email="g@example.com", status="cancelled"
+    )
+    token = await generate_token(PROPOSITO_CANCELACION_INSCRIPCION, registration_id)
+
+    vista = await cliente.post(PREVIEW, json={"token": token})
+
+    assert vista.status_code == 200
+    assert vista.json()["status"] == "cancelled"
+    assert vista.json()["refund"] is None
+
+
+async def test_un_token_de_otro_proposito_no_vale_para_la_vista_previa(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, correos
+) -> None:
+    from app.modules.auth.verification import PROPOSITO_PROMOCION_LISTA_ESPERA
+
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_y_publicar_evento(cliente, cabeceras, "otro-proposito", **_inicio(5))
+    registration_id = await _crear_inscripcion(organizacion, evento, email="h@example.com")
+    token = await generate_token(PROPOSITO_PROMOCION_LISTA_ESPERA, registration_id)
+
+    assert (await cliente.post(PREVIEW, json={"token": token})).status_code == 422
+
+
+async def test_sin_unos_minutos_de_margen_no_se_ofrece_la_plaza(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, correos
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_y_publicar_evento(
+        cliente, cabeceras, "sin-margen", capacity=1, **_inicio(0.1)
+    )
+    confirmada = await _crear_inscripcion(organizacion, evento, email="i@example.com")
+    en_espera = await _crear_inscripcion(
+        organizacion, evento, email="j@example.com", status="waitlisted"
+    )
+    token = await generate_token(PROPOSITO_CANCELACION_INSCRIPCION, confirmada)
+
+    assert (await cliente.post(CANCEL, json={"token": token})).status_code == 200
+    async with SessionMaintenance() as session:
+        assert (
+            await session.get(EventRegistration, uuid.UUID(en_espera))
+        ).waitlist_promoted_at is None
+    assert correos["promocion"].await_count == 0
+
+
+async def test_el_correo_de_promocion_da_la_hora_limite_en_la_zona_del_evento(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, correos
+) -> None:
+    from app.core.fechas import fecha_y_hora
+
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_y_publicar_evento(
+        cliente, cabeceras, "hora-local", capacity=1, timezone="America/Mexico_City", **_inicio(2)
+    )
+    confirmada = await _crear_inscripcion(organizacion, evento, email="k@example.com")
+    await _crear_inscripcion(organizacion, evento, email="l@example.com", status="waitlisted")
+    token = await generate_token(PROPOSITO_CANCELACION_INSCRIPCION, confirmada)
+
+    assert (await cliente.post(CANCEL, json={"token": token})).status_code == 200
+    expira_el = correos["promocion"].await_args.args[4]
+    inicio = datetime.fromisoformat(evento["starts_at"])
+    assert expira_el == fecha_y_hora(inicio, "America/Mexico_City")
