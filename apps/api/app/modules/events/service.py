@@ -445,7 +445,11 @@ async def update_session(
     fin = datos.get("ends_at", sesion.ends_at)
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
-    _validar_sesion_dentro_del_evento(evento, inicio, fin)
+    # El rango se comprueba solo si las fechas cambian (comparando valores: el
+    # formulario siempre las reenvía): una sesión que ya quedó fuera de rango
+    # antes de existir esta regla se tiene que poder seguir editando.
+    if inicio != sesion.starts_at or fin != sesion.ends_at:
+        _validar_sesion_dentro_del_evento(evento, inicio, fin)
     if "venue_id" in datos and datos["venue_id"] is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 

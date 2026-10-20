@@ -46,6 +46,9 @@ function flushRoster(http: HttpTestingController): void {
 function flushVenues(http: HttpTestingController): void {
   for (const peticion of http.match((p) => p.url === '/api/v1/events/e1/venues')) {
     peticion.flush([]);
+  } // El formulario de sesión pide el evento para limitar las fechas a su rango.
+  for (const peticion of http.match((p) => p.url === '/api/v1/events/e1')) {
+    peticion.flush({ starts_at: '2000-01-01T00:00:00Z', ends_at: '2100-01-01T00:00:00Z' });
   }
 }
 
@@ -131,6 +134,51 @@ describe('EventAgenda', () => {
     await avanzar(fixture);
 
     http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush(sesiones());
+  });
+
+  it('no envía una sesión que termina antes de empezar ni una fuera del evento', async () => {
+    const fixture = TestBed.createComponent(EventAgenda);
+    fixture.componentRef.setInput('eventId', 'e1');
+    await avanzar(fixture);
+    http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush([]);
+    flushRoster(http);
+    for (const peticion of http.match((p) => p.url === '/api/v1/events/e1/venues')) {
+      peticion.flush([]);
+    }
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/events/e1')
+      .flush({ starts_at: '2026-10-01T08:00:00Z', ends_at: '2026-10-01T18:00:00Z' });
+    await avanzar(fixture);
+
+    const escribir = async (id: string, valor: string): Promise<void> => {
+      const campo = fixture.nativeElement.querySelector(id) as HTMLInputElement;
+      campo.value = valor;
+      campo.dispatchEvent(new Event('input'));
+      await avanzar(fixture);
+    };
+    const enviar = async (): Promise<void> => {
+      (
+        fixture.nativeElement.querySelector('app-session-form form') as HTMLFormElement
+      ).dispatchEvent(new Event('submit'));
+      await avanzar(fixture);
+    };
+    await escribir('#sesion-titulo', 'Al revés');
+    const local = (iso: string): string => {
+      const fecha = new Date(iso);
+      return new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60_000)
+        .toISOString()
+        .slice(0, 16);
+    };
+    await escribir('#sesion-inicio-nativo', local('2026-10-01T12:00:00Z'));
+    await escribir('#sesion-fin-nativo', local('2026-10-01T11:00:00Z'));
+    expect(fixture.nativeElement.textContent).toContain('El fin tiene que ser posterior al inicio');
+    await enviar();
+    http.expectNone((peticion) => peticion.method === 'POST');
+
+    await escribir('#sesion-fin-nativo', local('2026-10-01T20:00:00Z'));
+    await enviar();
+    http.expectNone((peticion) => peticion.method === 'POST');
+    expect(fixture.nativeElement.textContent).toContain('dentro de las fechas y horas del evento');
   });
 
   it('editar rellena el formulario con la sesión y guarda contra su id', async () => {

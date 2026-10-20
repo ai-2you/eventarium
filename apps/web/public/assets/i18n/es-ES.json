@@ -33,7 +33,8 @@
       "menosUnaHora": "Restar una hora",
       "menosCincoMinutos": "Restar cinco minutos",
       "masCincoMinutos": "Sumar cinco minutos",
-      "masUnaHora": "Sumar una hora"
+      "masUnaHora": "Sumar una hora",
+      "fueraDeRango": "Tiene que estar entre {{desde}} y {{hasta}}."
     },
     "editor": {
       "barra": "Formato del texto",
@@ -1393,7 +1394,9 @@
         "sede": "Sede",
         "sinSedeEspecifica": "Sin sede específica",
         "cabeceraInicio": "Sesiones y",
-        "cabeceraMarca": "quien las imparte."
+        "cabeceraMarca": "quien las imparte.",
+        "finAntesDeInicio": "El fin tiene que ser posterior al inicio.",
+        "fueraDelEvento": "La sesión tiene que caer dentro de las fechas y horas del evento."
       },
       "design": {
         "titulo": "Diseño",
