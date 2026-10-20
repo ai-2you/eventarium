@@ -58,6 +58,11 @@ desconocido se rechaza con la lista de los disponibles. Las sesiones devuelven
 en `tipo` el nombre que le dio la organización. `editar_evento` acepta
 `mover_sesiones=True` para mover la agenda con el evento al cambiar sus fechas.
 
+**Recordatorio a los inscritos.** `crear_evento` y `editar_evento` aceptan
+`recordatorio` (si se envía; por defecto, sí) y `recordatorio_horas` (2, 6, 12,
+24, 48 o 72 horas antes; por defecto 24, o 48 en eventos de pago). Otro valor se
+rechaza. El historial de ausencias no se expone por el MCP.
+
 **Categoría y etiquetas.** `crear_evento` y `editar_evento` aceptan
 `categoria` (el `slug` de una categoría activa, tal como lo devuelve
 `listar_categorias`) y `etiquetas` (hasta 10, de 2 a 30 caracteres, en

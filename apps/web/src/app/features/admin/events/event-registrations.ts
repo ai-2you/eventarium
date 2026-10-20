@@ -217,6 +217,9 @@ interface FilaEmbudo {
                     <strong>{{ item.full_name }}</strong>
                     <small>{{ item.email }}</small>
                   </a>
+                  @if (item.absences_count) {
+                    <app-chip tone="espera">{{ textoDeAusencias(item.absences_count) }}</app-chip>
+                  }
                 </td>
                 <td class="num muted">{{ fechaRelativa(item.created_at) }}</td>
                 <td>
@@ -606,6 +609,15 @@ export class EventRegistrations implements OnInit {
   }
 
   /** El estado de una inscripción se lee por su texto: el color solo lo refuerza. */
+  protected textoDeAusencias(veces: number): string {
+    return this.transloco.translate(
+      veces === 1
+        ? 'admin.events.registrations.ausencias.una'
+        : 'admin.events.registrations.ausencias.varias',
+      { veces },
+    );
+  }
+
   protected tonoDeEstado(estado: RegistrationStatus): ChipTone {
     switch (estado) {
       case 'confirmed':

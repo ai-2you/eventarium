@@ -88,6 +88,8 @@ type EstadoDeCarga = 'cargando' | 'listo' | 'error';
           {{ errorConsentimiento() }}
         </p>
       }
+      <!-- Información previa (art. 13 RGPD) del historial de asistencia. -->
+      <p class="asistencia">{{ t('inscripcion.avisoAsistencia') }}</p>
 
       <app-checkbox [label]="t('inscripcion.marketing')" [(checked)]="marketingAccepted" />
 
@@ -106,6 +108,11 @@ type EstadoDeCarga = 'cargando' | 'listo' | 'error';
     .enlace {
       margin: calc(-1 * var(--space-sm)) 0 0;
       font-size: 0.875rem;
+    }
+    .asistencia {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
     }
     .aviso {
       display: grid;

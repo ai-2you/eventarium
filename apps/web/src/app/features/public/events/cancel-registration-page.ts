@@ -110,7 +110,7 @@ type Estado = 'comprobando' | 'listo' | 'ya-cancelada' | 'empezado' | 'exito' | 
     }
     .fecha {
       display: block;
-      color: var(--color-text-muted);
+      color: var(--muted);
     }
   `,
 })
