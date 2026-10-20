@@ -3,6 +3,7 @@
 
 import { PublicCategoryRef } from '../models/public-category-ref';
 import { PublicEventSession } from '../models/public-event-session';
+import { PublicNearbyPlace } from '../models/public-nearby-place';
 import { PublicOrganizationRef } from '../models/public-organization-ref';
 import { PublicParticipant } from '../models/public-participant';
 import { PublicSponsorTier } from '../models/public-sponsor-tier';
@@ -28,6 +29,7 @@ export interface PublicEventDetail {
   location_mode: 'in_person' | 'online' | 'hybrid';
   location_name: (string | null);
   longitude: (number | null);
+  nearby_places?: Array<PublicNearbyPlace>;
   online_url: (string | null);
   organization: PublicOrganizationRef;
   price_currency: (string | null);

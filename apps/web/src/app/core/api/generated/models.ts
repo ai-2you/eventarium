@@ -145,6 +145,10 @@ export type { ModelosDelProveedorOut } from './models/modelos-del-proveedor-out'
 export type { MyRegistrationItem } from './models/my-registration-item';
 export type { MyRegistrationsResponse } from './models/my-registrations-response';
 export type { MyTicketResponse } from './models/my-ticket-response';
+export type { NearbyPlaceCreate } from './models/nearby-place-create';
+export type { NearbyPlaceOrder } from './models/nearby-place-order';
+export type { NearbyPlaceResponse } from './models/nearby-place-response';
+export type { NearbyPlaceUpdate } from './models/nearby-place-update';
 export type { OcupacionOut } from './models/ocupacion-out';
 export type { OrganizationAiSettingsOut } from './models/organization-ai-settings-out';
 export type { OrganizationAiSettingsUpdate } from './models/organization-ai-settings-update';
@@ -200,6 +204,7 @@ export type { PublicEventDetail } from './models/public-event-detail';
 export type { PublicEventPolicies } from './models/public-event-policies';
 export type { PublicEventSession } from './models/public-event-session';
 export type { PublicEventSummary } from './models/public-event-summary';
+export type { PublicNearbyPlace } from './models/public-nearby-place';
 export type { PublicOrganizationProfile } from './models/public-organization-profile';
 export type { PublicOrganizationRef } from './models/public-organization-ref';
 export type { PublicParticipant } from './models/public-participant';

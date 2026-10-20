@@ -38,6 +38,19 @@ class Categoria(BaseModel):
     nombre: str
 
 
+class SitioCercano(BaseModel):
+    id: str
+    # hotel, restaurant, bar, parking, transport, pharmacy u other.
+    tipo: str
+    # Solo con `tipo` other: el tipo con nombre libre.
+    tipo_libre: str | None
+    nombre: str
+    direccion: str | None
+    telefono: str | None
+    web: str | None
+    nota: str | None
+
+
 class Sede(BaseModel):
     id: str
     nombre: str
@@ -94,6 +107,7 @@ class EventoDetalle(EventoResumen):
     # Recordatorio por correo a los inscritos: si se envía y cuántas horas antes.
     recordatorio: bool
     recordatorio_horas: int
+    sitios_cercanos: list[SitioCercano] = []
     motivo_cancelacion: str | None
     sedes: list[Sede]
     sesiones: list[Sesion]

@@ -22,6 +22,8 @@ from app.modules.events.models import Event
 from app.modules.mcp import schemas
 from app.modules.mcp.contexto import ContextoMcp, ErrorDeHerramienta, contexto_actual, sesion
 from app.modules.mcp.scopes import Ambito
+from app.modules.nearby import service as nearby_service
+from app.modules.nearby.models import EventNearbyPlace
 from app.modules.organizations import service as organizations_service
 from app.modules.registrations import repository as registrations_repository
 from app.modules.sponsors import repository as sponsors_repository
@@ -92,6 +94,19 @@ def _etiquetas_de_filtro(etiquetas: list[str] | None) -> tuple[str, ...]:
         return tuple(events_categories.normalizar_etiquetas(etiquetas))
     except ValueError as exc:
         raise ErrorDeHerramienta(str(exc)) from exc
+
+
+def sitio_out(sitio: EventNearbyPlace) -> schemas.SitioCercano:
+    return schemas.SitioCercano(
+        id=str(sitio.id),
+        tipo=sitio.kind,
+        tipo_libre=sitio.custom_kind,
+        nombre=sitio.name,
+        direccion=sitio.address,
+        telefono=sitio.phone,
+        web=sitio.website,
+        nota=sitio.notes,
+    )
 
 
 def registrar(mcp: MCPServer) -> None:
@@ -203,6 +218,12 @@ def registrar(mcp: MCPServer) -> None:
                 motivo_cancelacion=evento.cancellation_reason,
                 recordatorio=evento.reminder_enabled,
                 recordatorio_horas=evento.reminder_hours_before,
+                sitios_cercanos=[
+                    sitio_out(sitio)
+                    for sitio in await nearby_service.listar(
+                        session, contexto.organization_id, evento.id
+                    )
+                ],
                 sedes=[
                     schemas.Sede(id=str(s.id), nombre=s.name, direccion=s.address) for s in sedes
                 ],
