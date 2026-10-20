@@ -274,7 +274,11 @@
         "inscripcion": "Este evento se ha cancelado y ya no admite inscripciones."
       },
       "vistaPrevia": "Vista previa: así verá el público esta ficha. Si el evento aún no está publicado, solo la ve tu equipo y sus enlaces no funcionarán hasta publicarlo.",
-      "vistaPreviaError": "No se ha podido cargar la vista previa. Comprueba que sigues teniendo acceso y vuelve a intentarlo."
+      "vistaPreviaError": "No se ha podido cargar la vista previa. Comprueba que sigues teniendo acceso y vuelve a intentarlo.",
+      "comoLlegar": {
+        "texto": "Cómo llegar",
+        "aria": "Cómo llegar a {{lugar}} (se abre en otra pestaña)"
+      }
     },
     "accesoMenu": {
       "titulo": "Acceso a la cuenta",

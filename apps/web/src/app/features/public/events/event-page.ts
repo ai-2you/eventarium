@@ -40,6 +40,7 @@ import type {
 } from './event-page.types';
 import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-section';
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
+import { DirectionsLink } from '../../../shared/ui/directions-link';
 
 /** `starts_at` (UTC) al día calendario en la zona del evento, sin arrastrar la
  * zona horaria del entorno de ejecución (navegador o SSR) al agrupar por fecha:
@@ -87,6 +88,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
+    DirectionsLink,
     RouterLink,
     TranslocoDirective,
     Alert,
@@ -378,6 +380,12 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
                   </h2>
                   @if (evento.location_address) {
                     <p class="lugar__direccion">{{ evento.location_address }}</p>
+                  }
+                  @if (evento.location_mode !== 'online') {
+                    <app-directions-link
+                      [lugar]="evento.location_name"
+                      [direccion]="evento.location_address"
+                    />
                   }
                   @if (evento.location_mode !== 'in_person' && evento.online_url) {
                     <p>
