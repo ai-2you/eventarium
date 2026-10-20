@@ -201,6 +201,8 @@ def registrar(mcp: MCPServer) -> None:
                     else None
                 ),
                 motivo_cancelacion=evento.cancellation_reason,
+                recordatorio=evento.reminder_enabled,
+                recordatorio_horas=evento.reminder_hours_before,
                 sedes=[
                     schemas.Sede(id=str(s.id), nombre=s.name, direccion=s.address) for s in sedes
                 ],

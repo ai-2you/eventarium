@@ -159,7 +159,8 @@ async def test_la_migracion_no_lanza_recordatorios_de_los_que_empiezan_en_72_hor
         await session.commit()
         evento_id = evento.id
 
-    _correr_alembic("downgrade", "-1")
+    # Hasta antes de la `0064`, para que su backfill se vuelva a aplicar.
+    _correr_alembic("downgrade", "0063_tipos_de_sesion")
     _correr_alembic("upgrade", "head")
 
     async with SessionMaintenance() as session:

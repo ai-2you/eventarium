@@ -39,7 +39,8 @@ eventos concretos; en ese caso no puede crear eventos nuevos.
 - Lectura: `listar_eventos`, `ver_evento`, `cifras_de_inscripcion`,
   `listar_niveles_de_patrocinio`, `listar_categorias`, `listar_tipos_de_sesion`.
   `ver_evento` devuelve
-  `enlace_publico` con la URL pública del evento, `/{organización}/{evento}`.
+  `enlace_publico` con la URL pública del evento, `/{organización}/{evento}` (vacío si es
+  privado), y los ajustes del recordatorio (`recordatorio`, `recordatorio_horas`).
   `listar_eventos` filtra por `estado`, por `categoria` (slug) y por hasta 3
   `etiquetas` (el evento debe tener todas). No hay filtro por organización:
   una conexión pertenece a una sola.

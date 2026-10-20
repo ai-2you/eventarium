@@ -91,6 +91,9 @@ class EventoDetalle(EventoResumen):
     zona_horaria: str
     # Sin enlace si el evento es privado: no se abre por URL.
     enlace_publico: str | None
+    # Recordatorio por correo a los inscritos: si se envía y cuántas horas antes.
+    recordatorio: bool
+    recordatorio_horas: int
     motivo_cancelacion: str | None
     sedes: list[Sede]
     sesiones: list[Sesion]
