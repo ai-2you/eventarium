@@ -55,6 +55,17 @@ export interface PublicSponsorTier {
   readonly sponsors: readonly PublicSponsor[];
 }
 
+/** Un sitio que el organizador señala cerca del evento. */
+export interface PublicNearbyPlace {
+  readonly kind: 'hotel' | 'restaurant' | 'bar' | 'parking' | 'transport' | 'pharmacy' | 'other';
+  readonly custom_kind: string | null;
+  readonly name: string;
+  readonly address: string | null;
+  readonly phone: string | null;
+  readonly website: string | null;
+  readonly notes: string | null;
+}
+
 /** Sede del evento, para la vista de programa multisede. */
 export interface PublicVenue {
   readonly id: string;
@@ -66,6 +77,7 @@ export interface PublicVenue {
 }
 
 export interface PublicEventDetail {
+  readonly nearby_places?: readonly PublicNearbyPlace[];
   /** `hidden` = «solo con enlace»: se marca `noindex`. */
   readonly visibility?: 'public' | 'hidden' | 'private';
   readonly organization: OrganizacionPublica;

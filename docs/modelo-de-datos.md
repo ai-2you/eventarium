@@ -685,3 +685,19 @@ inicio, avisadas para esa fecha, con el correo verificado o un pago, en eventos
 presenciales con la asistencia cerrada en los últimos 12 meses y con la entrada sin
 escanear ni revocar. Nunca cruza organizaciones; índice parcial
 `ix_event_registrations_org_email_confirmadas`.
+
+### Sitios cercanos y ficha de la organización (migraciones `0066` y `0067`)
+
+`event_nearby_places` (módulo `app/modules/nearby/`) guarda lo que el organizador señala cerca
+de cada evento: `kind` (`hotel | restaurant | bar | parking | transport | pharmacy | other`, con
+`CHECK`), `custom_kind` (solo con `other`, `CHECK`), nombre, dirección, teléfono, web, nota y
+`display_order`. RLS forzada por organización y FK compuesta al evento (`ON DELETE CASCADE`),
+como las sedes. Máximo 50 por evento (el servicio bloquea la fila del evento antes de contar).
+
+`organizations.address` es la calle; `postal_code`, `city` y `province` van aparte (texto libre)
+y `address_public` decide si la dirección sale en la página pública (las cuatro claves llegan a
+`null` si está apagada). Las redes siguen en `organization_branding.social_links` (JSONB) con
+tipo cerrado (`linkedin | instagram | x | facebook | youtube | tiktok | other`, una por tipo;
+`other` lleva `label`) y se editan con `PATCH /organizations/me`; `PUT
+/organizations/me/branding` ya no las toca.
+

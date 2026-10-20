@@ -16,11 +16,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
 
-from app.core.deps import SessionDep
+from app.core.deps import SessionDep, VerifiedUserDep, get_token_claims
 from app.core.ratelimit import (
     CANCELACION_INSCRIPCION_POR_IP,
     CONFIRMACION_PROMOCION_POR_IP,
     INSCRIPCION_POR_IP,
+    MIS_EVENTOS_MIOS_POR_IP,
     MIS_EVENTOS_SOLICITAR_POR_IP,
     MIS_EVENTOS_VER_POR_IP,
     PUBLICO_POR_IP,
@@ -28,6 +29,7 @@ from app.core.ratelimit import (
     VISTA_CANCELACION_POR_IP,
     limit_per_ip,
 )
+from app.core.security import AccessTokenClaims
 from app.core.turnstile import require_turnstile
 from app.modules.events.models import Event
 from app.modules.events.public_deps import EVENTO_PARA_INSCRIBIR, ruta_de_evento
@@ -49,7 +51,7 @@ from app.modules.registrations.schemas import (
     VerifyRegistrationRequest,
     VerifyRegistrationResponse,
 )
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, PermissionDeniedError
 
 router = APIRouter(prefix="/public", tags=["público"])
 
@@ -245,4 +247,29 @@ async def ver_mis_eventos(
     datos: MisEventosVerRequest, session: SessionDep
 ) -> MyRegistrationsResponse:
     registrations = await mis_eventos_service.list_mis_eventos(session, token=datos.token)
+    return MyRegistrationsResponse(registrations=registrations)
+
+
+@router.get(
+    "/mis-eventos/mios",
+    summary="Listar «Mis eventos» con la sesión iniciada",
+    description=(
+        "Las inscripciones del correo de la cuenta, sin enlace mágico. Exige el "
+        "correo verificado (403 si no) y no se sirve durante una suplantación: "
+        "el personal de plataforma no debe ver las inscripciones personales de "
+        "la persona suplantada."
+    ),
+    response_model=MyRegistrationsResponse,
+    dependencies=[limit_per_ip("mis-eventos-mios", MIS_EVENTOS_MIOS_POR_IP)],
+)
+async def mis_eventos_de_la_cuenta(
+    usuario: VerifiedUserDep,
+    claims: Annotated[AccessTokenClaims, Depends(get_token_claims)],
+    session: SessionDep,
+) -> MyRegistrationsResponse:
+    if claims.impersonated_by is not None:
+        raise PermissionDeniedError("«Mis eventos» no está disponible durante una suplantación.")
+    registrations = await mis_eventos_service.list_mis_eventos_de_cuenta(
+        session, email_verificado=usuario.email
+    )
     return MyRegistrationsResponse(registrations=registrations)

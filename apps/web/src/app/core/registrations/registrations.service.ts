@@ -70,6 +70,11 @@ export interface MyRegistrationItem {
   readonly status: string;
   /** La organización canceló el evento (no la persona). */
   readonly event_cancelled?: boolean;
+  readonly ends_at: string;
+  readonly timezone: string;
+  /** Solo con la plaza confirmada y el evento en pie: lo necesario para
+   * «añadir al calendario». */
+  readonly calendar: EventoParaCalendario | null;
 }
 
 /** `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si no, nulo sin pago. */
@@ -197,6 +202,18 @@ export class RegistrationsService {
       this.http.post<{ registrations: readonly MyRegistrationItem[] }>(
         this.api.url('/public/mis-eventos/ver'),
         { token },
+      ),
+    );
+    return respuesta.registrations;
+  }
+
+  /** «Mis eventos» con la sesión iniciada: sin enlace, del correo de la cuenta.
+   * La API responde 403 si ese correo no está verificado o durante una
+   * suplantación. */
+  async getMyAccountRegistrations(): Promise<readonly MyRegistrationItem[]> {
+    const respuesta = await firstValueFrom(
+      this.http.get<{ registrations: readonly MyRegistrationItem[] }>(
+        this.api.url('/public/mis-eventos/mios'),
       ),
     );
     return respuesta.registrations;

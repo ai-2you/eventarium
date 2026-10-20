@@ -14,6 +14,11 @@ import { Checkbox } from '../../../shared/ui/checkbox';
 import { Input } from '../../../shared/ui/input';
 import { Textarea } from '../../../shared/ui/textarea';
 import { PageHeader } from '../../../shared/ui/page-header';
+import {
+  type EnlaceSocial,
+  OrganizationSocialLinks,
+  nombreDeRed,
+} from './organization-social-links';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,6 +31,11 @@ interface Organizacion {
   readonly website: string | null;
   readonly contact_email: string | null;
   readonly address: string | null;
+  readonly postal_code: string | null;
+  readonly city: string | null;
+  readonly province: string | null;
+  readonly address_public: boolean;
+  readonly social_links: readonly EnlaceSocial[];
   readonly public_page_enabled: boolean;
   readonly is_active: boolean;
 }
@@ -48,6 +58,7 @@ const WEB_RE = /^https?:\/\/\S+$/;
     Card,
     Checkbox,
     Input,
+    OrganizationSocialLinks,
     Textarea,
     PageHeader,
     RouterLink,
@@ -105,6 +116,28 @@ const WEB_RE = /^https?:\/\/\S+$/;
                 autocomplete="street-address"
                 [(value)]="address"
               />
+              <div class="direccion">
+                <app-input
+                  [label]="t('admin.organizacion.codigoPostal')"
+                  autocomplete="postal-code"
+                  [(value)]="postalCode"
+                />
+                <app-input
+                  [label]="t('admin.organizacion.ciudad')"
+                  autocomplete="address-level2"
+                  [(value)]="city"
+                />
+                <app-input
+                  [label]="t('admin.organizacion.provincia')"
+                  autocomplete="address-level1"
+                  [(value)]="province"
+                />
+              </div>
+              <app-checkbox
+                [label]="t('admin.organizacion.direccionPublica')"
+                [hint]="t('admin.organizacion.direccionPublicaPista')"
+                [(checked)]="addressPublic"
+              />
               <p class="publica__lista-titulo">
                 {{ t('admin.organizacion.paginaPublica.seHaraPublico') }}
               </p>
@@ -112,7 +145,9 @@ const WEB_RE = /^https?:\/\/\S+$/;
                 <li>{{ t('admin.organizacion.paginaPublica.campos.nombre') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.descripcion') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.web') }}</li>
-                <li>{{ t('admin.organizacion.paginaPublica.campos.direccion') }}</li>
+                @if (addressPublic()) {
+                  <li>{{ t('admin.organizacion.paginaPublica.campos.direccion') }}</li>
+                }
                 <li>{{ t('admin.organizacion.paginaPublica.campos.logo') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.redes') }}</li>
                 <li>{{ t('admin.organizacion.paginaPublica.campos.eventos') }}</li>
@@ -124,6 +159,8 @@ const WEB_RE = /^https?:\/\/\S+$/;
                 }}</a>
               }
             </fieldset>
+
+            <app-organization-social-links [(enlaces)]="socialLinks" />
 
             @if (guardado()) {
               <app-alert tone="exito">{{ t('admin.organizacion.guardado') }}</app-alert>
@@ -171,6 +208,11 @@ const WEB_RE = /^https?:\/\/\S+$/;
       padding-left: 1.25rem;
       font-size: var(--fs-sm);
     }
+    .direccion {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+      gap: var(--space-md);
+    }
     .publica__ver {
       justify-self: start;
       color: var(--accent);
@@ -194,6 +236,11 @@ export class OrganizationPage {
   protected readonly website = signal('');
   protected readonly contactEmail = signal('');
   protected readonly address = signal('');
+  protected readonly postalCode = signal('');
+  protected readonly city = signal('');
+  protected readonly province = signal('');
+  protected readonly addressPublic = signal(true);
+  protected readonly socialLinks = signal<readonly EnlaceSocial[]>([]);
   protected readonly publicPageEnabled = signal(false);
   protected readonly slug = signal('');
   /** La página existe de verdad: interruptor activado **y guardado**. */
@@ -219,6 +266,11 @@ export class OrganizationPage {
       this.website.set(organizacion.website ?? '');
       this.contactEmail.set(organizacion.contact_email ?? '');
       this.address.set(organizacion.address ?? '');
+      this.postalCode.set(organizacion.postal_code ?? '');
+      this.city.set(organizacion.city ?? '');
+      this.province.set(organizacion.province ?? '');
+      this.addressPublic.set(organizacion.address_public);
+      this.socialLinks.set(organizacion.social_links ?? []);
       this.publicPageEnabled.set(organizacion.public_page_enabled);
       this.paginaActiva.set(organizacion.public_page_enabled);
       this.slug.set(organizacion.slug);
@@ -268,6 +320,20 @@ export class OrganizationPage {
     if (Object.values(nuevosErrores).some((mensaje) => mensaje)) {
       return;
     }
+    const libre = this.socialLinks().find((enlace) => enlace.kind === 'other');
+    if (libre && !(libre.url && libre.label)) {
+      this.error.set(this.transloco.translate('admin.organizacion.redes.libreIncompleto'));
+      return;
+    }
+    const malEscrita = this.socialLinks().find((enlace) => !WEB_RE.test(enlace.url));
+    if (malEscrita) {
+      this.error.set(
+        this.transloco.translate('admin.organizacion.redes.urlInvalida', {
+          red: malEscrita.kind === 'other' ? malEscrita.label : nombreDeRed(malEscrita.kind),
+        }),
+      );
+      return;
+    }
 
     this.guardando.set(true);
     try {
@@ -279,6 +345,11 @@ export class OrganizationPage {
           website: this.website().trim() || null,
           contact_email: this.contactEmail().trim() || null,
           address: this.address().trim() || null,
+          postal_code: this.postalCode().trim() || null,
+          city: this.city().trim() || null,
+          province: this.province().trim() || null,
+          address_public: this.addressPublic(),
+          social_links: this.socialLinks(),
           public_page_enabled: this.publicPageEnabled(),
         }),
       );

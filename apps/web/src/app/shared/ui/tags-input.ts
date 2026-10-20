@@ -100,10 +100,12 @@ const ESPERA_SUGERENCIAS_MS = 200;
     :host {
       display: block;
     }
+    /* Mismo hueco bajo el rótulo y misma altura de caja (48px con el borde)
+     * que \`app-select\`: lado a lado en una fila, deben quedar a la par. */
     .campo {
       position: relative;
       display: grid;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
     }
     .rotulo {
       font-size: var(--fs-sm);
@@ -115,7 +117,7 @@ const ESPERA_SUGERENCIAS_MS = 200;
       flex-wrap: wrap;
       align-items: center;
       gap: 6px;
-      min-height: 2.875rem;
+      min-height: 3rem;
       padding: 6px 0.75rem;
       box-sizing: border-box;
       background: var(--surface-2);

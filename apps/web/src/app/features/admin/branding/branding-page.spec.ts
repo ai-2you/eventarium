@@ -142,6 +142,8 @@ describe('BrandingPage', () => {
 
     const peticion = http.expectOne(BRANDING_URL);
     expect(peticion.request.method).toBe('PUT');
+    // Las redes se editan en la ficha de la organización: aquí no se envían (ni se borran).
+    expect('social_links' in peticion.request.body).toBe(false);
     peticion.flush(BRANDING_VALIDO);
     // Dos ciclos: uno para la respuesta del PUT, otro para el `await` encadenado a
     // `theming.load()` dentro de `guardar()`.

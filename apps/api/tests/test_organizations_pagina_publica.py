@@ -24,6 +24,9 @@ CAMPOS_PUBLICOS = {
     "description",
     "website",
     "address",
+    "postal_code",
+    "city",
+    "province",
     "logo_url",
     "social_links",
 }

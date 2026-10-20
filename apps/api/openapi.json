@@ -4522,6 +4522,47 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Quitar la portada del evento",
+        "description": "Deja el evento sin portada. Una imagen de la biblioteca de medios sigue en la biblioteca; solo se borra el objeto de una portada legada, que no tiene otro dueño.",
+        "operationId": "remove_cover_api_v1_events__event_id__cover_delete",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/events/{event_id}/sessions": {
@@ -7526,6 +7567,28 @@
         }
       }
     },
+    "/api/v1/public/mis-eventos/mios": {
+      "get": {
+        "tags": [
+          "público"
+        ],
+        "summary": "Listar «Mis eventos» con la sesión iniciada",
+        "description": "Las inscripciones del correo de la cuenta, sin enlace mágico. Exige el correo verificado (403 si no) y no se sirve durante una suplantación: el personal de plataforma no debe ver las inscripciones personales de la persona suplantada.",
+        "operationId": "mis_eventos_de_la_cuenta_api_v1_public_mis_eventos_mios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyRegistrationsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/tickets/scan": {
       "post": {
         "tags": [
@@ -8640,6 +8703,317 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places": {
+      "get": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Listar los sitios cercanos de un evento",
+        "operationId": "list_nearby_places_api_v1_events__event_id__nearby_places_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response List Nearby Places Api V1 Events  Event Id  Nearby Places Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Añadir un sitio cercano",
+        "operationId": "create_nearby_place_api_v1_events__event_id__nearby_places_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyPlaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/order": {
+      "put": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Reordenar los sitios cercanos",
+        "operationId": "order_nearby_places_api_v1_events__event_id__nearby_places_order_put",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response Order Nearby Places Api V1 Events  Event Id  Nearby Places Order Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/copy-from/{source_event_id}": {
+      "post": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Copiar los sitios cercanos de otro evento",
+        "description": "Añade al final copias de los sitios de otro evento de la misma organización.",
+        "operationId": "copy_nearby_places_api_v1_events__event_id__nearby_places_copy_from__source_event_id__post",
+        "parameters": [
+          {
+            "name": "source_event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Event Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response Copy Nearby Places Api V1 Events  Event Id  Nearby Places Copy From  Source Event Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/{place_id}": {
+      "patch": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Editar un sitio cercano",
+        "operationId": "update_nearby_place_api_v1_events__event_id__nearby_places__place_id__patch",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyPlaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Quitar un sitio cercano",
+        "operationId": "delete_nearby_place_api_v1_events__event_id__nearby_places__place_id__delete",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -12674,10 +13048,17 @@
             "title": "Theme Template Id"
           },
           "social_links": {
-            "items": {
-              "$ref": "#/components/schemas/SocialLinkInput"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Social Links"
           },
           "organizer_blurb": {
@@ -18915,6 +19296,25 @@
             "type": "boolean",
             "title": "Event Cancelled",
             "default": false
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "calendar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCalendarInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -18924,7 +19324,9 @@
           "starts_at",
           "organization_name",
           "organization",
-          "status"
+          "status",
+          "ends_at",
+          "timezone"
         ],
         "title": "MyRegistrationItem",
         "description": "Una inscripción tal como la ve el listado de «Mis eventos»."
@@ -18979,6 +19381,319 @@
         ],
         "title": "MyTicketResponse",
         "description": "`/mi-entrada` (fase 4, fase 4 de trabajo): qué mostrar y si hay QR que pedir."
+      },
+      "NearbyPlaceCreate": {
+        "properties": {
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+?[0-9 ().-]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "NearbyPlaceCreate"
+      },
+      "NearbyPlaceOrder": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "NearbyPlaceOrder"
+      },
+      "NearbyPlaceResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "custom_kind",
+          "name",
+          "address",
+          "phone",
+          "website",
+          "notes",
+          "display_order",
+          "updated_at"
+        ],
+        "title": "NearbyPlaceResponse"
+      },
+      "NearbyPlaceUpdate": {
+        "properties": {
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+?[0-9 ().-]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hotel",
+                  "restaurant",
+                  "bar",
+                  "parking",
+                  "transport",
+                  "pharmacy",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "NearbyPlaceUpdate"
       },
       "OcupacionOut": {
         "properties": {
@@ -19445,6 +20160,51 @@
             ],
             "title": "Address"
           },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "type": "boolean",
+            "title": "Address Public",
+            "default": true
+          },
+          "social_links": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSocialLink"
+            },
+            "type": "array",
+            "title": "Social Links"
+          },
           "public_page_enabled": {
             "type": "boolean",
             "title": "Public Page Enabled"
@@ -19592,6 +20352,67 @@
               }
             ],
             "title": "Address"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Public"
+          },
+          "social_links": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Social Links"
           },
           "public_page_enabled": {
             "anyOf": [
@@ -21750,6 +22571,13 @@
             "type": "array",
             "title": "Venues"
           },
+          "nearby_places": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNearbyPlace"
+            },
+            "type": "array",
+            "title": "Nearby Places"
+          },
           "sponsor_tiers": {
             "items": {
               "$ref": "#/components/schemas/PublicSponsorTier"
@@ -22131,6 +22959,94 @@
         "title": "PublicEventSummary",
         "description": "Evento tal y como aparece en el listado público.\n\n`reserved_count` es el número de plazas realmente reservadas: `confirmed` +\n`pending_payment` dentro de su ventana de pago + promociones de lista de\nespera dentro de su ventana de confirmación — misma regla que\n`registrations.repository.count_reserved_registrations`. Nunca se expone el\ndetalle de qué estado concreto ocupa cada plaza, solo el agregado."
       },
+      "PublicNearbyPlace": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "custom_kind",
+          "name",
+          "address",
+          "phone",
+          "website",
+          "notes"
+        ],
+        "title": "PublicNearbyPlace",
+        "description": "Lo que ve el público: sin auditoría ni orden interno."
+      },
       "PublicOrganizationProfile": {
         "properties": {
           "slug": {
@@ -22173,6 +23089,39 @@
               }
             ],
             "title": "Address"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
           },
           "logo_url": {
             "anyOf": [
@@ -22526,6 +23475,17 @@
           "url": {
             "type": "string",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -24770,8 +25730,15 @@
         "properties": {
           "kind": {
             "type": "string",
-            "maxLength": 40,
-            "minLength": 1,
+            "enum": [
+              "linkedin",
+              "instagram",
+              "x",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "other"
+            ],
             "title": "Kind"
           },
           "url": {
@@ -24780,6 +25747,19 @@
             "minLength": 1,
             "pattern": "^https?://",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -24788,7 +25768,7 @@
           "url"
         ],
         "title": "SocialLinkInput",
-        "description": "Enlace social del organizador."
+        "description": "Enlace social del organizador: uno por red; `other` lleva su nombre."
       },
       "SocialLinkResponse": {
         "properties": {

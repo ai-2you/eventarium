@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
@@ -7,25 +6,11 @@ import {
   type MyRegistrationItem,
   RegistrationsService,
 } from '../../../core/registrations/registrations.service';
+import { MisEventosListado } from './mis-eventos-listado';
 import { Alert } from '../../../shared/ui/alert';
 import { Reveal } from '../../../shared/ui/reveal.directive';
-import { rutaEvento } from '../../../core/routing/rutas-publicas';
 
 type Estado = 'comprobando' | 'conInscripciones' | 'sinInscripciones' | 'tokenInvalido';
-
-/**
- * Convierte `pending_verification` en `PendingVerification`, para componer
- * la clave de i18n del estado — mismo criterio que `claveDeEstado` del panel
- * de organizador (`features/admin/events/registration-types.ts`), duplicado
- * aquí a propósito: esta página vive en el árbol público, sin acoplar su
- * texto (más neutro, dirigido al asistente) al namespace `admin.*`.
- */
-function claveDeEstado(valor: string): string {
-  return valor
-    .split('_')
-    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
-    .join('');
-}
 
 /**
  * Consume el token del magic-link de «Mis eventos» y lista las
@@ -40,7 +25,7 @@ function claveDeEstado(valor: string): string {
 @Component({
   selector: 'app-mis-eventos-listado-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, TranslocoDirective, RouterLink, Alert, Reveal],
+  imports: [TranslocoDirective, RouterLink, Alert, Reveal, MisEventosListado],
   template: `
     <ng-container *transloco="let t">
       <div class="ancho-maximo envoltura" appReveal>
@@ -63,26 +48,7 @@ function claveDeEstado(valor: string): string {
               <app-alert tone="info">{{ t('publico.misEventos.sinInscripciones') }}</app-alert>
             }
             @case ('conInscripciones') {
-              <ul class="listado">
-                @for (
-                  fila of inscripciones();
-                  track fila.organization.slug + fila.event_slug + fila.status
-                ) {
-                  <li>
-                    <a [routerLink]="rutaEvento(fila.organization.slug, fila.event_slug)">{{
-                      fila.event_title
-                    }}</a>
-                    <span class="detalle">
-                      {{ fila.starts_at | date: 'd MMM y, HH:mm' }} · {{ fila.organization.name }} ·
-                      @if (fila.event_cancelled) {
-                        {{ t('publico.misEventos.eventoCancelado') }}
-                      } @else {
-                        {{ t('publico.misEventos.estado.' + claveDeEstado(fila.status)) }}
-                      }
-                    </span>
-                  </li>
-                }
-              </ul>
+              <app-mis-eventos-listado [inscripciones]="inscripciones()" />
             }
           }
         </div>
@@ -93,34 +59,14 @@ function claveDeEstado(valor: string): string {
     .envoltura {
       padding: var(--space-lg) 0;
     }
-    .listado {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: var(--space-md);
-    }
-    .listado li {
-      display: grid;
-      gap: var(--space-xs);
-      padding: var(--space-md);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-    }
-    .detalle {
-      color: var(--muted);
-      font-size: var(--fs-sm);
-    }
   `,
 })
 export class MisEventosListadoPage {
-  protected readonly rutaEvento = rutaEvento;
   private readonly registrations = inject(RegistrationsService);
   private readonly ruta = inject(ActivatedRoute);
 
   protected readonly estado = signal<Estado>('comprobando');
   protected readonly inscripciones = signal<readonly MyRegistrationItem[]>([]);
-  protected readonly claveDeEstado = claveDeEstado;
 
   constructor() {
     const token = this.ruta.snapshot.queryParamMap.get('token');

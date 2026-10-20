@@ -6,7 +6,9 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile, status
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.base import NO_VALUE
 
 from app.core.deps import CurrentUserDep, DbDep, PermissionsDep, require_permission
 from app.core.permissions import Permission
@@ -22,7 +24,7 @@ from app.modules.organizations import (
 from app.modules.organizations import service as organizations_service
 from app.modules.organizations.invitations_models import OrganizationInvitation
 from app.modules.organizations.metrics_schemas import MetricasDeOrganizacionOut
-from app.modules.organizations.models import OrganizationBranding, OrganizationMember
+from app.modules.organizations.models import Organization, OrganizationBranding, OrganizationMember
 from app.modules.organizations.schemas import (
     BrandingAdminResponse,
     BrandingUpdate,
@@ -35,6 +37,7 @@ from app.modules.organizations.schemas import (
     MemberRoleOut,
     OrganizationResponse,
     OrganizationUpdate,
+    PublicSocialLink,
 )
 from app.modules.roles.models import Role
 from app.modules.roles.schemas import ProfileFieldResponse
@@ -95,6 +98,24 @@ async def get_me(usuario: CurrentUserDep, session: DbDep) -> OrganizationRespons
     organizacion = await repository.get_organization(session, usuario.organization_id)
     if organizacion is None:
         raise NotFoundError("La organización no existe.")
+    return organization_response(organizacion)
+
+
+def _redes_cargadas(organizacion: Organization) -> list[PublicSocialLink]:
+    """Las redes de la marca si ya están cargadas; sin consulta perezosa (en
+    async no se puede), que en una organización recién creada no las hay."""
+    branding = sa_inspect(organizacion).attrs.branding.loaded_value
+    if branding is NO_VALUE or branding is None:
+        return []
+    return [
+        PublicSocialLink(kind=str(e["kind"]), url=str(e["url"]), label=e.get("label"))
+        for e in branding.social_links or []
+        if e.get("kind") and e.get("url")
+    ]
+
+
+def organization_response(organizacion: Organization) -> OrganizationResponse:
+    """La organización tal y como la ve su panel (y el de la plataforma)."""
     return OrganizationResponse(
         id=str(organizacion.id),
         slug=organizacion.slug,
@@ -104,6 +125,12 @@ async def get_me(usuario: CurrentUserDep, session: DbDep) -> OrganizationRespons
         website=organizacion.website,
         contact_email=organizacion.contact_email,
         address=organizacion.address,
+        postal_code=organizacion.postal_code,
+        city=organizacion.city,
+        province=organizacion.province,
+        # `is not False`: recién creada, antes del flush, aún no tiene el valor por defecto.
+        address_public=organizacion.address_public is not False,
+        social_links=_redes_cargadas(organizacion),
         public_page_enabled=organizacion.public_page_enabled,
         is_active=organizacion.is_active,
     )
@@ -121,10 +148,19 @@ async def update_me(
     organizacion = await repository.get_organization(session, usuario.organization_id)
     if organizacion is None:
         raise NotFoundError("La organización no existe.")
-    for campo, valor in datos.model_dump(exclude_unset=True).items():
+    cambios = datos.model_dump(exclude_unset=True)
+    redes = cambios.pop("social_links", None)
+    for campo, valor in cambios.items():
         setattr(organizacion, campo, valor)
+    if redes is not None:
+        branding = await repository.get_branding(session, usuario.organization_id)
+        if branding is None:
+            branding = OrganizationBranding(organization_id=usuario.organization_id)
+            session.add(branding)
+        branding.social_links = redes
     await session.flush()
-    return await get_me(usuario, session)
+    await session.refresh(organizacion, ["branding"])
+    return organization_response(organizacion)
 
 
 @router.get(
@@ -167,7 +203,8 @@ async def update_branding(
         session.add(branding)
 
     branding.theme_template_id = theme_template_id
-    branding.social_links = [enlace.model_dump() for enlace in datos.social_links]
+    if datos.social_links is not None:
+        branding.social_links = [enlace.model_dump() for enlace in datos.social_links]
     branding.organizer_blurb = datos.organizer_blurb
     await session.flush()
     return await _branding_response(session, branding)

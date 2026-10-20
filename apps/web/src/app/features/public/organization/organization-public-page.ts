@@ -23,6 +23,7 @@ import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { Chip } from '../../../shared/ui/chip';
 import { Reveal } from '../../../shared/ui/reveal.directive';
+import { ICONOS_REDES } from '../../../shared/ui/share-links-iconos';
 
 interface PerfilPublico {
   readonly slug: string;
@@ -30,8 +31,15 @@ interface PerfilPublico {
   readonly description: string | null;
   readonly website: string | null;
   readonly address: string | null;
+  readonly postal_code?: string | null;
+  readonly city?: string | null;
+  readonly province?: string | null;
   readonly logo_url: string | null;
-  readonly social_links: readonly { readonly kind: string; readonly url: string }[];
+  readonly social_links: readonly {
+    readonly kind: string;
+    readonly url: string;
+    readonly label?: string | null;
+  }[];
 }
 
 interface EventoDeLaOrganizacion {
@@ -56,6 +64,10 @@ interface PaginaDeEventos {
 type Cuando = 'upcoming' | 'past';
 
 const TAMANO_DE_PAGINA = 12;
+
+/** Eslabón de cadena (relleno) para el enlace libre o una red sin icono. */
+const ICONO_ENLACE =
+  'M10.6 13.4a1 1 0 0 1 0-1.4l3.5-3.5a1 1 0 1 1 1.4 1.4L12 13.4a1 1 0 0 1-1.4 0ZM8.1 19.9a4.1 4.1 0 0 1-2.9-7l2.1-2.1a1 1 0 1 1 1.4 1.4l-2.1 2.1a2.1 2.1 0 0 0 3 3l2.1-2.1a1 1 0 1 1 1.4 1.4L11 18.7a4.1 4.1 0 0 1-2.9 1.2Zm7.9-6.3a1 1 0 0 1-.7-1.7l2.1-2.1a2.1 2.1 0 0 0-3-3l-2.1 2.1a1 1 0 1 1-1.4-1.4L13 5.3a4.1 4.1 0 0 1 5.8 5.8l-2.1 2.1a1 1 0 0 1-.7.4Z';
 
 /** Nombres propios de las redes conocidas (no se traducen). */
 const ETIQUETAS_DE_REDES: Record<string, string> = {
@@ -104,41 +116,75 @@ interface EstadoTransferido {
         </div>
       } @else if (perfil(); as p) {
         <header class="cabecera">
-          <div class="ancho-maximo cabecera__grid">
+          <div class="ancho-maximo cabecera__grid" [class.cabecera__grid--con-logo]="!!p.logo_url">
             @if (p.logo_url) {
-              <img
-                class="cabecera__logo"
-                [src]="p.logo_url"
-                [alt]="p.name"
-                width="96"
-                height="96"
-              />
+              <div class="cabecera__marco">
+                <!-- El nombre va justo al lado: el logo no lo repite al lector. -->
+                <img class="cabecera__logo" [src]="p.logo_url" alt="" />
+              </div>
             }
-            <div>
+            <div class="cabecera__datos">
               <p class="etiqueta-acento">{{ t('publico.organizacion.rotulo') }}</p>
               <h1>{{ p.name }}</h1>
               @if (p.description) {
                 <p class="cabecera__descripcion">{{ p.description }}</p>
               }
-              <ul class="datos">
+              <dl class="ficha">
                 @if (p.website) {
-                  <li>
-                    <a [href]="p.website" rel="noopener noreferrer" target="_blank">{{
-                      p.website
-                    }}</a>
-                  </li>
+                  <div>
+                    <dt>{{ t('publico.organizacion.web') }}</dt>
+                    <dd>
+                      <a [href]="p.website" rel="noopener noreferrer" target="_blank">{{
+                        dominio(p.website)
+                      }}</a>
+                    </dd>
+                  </div>
                 }
-                @if (p.address) {
-                  <li>{{ p.address }}</li>
+                @if (direccion(p); as lineas) {
+                  <div>
+                    <dt>{{ t('publico.organizacion.direccion') }}</dt>
+                    <dd>
+                      <address>
+                        @for (linea of lineas; track $index) {
+                          <span>{{ linea }}</span>
+                        }
+                      </address>
+                    </dd>
+                  </div>
                 }
-                @for (enlace of p.social_links; track enlace.url) {
-                  <li>
-                    <a [href]="enlace.url" rel="noopener noreferrer" target="_blank">{{
-                      etiqueta(enlace.kind)
-                    }}</a>
-                  </li>
-                }
-              </ul>
+              </dl>
+              @if (p.social_links.length) {
+                <ul class="redes" [attr.aria-label]="t('publico.organizacion.redes')">
+                  @for (enlace of p.social_links; track enlace.kind) {
+                    <li>
+                      <a
+                        class="red"
+                        [href]="enlace.url"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        [attr.aria-label]="
+                          t('publico.organizacion.redEnlace', { red: etiqueta(enlace) })
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="20"
+                          height="20"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <path
+                            fill="currentColor"
+                            fill-rule="evenodd"
+                            [attr.d]="icono(enlace.kind)"
+                          />
+                        </svg>
+                        <span>{{ etiqueta(enlace) }}</span>
+                      </a>
+                    </li>
+                  }
+                </ul>
+              }
             </div>
           </div>
         </header>
@@ -227,20 +273,34 @@ interface EstadoTransferido {
       border-bottom: 1px solid var(--border);
     }
     .cabecera__grid {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      gap: var(--sp-7);
       align-items: center;
-      gap: var(--sp-6);
     }
-    .cabecera__logo {
-      width: 96px;
-      height: 96px;
-      object-fit: contain;
+    /* Logo grande a la izquierda (la mitad) y los datos a la derecha; en móvil, apilado. */
+    @media (min-width: 768px) {
+      .cabecera__grid--con-logo {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+    }
+    .cabecera__marco {
+      display: grid;
+      place-items: center;
+      aspect-ratio: 4 / 3;
+      max-height: 22rem;
+      padding: var(--sp-7);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background-color: var(--surface);
     }
+    .cabecera__logo {
+      display: block;
+      max-width: min(100%, 22rem);
+      max-height: 100%;
+      object-fit: contain;
+    }
     .etiqueta-acento {
+      margin: 0;
       color: var(--accent);
     }
     .cabecera h1 {
@@ -248,20 +308,54 @@ interface EstadoTransferido {
     }
     .cabecera__descripcion {
       max-width: 60ch;
+      margin: var(--sp-4) 0 0;
       color: var(--muted);
       white-space: pre-line;
     }
-    .datos {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sp-2) var(--sp-5);
-      margin: var(--sp-4) 0 0;
-      padding: 0;
-      list-style: none;
-      font-size: var(--fs-sm);
+    .ficha {
+      display: grid;
+      gap: var(--sp-4);
+      margin: var(--sp-6) 0 0;
+    }
+    .ficha dt {
+      font-size: var(--fs-xs, 0.75rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--muted);
     }
-    .datos a {
+    .ficha dd {
+      margin: 2px 0 0;
+    }
+    .ficha address {
+      display: grid;
+      font-style: normal;
+    }
+    .ficha a {
+      color: var(--accent);
+    }
+    .redes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-2);
+      margin: var(--sp-6) 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .red {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 2.75rem;
+      padding: 0 var(--sp-4);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--fg);
+      text-decoration: none;
+      font-size: var(--fs-sm);
+    }
+    .red:hover,
+    .red:focus-visible {
+      border-color: var(--accent);
       color: var(--accent);
     }
     .secciones {
@@ -382,8 +476,32 @@ export class OrganizationPublicPage implements OnInit {
     void this.tareasPendientes.run(() => this.cargar());
   }
 
-  protected etiqueta(tipo: string): string {
+  protected etiqueta(enlace: { readonly kind: string; readonly label?: string | null }): string {
+    if (enlace.kind === 'other' && enlace.label) return enlace.label;
+    const tipo = enlace.kind;
     return ETIQUETAS_DE_REDES[tipo.toLowerCase()] ?? tipo.replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+
+  protected icono(tipo: string): string {
+    return (ICONOS_REDES as Record<string, string>)[tipo.toLowerCase()] ?? ICONO_ENLACE;
+  }
+
+  /** Calle; código postal y ciudad; provincia. Sin líneas vacías. */
+  protected direccion(p: PerfilPublico): string[] | null {
+    const lineas = [
+      p.address,
+      [p.postal_code, p.city].filter(Boolean).join(' '),
+      p.province && p.province !== p.city ? p.province : null,
+    ].filter((linea): linea is string => !!linea);
+    return lineas.length ? lineas : null;
+  }
+
+  protected dominio(url: string): string {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
   }
 
   private urlEventos(cuando: Cuando, offset: number): string {

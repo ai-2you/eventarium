@@ -352,3 +352,68 @@ async def test_reemplazar_el_logo_de_patrocinador_de_biblioteca_no_borra_el_obje
         )
     assert reemplazado.status_code == 200, reemplazado.text
     borrar.assert_not_called()
+
+
+async def test_quitar_la_portada_de_biblioteca_deja_el_evento_sin_portada_y_conserva_la_imagen(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-quitada")
+    subido = await _subir_a_biblioteca(cliente, cabeceras, "events")
+    asignada = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={"media_id": subido["id"]}
+    )
+    assert asignada.status_code == 200, asignada.text
+
+    with patch(
+        "app.core.storage.S3StorageProvider.delete_object", new_callable=AsyncMock
+    ) as borrar:
+        quitada = await cliente.delete(f"{EVENTS}/{evento['id']}/cover", headers=cabeceras)
+    assert quitada.status_code == 200, quitada.text
+    assert quitada.json()["cover_url"] is None
+    borrar.assert_not_called()
+
+    detalle = await cliente.get(f"{EVENTS}/{evento['id']}", headers=cabeceras)
+    assert detalle.json()["cover_url"] is None
+
+
+async def test_quitar_una_portada_legada_borra_su_objeto(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-legada-quitada")
+    heredada = await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover",
+        headers=cabeceras,
+        files={"fichero": ("legado.png", PNG, "image/png")},
+    )
+    assert heredada.status_code == 200, heredada.text
+
+    with patch(
+        "app.core.storage.S3StorageProvider.delete_object", new_callable=AsyncMock
+    ) as borrar:
+        quitada = await cliente.delete(f"{EVENTS}/{evento['id']}/cover", headers=cabeceras)
+    assert quitada.status_code == 200, quitada.text
+    assert quitada.json()["cover_url"] is None
+    borrar.assert_called_once()
+
+
+async def test_quitar_la_portada_de_un_evento_de_otra_organizacion_da_404(
+    cliente: AsyncClient,
+    organizacion: OrganizacionDePrueba,
+    otra_organizacion: OrganizacionDePrueba,
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, "portada-ajena")
+    subido = await _subir_a_biblioteca(cliente, cabeceras, "events")
+    await cliente.put(
+        f"{EVENTS}/{evento['id']}/cover", headers=cabeceras, json={"media_id": subido["id"]}
+    )
+
+    _, cabeceras_ajenas = await iniciar_sesion(cliente, otra_organizacion)
+    respuesta = await cliente.delete(f"{EVENTS}/{evento['id']}/cover", headers=cabeceras_ajenas)
+    assert respuesta.status_code == 404, respuesta.text
+
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    detalle = await cliente.get(f"{EVENTS}/{evento['id']}", headers=cabeceras)
+    assert detalle.json()["cover_url"] == subido["url"]

@@ -3,5 +3,6 @@
 
 export interface PublicSocialLink {
   kind: string;
+  label?: (string | null);
   url: string;
 }

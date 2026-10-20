@@ -17,11 +17,6 @@ import { ThemeTemplatePreview } from '../superadmin/theme-template-preview';
 import { MediaPicker } from '../../../shared/ui/media-picker';
 import { LOGO_ACEPTADOS } from '../../../shared/uploads/image-upload-constraints';
 
-interface SocialLink {
-  kind: string;
-  url: string;
-}
-
 /** Igual que en `organization-page.ts`: solo se usan los campos que hacen falta aquí. */
 interface Organizacion {
   readonly name: string;
@@ -33,14 +28,13 @@ interface Organizacion {
  * portada por organización, la plantilla de portada dejó de existir). */
 interface Branding {
   readonly theme_template_id: string | null;
-  readonly social_links: readonly SocialLink[];
   readonly organizer_blurb: string | null;
   readonly logo_url: string | null;
 }
 
 /**
- * Identidad visual editable: logotipo, plantilla de tema, redes sociales y
- * resumen del organizador.
+ * Identidad visual editable: logotipo, plantilla de tema y resumen del
+ * organizador. Las redes sociales se editan en la ficha de la organización.
  *
  * Ya no hay ningún campo de color ni de tipografía: la organización elige una
  * plantilla completa del catálogo de la plataforma (sesión 2 de validación del plan),
@@ -101,35 +95,6 @@ interface Branding {
                 [(url)]="previaLogo"
                 [(mediaId)]="logoMediaIdPendiente"
               />
-            </app-card>
-
-            <app-card [heading]="t('admin.branding.redesSociales')">
-              @for (enlace of socialLinks(); track $index) {
-                <div class="red-fila">
-                  <label
-                    >{{ t('admin.branding.tipoDeRed') }}
-                    <input
-                      type="text"
-                      [value]="enlace.kind"
-                      (input)="alCambiarRed($index, 'kind', inputDelEvento($event))"
-                    />
-                  </label>
-                  <label
-                    >{{ t('admin.branding.urlDeRed') }}
-                    <input
-                      type="url"
-                      [value]="enlace.url"
-                      (input)="alCambiarRed($index, 'url', inputDelEvento($event))"
-                    />
-                  </label>
-                  <app-button variant="secundario" type="button" (pulsado)="quitarRed($index)">
-                    {{ t('admin.branding.quitarRed') }}
-                  </app-button>
-                </div>
-              }
-              <app-button variant="secundario" type="button" (pulsado)="anadirRed()">
-                {{ t('admin.branding.anadirRed') }}
-              </app-button>
             </app-card>
 
             <app-card [heading]="t('admin.branding.resumenOrganizador')">
@@ -203,24 +168,6 @@ interface Branding {
       align-items: center;
       gap: var(--space-sm);
       font-weight: 600;
-    }
-    .red-fila {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      margin-bottom: var(--space-sm);
-    }
-    .red-fila label {
-      flex: 1;
-      display: grid;
-      gap: var(--space-xs);
-      font-size: 0.875rem;
-    }
-    .red-fila input {
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      font: inherit;
     }
     .etiqueta-fichero {
       display: block;
@@ -316,7 +263,6 @@ export class BrandingPage {
 
   protected readonly themeTemplateId = signal<string | null>(null);
   protected readonly plantillasDeTema = signal<PlantillaDeTema[]>([]);
-  protected readonly socialLinks = signal<SocialLink[]>([]);
   protected readonly organizerBlurb = signal('');
   protected readonly nombreOrganizacion = signal('');
 
@@ -360,31 +306,12 @@ export class BrandingPage {
 
   private aplicarRespuesta(branding: Branding): void {
     this.themeTemplateId.set(branding.theme_template_id);
-    this.socialLinks.set(branding.social_links.map((enlace) => ({ ...enlace })));
     this.organizerBlurb.set(branding.organizer_blurb ?? '');
     this.previaLogo.set(branding.logo_url);
   }
 
   protected colorDelEvento(evento: Event): string {
     return (evento.target as HTMLInputElement).value;
-  }
-
-  protected inputDelEvento(evento: Event): string {
-    return (evento.target as HTMLInputElement).value;
-  }
-
-  protected alCambiarRed(indice: number, campo: 'kind' | 'url', valor: string): void {
-    this.socialLinks.update((actuales) =>
-      actuales.map((enlace, i) => (i === indice ? { ...enlace, [campo]: valor } : enlace)),
-    );
-  }
-
-  protected anadirRed(): void {
-    this.socialLinks.update((actuales) => [...actuales, { kind: '', url: '' }]);
-  }
-
-  protected quitarRed(indice: number): void {
-    this.socialLinks.update((actuales) => actuales.filter((_, i) => i !== indice));
   }
 
   protected async guardar(evento: Event): Promise<void> {
@@ -397,12 +324,6 @@ export class BrandingPage {
       let respuesta = await firstValueFrom(
         this.http.put<Branding>(this.api.url('/organizations/me/branding'), {
           theme_template_id: this.themeTemplateId(),
-          // Una fila añadida y no rellenada no cuenta como enlace: el backend exige
-          // `kind`/`url` no vacíos, y descartarla aquí evita un 422 confuso por un
-          // campo que la persona nunca llegó a completar.
-          social_links: this.socialLinks().filter(
-            (enlace) => enlace.kind.trim() && enlace.url.trim(),
-          ),
           organizer_blurb: this.organizerBlurb().trim() || null,
         }),
       );

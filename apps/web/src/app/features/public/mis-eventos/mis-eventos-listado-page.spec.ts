@@ -53,8 +53,11 @@ describe('MisEventosListadoPage', () => {
         event_slug: 'ia-week',
         event_title: 'IA Week',
         starts_at: '2026-10-01T10:00:00Z',
+        ends_at: '2026-10-01T18:00:00Z',
+        timezone: 'Europe/Madrid',
         organization_name: 'Humanitek',
         status: 'confirmed',
+        calendar: null,
       },
     ]);
     configurar({ getMyRegistrations }, rutaConToken('token-valido'));
