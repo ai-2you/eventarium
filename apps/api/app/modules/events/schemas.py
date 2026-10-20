@@ -325,10 +325,65 @@ class EventVenueResponse(BaseModel):
     geocoded_at: datetime | None
 
 
-class EventSessionCreate(BaseModel):
-    """Alta de una sesión de agenda."""
+ColorDeTipo = Literal["azul", "violeta", "verde", "ambar", "rosa", "cian", "rojo", "gris"]
 
-    session_type: SessionType
+
+class SessionTypeRef(BaseModel):
+    """El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."""
+
+    id: str
+    name: str
+    color: str
+    is_break: bool
+
+
+class SessionTypeOut(SessionTypeRef):
+    """Un tipo de sesión del catálogo de la organización."""
+
+    description: str | None
+    base_key: str | None
+    display_order: int
+    is_active: bool
+    # Sesiones que lo usan: con alguna no se puede borrar, solo desactivar.
+    sesiones: int
+
+
+NombreDeTipo = Annotated[str, Field(min_length=1, max_length=60)]
+DescripcionDeTipo = Annotated[str, Field(max_length=200)]
+
+
+class SessionTypeCreate(BaseModel):
+    name: NombreDeTipo
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo = "azul"
+    is_break: bool = False
+
+
+class SessionTypeUpdate(BaseModel):
+    name: NombreDeTipo | None = None
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo | None = None
+    is_break: bool | None = None
+    is_active: bool | None = None
+
+
+class SessionTypeOrder(BaseModel):
+    """Todos los tipos de la organización, en el orden nuevo."""
+
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class EventSessionCreate(BaseModel):
+    """Alta de una sesión de agenda.
+
+    El tipo va por `session_type_id` (el catálogo de la organización). El texto
+    `session_type` se sigue aceptando durante la transición: se traduce al tipo
+    con esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo
+    que no es una pausa.
+    """
+
+    session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)]
     description: str | None = None
     starts_at: datetime
@@ -352,6 +407,7 @@ class EventSessionUpdate(BaseModel):
     """Campos editables de una sesión."""
 
     session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     description: str | None = None
     starts_at: datetime | None = None
@@ -374,7 +430,10 @@ class EventSessionResponse(BaseModel):
     """Sesión de agenda tal y como la ve el panel de administración."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base del tipo, u `other` en los propios), mientras
+    # haya clientes que lo lean. El tipo de verdad es `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime
@@ -532,7 +591,9 @@ class PublicEventSession(BaseModel):
     """Sesión de la agenda tal y como se muestra en la página pública del evento."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base); el nombre, color y pausa vienen en `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime

@@ -501,25 +501,41 @@ async def create_session(
     if datos.get("venue_id") is not None:
         await _validar_sede_del_evento(session, organization_id, event_id, datos["venue_id"])
 
-    tipo = await _tipo_de_sesion(session, organization_id, datos["session_type"])
+    tipo = await _tipo_pedido(session, organization_id, datos)
     sesion = EventSession(
-        event_id=event_id, organization_id=organization_id, session_type_id=tipo.id, **datos
+        event_id=event_id,
+        organization_id=organization_id,
+        session_type_id=tipo.id,
+        session_type=session_types.clave_heredada(tipo),
+        **datos,
     )
     session.add(sesion)
     await session.flush()
+    await session.refresh(sesion, ["tipo"])
     return sesion
 
 
-async def _tipo_de_sesion(
-    session: AsyncSession, organization_id: uuid.UUID, clave: str
+async def _tipo_pedido(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    datos: dict[str, Any],
+    *,
+    actual: uuid.UUID | None = None,
 ) -> SessionType:
-    """El tipo de la organización para el texto heredado (`talk`, `workshop`…)."""
-    tipo = await session_types.tipo_por_clave_base(session, organization_id, clave)
-    if tipo is None:
-        raise ValidationDomainError(
-            "La organización no tiene tipos de sesión: crea al menos uno antes de añadir sesiones."
-        )
-    return tipo
+    """Saca de `datos` el tipo pedido (por id o por clave heredada) y lo resuelve."""
+    tipo_id = datos.pop("session_type_id", None)
+    clave = datos.pop("session_type", None)
+    try:
+        id_pedido = uuid.UUID(tipo_id) if tipo_id else None
+    except ValueError as exc:
+        raise ValidationDomainError("Ese tipo de sesión no es válido.") from exc
+    return await session_types.resolver_para_sesion(
+        session,
+        organization_id,
+        tipo_id=id_pedido,
+        clave=clave,
+        actual=actual,
+    )
 
 
 async def update_session(
@@ -562,12 +578,19 @@ async def update_session(
     except ValueError as exc:
         raise ValidationDomainError(str(exc)) from exc
 
-    if "session_type" in datos and datos["session_type"] != sesion.session_type:
-        tipo = await _tipo_de_sesion(session, organization_id, datos["session_type"])
+    pide_tipo = datos.get("session_type_id") is not None or (
+        datos.get("session_type") is not None and datos["session_type"] != sesion.session_type
+    )
+    if pide_tipo:
+        tipo = await _tipo_pedido(session, organization_id, datos, actual=sesion.session_type_id)
         sesion.session_type_id = tipo.id
+        sesion.session_type = session_types.clave_heredada(tipo)
+    datos.pop("session_type_id", None)
+    datos.pop("session_type", None)
     for campo, valor in datos.items():
         setattr(sesion, campo, valor)
     await session.flush()
+    await session.refresh(sesion, ["tipo"])
     return sesion
 
 

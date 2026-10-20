@@ -29,6 +29,17 @@ from app.modules.roles.system_roles import SYSTEM_ROLE_TEMPLATES
 from app.shared.errors import ConflictError, NotFoundError
 
 
+async def inicializar_organizacion(
+    session: AsyncSession, organization_id: uuid.UUID
+) -> dict[str, Role]:
+    """Lo que toda organización necesita al nacer: sus roles (clonados de las
+    plantillas) y sus tipos de sesión base. La usan las dos altas (superadmin y
+    autoservicio) para que no puedan divergir."""
+    roles = await clone_system_roles(session, organization_id)
+    await session_types.crear_tipos_base(session, organization_id)
+    return roles
+
+
 async def clone_system_roles(session: AsyncSession, organization_id: uuid.UUID) -> dict[str, Role]:
     """Clona las plantillas del sistema como roles propios de la organización."""
     creados: dict[str, Role] = {}
@@ -110,8 +121,7 @@ async def create_organization(
             social_links=[],
         )
     )
-    await clone_system_roles(session, organizacion.id)
-    await session_types.crear_tipos_base(session, organizacion.id)
+    await inicializar_organizacion(session, organizacion.id)
     await session.flush()
     return organizacion
 

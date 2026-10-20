@@ -35,6 +35,7 @@ from app.modules.events.cancel_router import router as events_cancel_router
 from app.modules.events.categories_router import router as event_categories_router
 from app.modules.events.public_router import router as events_public_router
 from app.modules.events.router import router as events_router
+from app.modules.events.session_types_router import router as session_types_router
 from app.modules.health.router import router as health_router
 from app.modules.legal.router import router_cookie_consent as cookie_consent_router
 from app.modules.legal.router import router_public as legal_public_router
@@ -206,6 +207,7 @@ def create_app() -> FastAPI:
     api.include_router(tickets_router)
     api.include_router(tickets_public_router)
     api.include_router(sponsor_tiers_router)
+    api.include_router(session_types_router)
     api.include_router(sponsors_router)
     api.include_router(media_router)
     api.include_router(media_folders_router)

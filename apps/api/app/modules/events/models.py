@@ -252,12 +252,18 @@ class SessionType(Base, TimestampMixin):
     # tema claro y oscuro, nunca un color libre.
     color: Mapped[str] = mapped_column(String(20), nullable=False)
     # Pausa (descanso, comida…): se pinta apagada en la agenda y no pide ponentes.
-    is_break: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_break: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     # talk | workshop | break | service | other en los base; `null` en los propios.
     # Empareja datos antiguos y alias del MCP aunque el nombre se haya cambiado.
     base_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    display_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
 
 
 class EventSession(Base, TimestampMixin):
@@ -307,6 +313,14 @@ class EventSession(Base, TimestampMixin):
     session_type: Mapped[str] = mapped_column(String(20), nullable=False)
     session_type_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), nullable=False, index=True
+    )
+    # Se carga con la sesión (una tabla pequeña): pintar el tipo nunca es N+1.
+    tipo: Mapped[SessionType] = relationship(
+        SessionType,
+        primaryjoin="EventSession.session_type_id == SessionType.id",
+        foreign_keys=[session_type_id],
+        lazy="joined",
+        viewonly=True,
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

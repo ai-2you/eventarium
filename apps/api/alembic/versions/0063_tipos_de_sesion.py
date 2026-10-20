@@ -76,6 +76,22 @@ def upgrade() -> None:
         "USING (organization_id = app_current_organization()) "
         "WITH CHECK (organization_id = app_current_organization())"
     )
+    # Como las migraciones anteriores: si `ALTER DEFAULT PRIVILEGES` no se aplicó,
+    # mejor fallar aquí que con un «permission denied» al dar de alta organizaciones.
+    for privilegio in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        concedido = (
+            op.get_bind()
+            .execute(
+                sa.text("SELECT has_table_privilege('app_user', 'session_types', :p)"),
+                {"p": privilegio},
+            )
+            .scalar()
+        )
+        if not concedido:
+            raise RuntimeError(
+                f"El rol «app_user» no tiene {privilegio} sobre «session_types». Ejecuta "
+                "infra/scripts/ensure-roles.sh para aplicar ALTER DEFAULT PRIVILEGES."
+            )
 
     # Los cinco base en cada organización existente (la migración corre como
     # `app_maintainer`, con BYPASSRLS: no hace falta contexto de organización).

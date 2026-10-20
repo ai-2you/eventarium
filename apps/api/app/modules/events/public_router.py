@@ -44,7 +44,13 @@ from app.core.database import set_organization_context
 from app.core.deps import SessionDep
 from app.core.ratelimit import PUBLICO_POR_IP, limit_per_ip
 from app.core.storage import get_storage, public_url_versionada
-from app.modules.events import categories, repository, service, speakers_repository
+from app.modules.events import (
+    categories,
+    repository,
+    service,
+    session_types,
+    speakers_repository,
+)
 from app.modules.events.models import (
     Event,
     EventMember,
@@ -61,6 +67,7 @@ from app.modules.events.schemas import (
     PublicParticipant,
     PublicSessionDetail,
     PublicVenue,
+    SessionTypeRef,
 )
 from app.modules.media.models import Media
 from app.modules.organizations import service as organizations_service
@@ -196,7 +203,8 @@ async def _sesiones_publicas(
     return [
         PublicEventSession(
             id=str(sesion.id),
-            session_type=sesion.session_type,  # type: ignore[arg-type]
+            session_type=sesion.session_type,
+            type=SessionTypeRef(**session_types.referencia(sesion.tipo)),
             title=sesion.title,
             description=sesion.description,
             starts_at=sesion.starts_at,
@@ -505,7 +513,8 @@ async def get_public_session(
 
     return PublicSessionDetail(
         id=str(sesion.id),
-        session_type=sesion.session_type,  # type: ignore[arg-type]
+        session_type=sesion.session_type,
+        type=SessionTypeRef(**session_types.referencia(sesion.tipo)),
         title=sesion.title,
         description=sesion.description,
         starts_at=sesion.starts_at,

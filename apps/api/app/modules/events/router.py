@@ -15,7 +15,13 @@ from app.core.permissions import Permission
 from app.core.ratelimit import PEDIR_BIO_POR_IP, limit_per_ip
 from app.core.storage import build_object_key, get_storage, public_url_versionada, validate_upload
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
-from app.modules.events import public_router, repository, service, speakers_repository
+from app.modules.events import (
+    public_router,
+    repository,
+    service,
+    session_types,
+    speakers_repository,
+)
 from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
 from app.modules.events.models import (
     Event,
@@ -45,6 +51,7 @@ from app.modules.events.schemas import (
     SessionParticipantResponse,
     SessionParticipantsUpdate,
     SessionParticipationOut,
+    SessionTypeRef,
     SpeakerCompletitudOut,
     SpeakerHistoryItemOut,
     SpeakerRowOut,
@@ -143,7 +150,8 @@ def _venue_response(sede: EventVenue) -> EventVenueResponse:
 def _session_response(sesion: EventSession) -> EventSessionResponse:
     return EventSessionResponse(
         id=str(sesion.id),
-        session_type=sesion.session_type,  # type: ignore[arg-type]
+        session_type=sesion.session_type,
+        type=SessionTypeRef(**session_types.referencia(sesion.tipo)),
         title=sesion.title,
         description=sesion.description,
         starts_at=sesion.starts_at,
