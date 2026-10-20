@@ -240,6 +240,16 @@ class RegistrationListItem(BaseModel):
     confirmed_at: datetime | None
     waitlist_promoted_at: datetime | None
     waitlist_promotion_expires_at: datetime | None
+    # Veces que esta persona no se presentó, sin cancelar, a eventos de la
+    # organización con la asistencia cerrada (últimos 12 meses).
+    absences_count: int = 0
+
+
+class AbsenceOut(BaseModel):
+    """Un evento al que la persona no se presentó."""
+
+    event_title: str
+    starts_at: datetime
 
 
 class RegistrationDetail(RegistrationListItem):
@@ -250,6 +260,7 @@ class RegistrationDetail(RegistrationListItem):
     cancelled_at: datetime | None
     answers: list[RegistrationAnswerOut]
     consent: RegistrationConsentOut | None
+    absences: list[AbsenceOut] = []
 
 
 class RegistrationStats(BaseModel):

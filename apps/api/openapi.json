@@ -7792,6 +7792,91 @@
         }
       }
     },
+    "/api/v1/events/{event_id}/attendance/close": {
+      "post": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Cerrar la asistencia de un evento terminado",
+        "description": "Declara completo el check-in: desde entonces, quien estaba confirmado y no se escaneó cuenta como ausencia en el historial de la organización. Solo tras el fin del evento; se puede reabrir durante 7 días.",
+        "operationId": "close_attendance_api_v1_events__event_id__attendance_close_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/attendance/reopen": {
+      "post": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Reabrir la asistencia de un evento",
+        "operationId": "reopen_attendance_api_v1_events__event_id__attendance_reopen_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/registrations/my-ticket": {
       "get": {
         "tags": [
@@ -11349,6 +11434,26 @@
   },
   "components": {
     "schemas": {
+      "AbsenceOut": {
+        "properties": {
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_title",
+          "starts_at"
+        ],
+        "title": "AbsenceOut",
+        "description": "Un evento al que la persona no se presentó."
+      },
       "AcceptedPolicyOut": {
         "properties": {
           "version_id": {
@@ -12146,6 +12251,28 @@
           "scopes"
         ],
         "title": "AprobarIn"
+      },
+      "AttendanceOut": {
+        "properties": {
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attendance_closed_at"
+        ],
+        "title": "AttendanceOut",
+        "description": "Estado del cierre de asistencia de un evento."
       },
       "AuditLogEntry": {
         "properties": {
@@ -23112,6 +23239,11 @@
             ],
             "title": "Waitlist Promotion Expires At"
           },
+          "absences_count": {
+            "type": "integer",
+            "title": "Absences Count",
+            "default": 0
+          },
           "approved_at": {
             "anyOf": [
               {
@@ -23164,6 +23296,14 @@
                 "type": "null"
               }
             ]
+          },
+          "absences": {
+            "items": {
+              "$ref": "#/components/schemas/AbsenceOut"
+            },
+            "type": "array",
+            "title": "Absences",
+            "default": []
           }
         },
         "type": "object",
@@ -23265,6 +23405,11 @@
               }
             ],
             "title": "Waitlist Promotion Expires At"
+          },
+          "absences_count": {
+            "type": "integer",
+            "title": "Absences Count",
+            "default": 0
           }
         },
         "type": "object",

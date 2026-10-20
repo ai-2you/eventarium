@@ -20,9 +20,10 @@ from app.modules.events.models import Event
 from app.modules.policies import service as policies_service
 from app.modules.policies.models import OrganizationPolicyVersion
 from app.modules.policies.schemas import AcceptedPolicyOut
-from app.modules.registrations import questions_service, repository, service
+from app.modules.registrations import absences, questions_service, repository, service
 from app.modules.registrations.models import EventRegistration, EventRegistrationQuestion
 from app.modules.registrations.schemas import (
+    AbsenceOut,
     RegistrationAnswerOut,
     RegistrationConsentOut,
     RegistrationDetail,
@@ -49,7 +50,9 @@ async def _obtener_evento_o_404(usuario: CurrentUserDep, session: DbDep, event_i
     return evento
 
 
-def _registration_list_item(inscripcion: EventRegistration) -> RegistrationListItem:
+def _registration_list_item(
+    inscripcion: EventRegistration, ausencias: int = 0
+) -> RegistrationListItem:
     return RegistrationListItem(
         id=str(inscripcion.id),
         email=inscripcion.email,
@@ -60,6 +63,7 @@ def _registration_list_item(inscripcion: EventRegistration) -> RegistrationListI
         confirmed_at=inscripcion.confirmed_at,
         waitlist_promoted_at=inscripcion.waitlist_promoted_at,
         waitlist_promotion_expires_at=inscripcion.waitlist_promotion_expires_at,
+        absences_count=ausencias,
     )
 
 
@@ -67,6 +71,7 @@ def _registration_detail(
     inscripcion: EventRegistration,
     preguntas_por_id: dict[uuid.UUID, EventRegistrationQuestion],
     politicas: list[OrganizationPolicyVersion],
+    ausencias: list[absences.Ausencia],
 ) -> RegistrationDetail:
     respuestas = [
         RegistrationAnswerOut(
@@ -99,7 +104,11 @@ def _registration_detail(
         else None
     )
     return RegistrationDetail(
-        **_registration_list_item(inscripcion).model_dump(),
+        **_registration_list_item(inscripcion, len(ausencias)).model_dump(),
+        absences=[
+            AbsenceOut(event_title=ausencia.event_title, starts_at=ausencia.starts_at)
+            for ausencia in ausencias
+        ],
         approved_at=inscripcion.approved_at,
         rejected_at=inscripcion.rejected_at,
         cancelled_at=inscripcion.cancelled_at,
@@ -146,11 +155,19 @@ async def list_registrations(
     total = await repository.count_registrations(
         session, evento.organization_id, evento.id, status=estado
     )
-    filas = (
-        await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
-    ).scalars()
+    filas = list(
+        (
+            await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
+        ).scalars()
+    )
+    ausencias = await absences.contar_por_correo(
+        session, evento.organization_id, [inscripcion.email for inscripcion in filas]
+    )
     return Page[RegistrationListItem](
-        items=[_registration_list_item(inscripcion) for inscripcion in filas],
+        items=[
+            _registration_list_item(inscripcion, ausencias.get(inscripcion.email, 0))
+            for inscripcion in filas
+        ],
         total=total,
         limit=paginacion.limit,
         offset=paginacion.offset,
@@ -194,7 +211,10 @@ async def get_registration(
         inscripcion.consent.accepted_policy_version_ids if inscripcion.consent else [],
     )
     return _registration_detail(
-        inscripcion, {pregunta.id: pregunta for pregunta in preguntas}, politicas
+        inscripcion,
+        {pregunta.id: pregunta for pregunta in preguntas},
+        politicas,
+        await absences.de_una_persona(session, evento.organization_id, inscripcion.email),
     )
 
 
