@@ -1387,9 +1387,10 @@
         "participantes": {
           "gestionar": "Participantes",
           "sinRoster": "Añade primero a alguien al evento en «Participantes del evento».",
-          "rolesAyuda": "Uno o varios roles separados por comas, p. ej. «ponente, moderador». Vacío para quitarla de esta sesión.",
           "guardar": "Guardar participantes",
-          "error": "No hemos podido guardar los participantes."
+          "error": "No hemos podido guardar los participantes.",
+          "noParticipa": "No participa",
+          "solape": "Ojo: a esta hora también está en {{sesiones}}."
         },
         "sede": "Sede",
         "sinSedeEspecifica": "Sin sede específica",

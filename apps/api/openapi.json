@@ -5061,6 +5061,52 @@
         }
       }
     },
+    "/api/v1/events/{event_id}/participations": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Participaciones del roster en las sesiones del evento",
+        "operationId": "list_event_participations_api_v1_events__event_id__participations_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionParticipationOut"
+                  },
+                  "title": "Response List Event Participations Api V1 Events  Event Id  Participations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/sessions/{session_id}/participants": {
       "get": {
         "tags": [
@@ -23787,6 +23833,47 @@
         ],
         "title": "SessionParticipantsUpdate",
         "description": "Reemplazo completo de la lista de participantes de una sesión.\n\n`expected_updated_at` es el `updated_at` de la sesión que el cliente tenía\ncargado: si no coincide con el actual, la petición falla con 409 en vez de\nsobrescribir en silencio el trabajo de otra persona."
+      },
+      "SessionParticipationOut": {
+        "properties": {
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "session_title": {
+            "type": "string",
+            "title": "Session Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "role_key": {
+            "type": "string",
+            "title": "Role Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_member_id",
+          "session_id",
+          "session_title",
+          "starts_at",
+          "ends_at",
+          "role_key"
+        ],
+        "title": "SessionParticipationOut",
+        "description": "Una persona del roster en una sesión, con su horario: lo justo para que\nel panel avise de solapes sin pedir los participantes sesión a sesión."
       },
       "SocialLinkInput": {
         "properties": {

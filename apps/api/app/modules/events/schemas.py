@@ -437,6 +437,18 @@ class SessionParticipantsUpdate(BaseModel):
     participants: list[SessionParticipantEntry]
 
 
+class SessionParticipationOut(BaseModel):
+    """Una persona del roster en una sesión, con su horario: lo justo para que
+    el panel avise de solapes sin pedir los participantes sesión a sesión."""
+
+    event_member_id: str
+    session_id: str
+    session_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_key: str
+
+
 class SessionParticipantResponse(BaseModel):
     """Participación de una persona en una sesión, con su rol libre."""
 

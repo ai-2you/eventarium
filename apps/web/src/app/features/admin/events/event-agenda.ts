@@ -116,6 +116,8 @@ interface DiaDeAgenda {
                         [sessionId]="sesion.id"
                         [updatedAt]="sesion.updated_at"
                         [roster]="roster()"
+                        [inicio]="sesion.starts_at"
+                        [fin]="sesion.ends_at"
                         (guardado)="alGuardarParticipantes()"
                       />
                     }
