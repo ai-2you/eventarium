@@ -99,6 +99,15 @@ interface Page<T> {
                 {{ evento.capacity === null ? t('admin.events.sinLimite') : evento.capacity }}
               </td>
               <td>{{ evento.starts_at | date: 'short' }}</td>
+              <td>
+                <a
+                  class="vista-previa"
+                  [routerLink]="['/vista-previa', evento.id]"
+                  target="_blank"
+                  [attr.aria-label]="t('admin.events.vistaPreviaDe', { titulo: evento.title })"
+                  >{{ t('admin.events.vistaPrevia') }}</a
+                >
+              </td>
             </tr>
           }
         </app-data-table>
@@ -106,6 +115,9 @@ interface Page<T> {
     </ng-container>
   `,
   styles: `
+    .vista-previa {
+      white-space: nowrap;
+    }
     .filtro {
       display: block;
       max-width: 18rem;
@@ -133,6 +145,7 @@ export class EventsPage {
       { key: 'precio', label: t('admin.events.columnaPrecio') },
       { key: 'aforo', label: t('admin.events.columnaAforo') },
       { key: 'fecha', label: t('admin.events.columnaFecha') },
+      { key: 'acciones', label: t('admin.events.columnaAcciones') },
     ];
   });
 

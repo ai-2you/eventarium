@@ -4429,6 +4429,49 @@
         }
       }
     },
+    "/api/v1/events/{event_id}/preview": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Vista previa de la ficha pública de un evento",
+        "description": "La ficha tal y como la verá el público, en cualquier estado (también un\nborrador): para revisarla antes de publicar. Solo para el equipo.",
+        "operationId": "preview_event_api_v1_events__event_id__preview_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEventDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/cover": {
       "put": {
         "tags": [

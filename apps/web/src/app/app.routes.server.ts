@@ -33,6 +33,8 @@ export const serverRoutes: ServerRoute[] = [
   // olvidara cualquiera de estos, `authGuard` denegaría en SSR y el panel no
   // cargaría.
   { path: 'acceder', renderMode: RenderMode.Client },
+  // La vista previa necesita la sesión del equipo, que el servidor no tiene.
+  { path: 'vista-previa/**', renderMode: RenderMode.Client },
   { path: 'espacio-de-trabajo', renderMode: RenderMode.Client },
   // Necesita la sesión, que el servidor no maneja.
   { path: 'oauth/consentimiento', renderMode: RenderMode.Client },

@@ -108,6 +108,11 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
           <app-alert tone="error">{{ t('publico.eventos.noEncontrado') }}</app-alert>
         </div>
       } @else if (evento(); as evento) {
+        @if (eventId()) {
+          <div class="ancho-maximo aviso-vista-previa">
+            <app-alert tone="info">{{ t('publico.eventos.vistaPrevia') }}</app-alert>
+          </div>
+        }
         <article [attr.data-ambito]="ambitoDelEvento()">
           <section class="hero">
             <div class="ancho-maximo">
@@ -297,7 +302,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
               } @else {
                 <app-event-agenda-section
                   [dias]="dias()"
-                  [org]="org()"
+                  [org]="evento.organization.slug"
                   [eventSlug]="evento.slug"
                   [eventTimezone]="evento.timezone"
                 />
@@ -416,6 +421,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     </ng-container>
   `,
   styles: `
+    .aviso-vista-previa {
+      margin-block: var(--sp-4);
+    }
     .hero {
       padding: var(--sp-8) 0 var(--sp-7);
       border-bottom: 1px solid var(--border);
@@ -664,8 +672,12 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   `,
 })
 export class EventPage implements OnInit {
-  readonly org = input.required<string>();
-  readonly slug = input.required<string>();
+  // Vacíos en la vista previa, que llega por `eventId` (`/vista-previa/:eventId`).
+  readonly org = input('');
+  readonly slug = input('');
+  /** Vista previa del panel: la ficha de cualquier evento de la organización,
+   * también un borrador, desde `GET /events/{id}/preview` y solo en el navegador. */
+  readonly eventId = input<string | undefined>(undefined);
 
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
@@ -768,7 +780,12 @@ export class EventPage implements OnInit {
 
   /** Ruta hacia otra página de este mismo evento. */
   protected ruta(...resto: string[]): string[] {
-    return rutaEvento(this.org(), this.slug(), ...resto);
+    const evento = this.evento();
+    return rutaEvento(
+      evento?.organization.slug ?? this.org(),
+      evento?.slug ?? this.slug(),
+      ...resto,
+    );
   }
 
   protected readonly formato = computed(() => {
@@ -838,6 +855,11 @@ export class EventPage implements OnInit {
   }
 
   private async cargar(): Promise<void> {
+    const eventId = this.eventId();
+    if (eventId) {
+      await this.cargarVistaPrevia(eventId);
+      return;
+    }
     const clave = makeStateKey<PublicEventDetail>(`public-event:${this.org()}:${this.slug()}`);
     const transferido = this.transferState.get(clave, null);
     if (transferido) {
@@ -869,7 +891,22 @@ export class EventPage implements OnInit {
     }
   }
 
-  private aplicar(evento: PublicEventDetail): void {
+  /** Sin `TransferState` ni SSR: la ruta se pinta en el navegador, que es quien
+   * tiene la sesión del equipo. */
+  private async cargarVistaPrevia(eventId: string): Promise<void> {
+    try {
+      const evento = await firstValueFrom(
+        this.http.get<PublicEventDetail>(this.api.url(`/events/${eventId}/preview`)),
+      );
+      this.aplicar(evento, { vistaPrevia: true });
+    } catch {
+      this.noEncontrado.set(true);
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  private aplicar(evento: PublicEventDetail, { vistaPrevia = false } = {}): void {
     this.evento.set(evento);
     // La plantilla del evento se inyecta al llegar el dato, no al construir el
     // componente: en SSR el `document` no existe al construirlo, y quitarla
@@ -880,6 +917,7 @@ export class EventPage implements OnInit {
       description: evento.summary ?? this.transloco.translate('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug),
+      noIndexar: vistaPrevia,
     });
   }
 }

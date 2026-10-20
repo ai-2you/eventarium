@@ -275,6 +275,8 @@ export type { DeleteEventApiV1EventsEventIdDelete$Params as DeleteEventApiV1Even
 export { deleteEventApiV1EventsEventIdDelete as deleteEventApiV1EventsEventIdDelete } from './fn/eventos/delete-event-api-v-1-events-event-id-delete';
 export type { UpdateEventApiV1EventsEventIdPatch$Params as UpdateEventApiV1EventsEventIdPatch$Params } from './fn/eventos/update-event-api-v-1-events-event-id-patch';
 export { updateEventApiV1EventsEventIdPatch as updateEventApiV1EventsEventIdPatch } from './fn/eventos/update-event-api-v-1-events-event-id-patch';
+export type { PreviewEventApiV1EventsEventIdPreviewGet$Params as PreviewEventApiV1EventsEventIdPreviewGet$Params } from './fn/eventos/preview-event-api-v-1-events-event-id-preview-get';
+export { previewEventApiV1EventsEventIdPreviewGet as previewEventApiV1EventsEventIdPreviewGet } from './fn/eventos/preview-event-api-v-1-events-event-id-preview-get';
 export type { UploadCoverApiV1EventsEventIdCoverPut$Params as UploadCoverApiV1EventsEventIdCoverPut$Params } from './fn/eventos/upload-cover-api-v-1-events-event-id-cover-put';
 export { uploadCoverApiV1EventsEventIdCoverPut as uploadCoverApiV1EventsEventIdCoverPut } from './fn/eventos/upload-cover-api-v-1-events-event-id-cover-put';
 export type { ListSessionsApiV1EventsEventIdSessionsGet$Params as ListSessionsApiV1EventsEventIdSessionsGet$Params } from './fn/eventos/list-sessions-api-v-1-events-event-id-sessions-get';
