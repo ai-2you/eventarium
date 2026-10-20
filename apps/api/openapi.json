@@ -4522,6 +4522,47 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Quitar la portada del evento",
+        "description": "Deja el evento sin portada. Una imagen de la biblioteca de medios sigue en la biblioteca; solo se borra el objeto de una portada legada, que no tiene otro dueño.",
+        "operationId": "remove_cover_api_v1_events__event_id__cover_delete",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/events/{event_id}/sessions": {

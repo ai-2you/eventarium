@@ -437,6 +437,35 @@ async def upload_cover(
     return await _event_response(session, evento)
 
 
+@router.delete(
+    "/{event_id}/cover",
+    summary="Quitar la portada del evento",
+    description=(
+        "Deja el evento sin portada. Una imagen de la biblioteca de medios sigue "
+        "en la biblioteca; solo se borra el objeto de una portada legada, que no "
+        "tiene otro dueño."
+    ),
+    response_model=EventResponse,
+    dependencies=[require_permission(Permission.EVENTS_WRITE)],
+)
+async def remove_cover(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)],
+    session: DbDep,
+    background_tasks: BackgroundTasks,
+) -> EventResponse:
+    anterior_media_id = evento.cover_media_id
+    anterior_object_key = evento.cover_object_key
+    evento.cover_media_id = None
+    evento.cover_object_key = None
+    await session.flush()
+
+    # Mismo orden que en `upload_cover`: el objeto legado se borra tras el commit.
+    if anterior_media_id is None and anterior_object_key:
+        background_tasks.add_task(get_storage().delete_object, anterior_object_key)
+
+    return await _event_response(session, evento)
+
+
 @router.get(
     "/{event_id}/sessions",
     summary="Listar la agenda de un evento",

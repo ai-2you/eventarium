@@ -64,65 +64,49 @@ interface OtroEvento {
           <app-alert tone="error">{{ mensaje }}</app-alert>
         }
         <div class="contenido">
-          <div>
-            @if (cargando()) {
-              <p>{{ t('cargando') }}</p>
-            } @else if (sitios().length === 0) {
-              <p>{{ t('vacio') }}</p>
-            } @else {
-              <ol class="lista">
-                @for (sitio of sitios(); track sitio.id; let i = $index, ultimo = $last) {
-                  <li>
-                    <div>
-                      <strong>{{ sitio.name }}</strong>
-                      <span class="detalle">
-                        {{ sitio.kind === 'other' ? sitio.custom_kind : t('tipos.' + sitio.kind) }}
-                        @if (sitio.address) {
-                          · {{ sitio.address }}
-                        }
-                      </span>
-                    </div>
-                    <div class="acciones">
-                      <app-button
-                        variant="terciario"
-                        [disabled]="i === 0"
-                        [ariaLabel]="t('subir', { nombre: sitio.name })"
-                        (pulsado)="mover(i, -1)"
-                        >↑</app-button
-                      >
-                      <app-button
-                        variant="terciario"
-                        [disabled]="ultimo"
-                        [ariaLabel]="t('bajar', { nombre: sitio.name })"
-                        (pulsado)="mover(i, 1)"
-                        >↓</app-button
-                      >
-                      <app-button variant="secundario" (pulsado)="editar(sitio)">
-                        {{ t('editar') }}
-                      </app-button>
-                      <app-button variant="peligro" (pulsado)="borrar(sitio)">
-                        {{ t('quitar') }}
-                      </app-button>
-                    </div>
-                  </li>
-                }
-              </ol>
-            }
-            @if (otrosEventos().length > 0) {
-              <div class="copiar">
-                <app-select
-                  fieldId="cercanos-copiar-de"
-                  [label]="t('copiarDe')"
-                  [placeholder]="t('eligeEvento')"
-                  [options]="opcionesDeOtrosEventos()"
-                  [(value)]="origen"
-                />
-                <app-button variant="secundario" [disabled]="!origen()" (pulsado)="copiar()">
-                  {{ t('copiar') }}
-                </app-button>
-              </div>
-            }
-          </div>
+          @if (cargando()) {
+            <p>{{ t('cargando') }}</p>
+          } @else if (sitios().length === 0) {
+            <p>{{ t('vacio') }}</p>
+          } @else {
+            <ol class="lista">
+              @for (sitio of sitios(); track sitio.id; let i = $index, ultimo = $last) {
+                <li>
+                  <div>
+                    <strong>{{ sitio.name }}</strong>
+                    <span class="detalle">
+                      {{ sitio.kind === 'other' ? sitio.custom_kind : t('tipos.' + sitio.kind) }}
+                      @if (sitio.address) {
+                        · {{ sitio.address }}
+                      }
+                    </span>
+                  </div>
+                  <div class="acciones">
+                    <app-button
+                      variant="terciario"
+                      [disabled]="i === 0"
+                      [ariaLabel]="t('subir', { nombre: sitio.name })"
+                      (pulsado)="mover(i, -1)"
+                      >↑</app-button
+                    >
+                    <app-button
+                      variant="terciario"
+                      [disabled]="ultimo"
+                      [ariaLabel]="t('bajar', { nombre: sitio.name })"
+                      (pulsado)="mover(i, 1)"
+                      >↓</app-button
+                    >
+                    <app-button variant="secundario" (pulsado)="editar(sitio)">
+                      {{ t('editar') }}
+                    </app-button>
+                    <app-button variant="peligro" (pulsado)="borrar(sitio)">
+                      {{ t('quitar') }}
+                    </app-button>
+                  </div>
+                </li>
+              }
+            </ol>
+          }
 
           <form class="formulario" novalidate (submit)="guardar($event)">
             <h3>{{ editandoId() ? t('editarSitio') : t('anadirSitio') }}</h3>
@@ -179,6 +163,24 @@ interface OtroEvento {
           </form>
         </div>
       </app-card>
+
+      @if (otrosEventos().length > 0) {
+        <app-card [heading]="t('copiarDe')">
+          <div class="copiar">
+            <app-select
+              fieldId="cercanos-copiar-de"
+              [label]="t('copiarDe')"
+              [etiquetaOculta]="true"
+              [placeholder]="t('eligeEvento')"
+              [options]="opcionesDeOtrosEventos()"
+              [(value)]="origen"
+            />
+            <app-button variant="secundario" [disabled]="!origen()" (pulsado)="copiar()">
+              {{ t('copiar') }}
+            </app-button>
+          </div>
+        </app-card>
+      }
     </ng-container>
   `,
   styles: `
@@ -186,9 +188,10 @@ interface OtroEvento {
       margin: 0 0 var(--sp-4);
       color: var(--muted);
     }
+    /* Va en la columna lateral de la ficha: el alta de un sitio siempre
+       debajo de la lista, nunca al lado. */
     .contenido {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
       gap: var(--sp-6);
       align-items: start;
     }
@@ -219,11 +222,19 @@ interface OtroEvento {
       align-items: center;
       gap: var(--sp-2);
     }
+    /* La tarjeta de la lista y el alta, y debajo la de copiar de otro evento. */
+    :host {
+      display: grid;
+      gap: var(--space-lg);
+    }
+    /* El desplegable ocupa todo el ancho, como los campos de «Añadir sitio»,
+       para que se lean los nombres largos de los otros eventos. */
     .copiar {
       display: grid;
-      gap: var(--sp-2);
-      margin-top: var(--sp-6);
-      justify-items: start;
+      gap: var(--sp-3);
+    }
+    .copiar app-button {
+      justify-self: start;
     }
     .formulario {
       display: grid;
