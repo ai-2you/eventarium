@@ -34,7 +34,7 @@ export interface ChangelogVersion {
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
     version: '0.29.0',
-    fecha: '2026-10-20',
+    fecha: '2026-10-21',
     secciones: [
       {
         categoria: 'agregado',
@@ -54,6 +54,16 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
             descripcion:
               'La ficha de la organización guarda calle, código postal, ciudad y provincia (con una casilla para mostrarla o no en la página pública) y las redes: LinkedIn, Instagram, X, Facebook, YouTube, TikTok y un enlace libre con nombre. Las redes ya no se editan en «Marca».',
           },
+          {
+            titulo: '«Mis eventos» con la sesión iniciada',
+            descripcion:
+              'Quien tiene cuenta con el correo verificado ve sus inscripciones al entrar en «Mis eventos», sin pedir el enlace por correo. Se separan en Próximos y Pasados, con la hora en la zona del evento y «Añadir a mi calendario» en cada plaza confirmada.',
+          },
+          {
+            titulo: 'Quitar la portada de un evento',
+            descripcion:
+              'La portada de un evento se puede quitar desde su ficha del panel; la imagen sigue en la biblioteca de medios.',
+          },
         ],
       },
       {
@@ -64,6 +74,16 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
             descripcion:
               'El logo se ve grande en la mitad izquierda y los datos a la derecha (apilado en el móvil), con la dirección en líneas y las redes como botones con su icono.',
           },
+          {
+            titulo: 'Ficha del evento en dos columnas',
+            descripcion:
+              'Al editar un evento, el formulario queda a la izquierda y el estado, la cancelación, la portada y «Qué hay cerca» en una columna a la derecha.',
+          },
+          {
+            titulo: 'Descansos visibles en la agenda',
+            descripcion:
+              'En la agenda pública, los descansos y servicios llevan un fondo propio para que se note la parada en el programa.',
+          },
         ],
       },
       {
@@ -73,6 +93,11 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
             titulo: 'Avisos de plaza libre más fiables',
             descripcion:
               'El correo que ofrece una plaza de la lista de espera sale cuando el cambio ya está guardado, también al subir el aforo desde el asistente MCP. Y las pausas de la agenda ya no admiten ponentes tampoco por la API.',
+          },
+          {
+            titulo: 'El enlace de «Mis eventos» ya no sale caducado',
+            descripcion:
+              'Al abrir el enlace del correo, la página lo daba por usado antes de mostrar las inscripciones y pedía uno nuevo.',
           },
         ],
       },
