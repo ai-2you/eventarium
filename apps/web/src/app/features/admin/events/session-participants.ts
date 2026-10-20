@@ -51,10 +51,10 @@ interface SessionParticipant {
               [fieldId]="'participante-' + sessionId() + '-' + persona.id"
               [label]="nombreDe(persona)"
               [options]="opciones(rolesDePersona()[persona.id] || '')"
-              [hint]="avisoDeSolape(persona.id)"
               [value]="rolesDePersona()[persona.id] || ''"
               (valueChange)="fijarRolesDePersona(persona.id, $event)"
             />
+            <p class="solape" aria-live="polite">{{ avisoDeSolape(persona.id) }}</p>
           }
         }
         @if (error(); as mensaje) {
@@ -67,6 +67,13 @@ interface SessionParticipant {
     </ng-container>
   `,
   styles: `
+    .solape {
+      margin: 0;
+      font-size: var(--fs-sm);
+    }
+    .solape:empty {
+      display: none;
+    }
     .participantes-editor {
       display: grid;
       gap: var(--space-sm);

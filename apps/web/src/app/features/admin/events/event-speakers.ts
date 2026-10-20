@@ -148,14 +148,11 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                     @if (fila.sesiones.length === 0) {
                       <app-chip tone="espera">{{ t('admin.events.speakers.sinAsignar') }}</app-chip>
                     } @else {
-                      {{ fila.sesiones[0].titulo }}
-                      @if (fila.sesiones.length > 1) {
-                        <small class="mas">
-                          {{
-                            t('admin.events.speakers.masSesiones', { n: fila.sesiones.length - 1 })
-                          }}
-                        </small>
-                      }
+                      <ul class="sesiones">
+                        @for (sesion of fila.sesiones; track sesion.id) {
+                          <li>{{ sesion.titulo }}</li>
+                        }
+                      </ul>
                     }
                   </td>
                   <td>
@@ -181,7 +178,7 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                   </td>
                   <td class="numerica">{{ fila.ediciones }}</td>
                   <td class="acciones">
-                    @if (fila.completitud.porcentaje < 100) {
+                    @if (!fila.bio) {
                       <app-button
                         variant="secundario"
                         type="button"
@@ -191,15 +188,36 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                       >
                         {{ t('admin.events.speakers.pedirBio') }}
                       </app-button>
+                    } @else if (fila.public_slug) {
+                      <a
+                        class="enlace"
+                        [routerLink]="['/ponentes', fila.public_slug]"
+                        target="_blank"
+                        [attr.aria-label]="
+                          t('admin.events.speakers.verBioDe', { nombre: nombre(fila) })
+                        "
+                        >{{ t('admin.events.speakers.verBio') }}</a
+                      >
+                    } @else {
+                      <app-button
+                        variant="secundario"
+                        type="button"
+                        [compacto]="true"
+                        (pulsado)="abrirBio(fila)"
+                      >
+                        {{ t('admin.events.speakers.verBio') }}
+                      </app-button>
                     }
-                    <app-button
-                      variant="secundario"
-                      type="button"
-                      [compacto]="true"
-                      (pulsado)="abrirAsignar(fila)"
-                    >
-                      {{ t('admin.events.speakers.asignarSesion') }}
-                    </app-button>
+                    @if (fila.sesiones.length === 0) {
+                      <app-button
+                        variant="secundario"
+                        type="button"
+                        [compacto]="true"
+                        (pulsado)="abrirAsignar(fila)"
+                      >
+                        {{ t('admin.events.speakers.asignarSesion') }}
+                      </app-button>
+                    }
                     <app-button
                       variant="terciario"
                       type="button"
@@ -263,6 +281,19 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
         </div>
       </app-dialog>
 
+      <app-dialog #dialogoBio (cerrado)="bioAbierta.set(null)">
+        @if (bioAbierta(); as fila) {
+          <span class="rotulo-seccion">{{
+            t('admin.events.speakers.bioDe', { nombre: nombre(fila) })
+          }}</span>
+          <p class="bio">{{ fila.bio }}</p>
+          <p class="nota">{{ t('admin.events.speakers.bioSinPerfil') }}</p>
+        }
+        <app-button pie variant="secundario" type="button" (pulsado)="dialogoBio.cerrar()">
+          {{ t('comun.cerrar') }}
+        </app-button>
+      </app-dialog>
+
       <app-dialog #dialogoAsignar (cerrado)="asignando.set(null)">
         @if (asignando(); as fila) {
           <span class="rotulo-seccion">{{
@@ -285,6 +316,17 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
     </ng-container>
   `,
   styles: `
+    .sesiones {
+      margin: 0;
+      padding-left: 1.1em;
+    }
+    .bio {
+      white-space: pre-line;
+    }
+    .nota {
+      color: var(--muted);
+      font-size: var(--fs-sm);
+    }
     .kpis {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(10.625rem, 1fr));
@@ -404,6 +446,14 @@ export class EventSpeakers implements OnInit {
   private readonly dialogoHistorialRef = viewChild.required<Dialog>('dialogoHistorial');
   private readonly dialogoInvitarRef = viewChild.required<Dialog>('dialogoInvitar');
   private readonly dialogoAsignarRef = viewChild.required<Dialog>('dialogoAsignar');
+  private readonly dialogoBioRef = viewChild.required<Dialog>('dialogoBio');
+  /** Ponente cuya biografía se lee en el diálogo (sin perfil público al que llevar). */
+  protected readonly bioAbierta = signal<SpeakerRow | null>(null);
+
+  protected abrirBio(fila: SpeakerRow): void {
+    this.bioAbierta.set(fila);
+    this.dialogoBioRef().abrir();
+  }
   /** Ponente al que se está asignando sesión (monta el diálogo solo entonces). */
   protected readonly asignando = signal<SpeakerRow | null>(null);
 

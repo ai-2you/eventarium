@@ -196,7 +196,7 @@ import {
                   [class.fuera]="celda.fueraDeMes"
                   [class.hoy]="celda.esHoy"
                   [class.elegido]="celda.esSeleccionado"
-                  [disabled]="celda.deshabilitado"
+                  [attr.aria-disabled]="celda.deshabilitado ? 'true' : null"
                   [tabindex]="i === indiceDiaEnfocado() ? 0 : -1"
                   (click)="elegirDia(celda)"
                   (focus)="indiceDiaEnfocado.set(i)"
@@ -520,7 +520,20 @@ export class DatetimePicker {
         const dias = untracked(this.dias);
         const elegido = dias.findIndex((celda) => celda.esSeleccionado);
         const hoyIdx = dias.findIndex((celda) => celda.esHoy);
-        const indice = elegido >= 0 ? elegido : hoyIdx >= 0 ? hoyIdx : 0;
+        // Ni el día elegido ni hoy (si cae fuera del rango): el primer día que
+        // se puede elegir, para que el foco no aterrice en uno deshabilitado.
+        const hoyElegible = hoyIdx >= 0 && !dias[hoyIdx]!.deshabilitado;
+        const primeroElegible = dias.findIndex(
+          (celda) => !celda.deshabilitado && !celda.fueraDeMes,
+        );
+        const indice =
+          elegido >= 0
+            ? elegido
+            : hoyElegible
+              ? hoyIdx
+              : primeroElegible >= 0
+                ? primeroElegible
+                : 0;
         this.indiceDiaEnfocado.set(indice);
         this.enfocar(anfitrion.querySelector(`#${this.idDia(indice)}`));
       } else if (panel === 'hora') {

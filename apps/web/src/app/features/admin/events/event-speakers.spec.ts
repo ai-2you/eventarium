@@ -41,7 +41,11 @@ function vista() {
         first_name: 'Ana',
         last_name: 'García',
         titular: 'Plataformas de datos',
-        sesiones: [{ id: 's1', titulo: 'Poner un modelo en producción', starts_at: null }],
+        bio: 'Ingeniera de datos.',
+        sesiones: [
+          { id: 's1', titulo: 'Poner un modelo en producción', starts_at: null },
+          { id: 's2', titulo: 'Mesa de cierre', starts_at: null },
+        ],
         completitud: {
           porcentaje: 100,
           rellenas: 6,
@@ -58,6 +62,7 @@ function vista() {
         first_name: 'Roberto',
         last_name: 'Beltrán',
         titular: null,
+        bio: null,
         sesiones: [],
         completitud: {
           porcentaje: 33,
@@ -206,6 +211,30 @@ describe('EventSpeakers', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Recordatorio enviado para que complete su ficha.',
     );
+  });
+
+  it('con sesiones las lista todas y sin bio pendiente ofrece «Ver bio» en otra pestaña', async () => {
+    const fixture = TestBed.createComponent(EventSpeakers);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.detectChanges();
+    await avanzar(fixture);
+    flushCarga(http);
+    await avanzar(fixture);
+
+    const filas = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+    ) as HTMLElement[];
+    const ana = filas.find((fila) => fila.textContent?.includes('Ana García'))!;
+    const roberto = filas.find((fila) => fila.textContent?.includes('Roberto'))!;
+    expect(ana.textContent).toContain('Poner un modelo en producción');
+    expect(ana.textContent).toContain('Mesa de cierre');
+    expect(ana.textContent).not.toContain('Asignar sesión');
+    expect(roberto.textContent).toContain('Asignar sesión');
+    const verBio = ana.querySelector('a.enlace') as HTMLAnchorElement;
+    expect(verBio.textContent?.trim()).toBe('Ver bio');
+    expect(verBio.getAttribute('href')).toBe('/ponentes/ana-garcia');
+    expect(verBio.getAttribute('target')).toBe('_blank');
+    expect(roberto.textContent).toContain('Pedir bio');
   });
 
   it('el historial abre un diálogo con las participaciones pasadas', async () => {

@@ -660,6 +660,9 @@ class SpeakerRowOut(BaseModel):
     # Titular profesional de su ficha (`profile_data.titular`), para pintar
     # bajo el nombre; `None` si no lo rellenó.
     titular: str | None
+    # Biografía de su ficha, para que el equipo la lea sin salir del panel
+    # (quien ve esta vista ya puede leer los perfiles de los miembros).
+    bio: str | None = None
     sesiones: list[SpeakerSessionOut]
     completitud: SpeakerCompletitudOut
     # Eventos de esta organización donde la persona está en el roster,

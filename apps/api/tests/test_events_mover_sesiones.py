@@ -6,7 +6,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from httpx import AsyncClient
+from sqlalchemy import text
 
+from app.core.database import SessionMaintenance
 from tests.conftest import OrganizacionDePrueba, iniciar_sesion
 from tests.test_events_public import AHORA, EVENTS, _crear_evento
 from tests.test_events_sesiones_rango import _sesion
@@ -72,6 +74,32 @@ async def test_ampliar_el_evento_no_pregunta_nada(
     _, cabeceras = await iniciar_sesion(cliente, organizacion)
     evento = await _crear_evento(cliente, cabeceras, slug="se-amplia")
     await _sesion(cliente, cabeceras, evento["id"])
+
+    respuesta = await cliente.patch(
+        f"{EVENTS}/{evento['id']}",
+        headers=cabeceras,
+        json=_fechas(timedelta(0), timedelta(days=5)),
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+
+
+async def test_una_sesion_que_ya_estaba_fuera_no_bloquea_cambiar_las_fechas(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+    evento = await _crear_evento(cliente, cabeceras, slug="con-sesion-heredada")
+    sesion = await _sesion(cliente, cabeceras, evento["id"])
+    async with SessionMaintenance() as session:
+        await session.execute(
+            text("UPDATE event_sessions SET starts_at = :i, ends_at = :f WHERE id = :id"),
+            {
+                "i": AHORA - timedelta(days=9),
+                "f": AHORA - timedelta(days=9) + timedelta(hours=1),
+                "id": sesion["id"],
+            },
+        )
+        await session.commit()
 
     respuesta = await cliente.patch(
         f"{EVENTS}/{evento['id']}",

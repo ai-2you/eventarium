@@ -31,7 +31,7 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
-    version: '0.27.15',
+    version: '0.27.16',
     fecha: '2026-10-20',
     secciones: [
       {
@@ -52,6 +52,16 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
       {
         categoria: 'modificado',
         items: [
+          {
+            titulo: 'Ponentes: sus sesiones y su biografía a la vista',
+            descripcion:
+              'La tabla de ponentes lista todas las sesiones de cada persona; «Asignar sesión» solo aparece si no tiene ninguna, y «Pedir bio» pasa a «Ver bio» en cuanto la ha escrito.',
+          },
+          {
+            titulo: 'Editar una sesión, debajo de la sesión',
+            descripcion:
+              'En la agenda, «Editar» abre el formulario justo debajo de la sesión, igual que los participantes, en vez de al final de la página.',
+          },
           {
             titulo: 'Sesiones dentro de las fechas del evento',
             descripcion:

@@ -243,6 +243,10 @@ async def _resolver_plantilla_del_evento(
     return plantilla_id
 
 
+def _al_minuto(momento: datetime) -> datetime:
+    return momento.replace(second=0, microsecond=0)
+
+
 #: Código del 409 que el formulario del evento reconoce para preguntar si mover
 #: las sesiones con el evento (distinto de otros 409, que no se preguntan).
 CODIGO_SESIONES_FUERA_DE_RANGO = "sesiones_fuera_de_rango"
@@ -269,12 +273,23 @@ async def _ajustar_sesiones_al_rango(
         .scalars()
         .all()
     )
+    # Solo cuentan las que hoy caen dentro: una sesión que ya estaba fuera
+    # (anterior a esta regla) no bloquea cambiar las fechas del evento.
+    dentro_antes = {
+        sesion.id
+        for sesion in sesiones
+        if evento.starts_at <= sesion.starts_at and sesion.ends_at <= evento.ends_at
+    }
     if mover:
         desplazamiento = inicio - evento.starts_at
         for sesion in sesiones:
             sesion.starts_at += desplazamiento
             sesion.ends_at += desplazamiento
-    fuera = [sesion for sesion in sesiones if sesion.starts_at < inicio or sesion.ends_at > fin]
+    fuera = [
+        sesion
+        for sesion in sesiones
+        if sesion.id in dentro_antes and (sesion.starts_at < inicio or sesion.ends_at > fin)
+    ]
     if not fuera:
         return
     titulos = [sesion.title for sesion in fuera[:_TITULOS_EN_EL_AVISO]]
@@ -348,7 +363,11 @@ async def update_event(
     fin = datos.get("ends_at", evento.ends_at)
     if fin <= inicio:
         raise ValidationDomainError("La fecha de fin debe ser posterior a la de inicio.")
-    if inicio != evento.starts_at or fin != evento.ends_at:
+    # Al minuto: el formulario envía las fechas sin segundos, y unos segundos
+    # guardados por la API o el MCP no son un cambio de fechas.
+    if _al_minuto(inicio) != _al_minuto(evento.starts_at) or _al_minuto(fin) != _al_minuto(
+        evento.ends_at
+    ):
         await _ajustar_sesiones_al_rango(session, evento, inicio, fin, mover=mover_sesiones)
 
     # Se comparan contra el valor actual, no por presencia de la clave: el

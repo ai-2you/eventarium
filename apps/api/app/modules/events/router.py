@@ -556,6 +556,7 @@ async def list_event_speakers(
     items: list[SpeakerRowOut] = []
     for miembro, miembro_org, persona, _rol in filas:
         titular = miembro_org.profile_data.get("titular")
+        bio = miembro_org.profile_data.get("bio")
         items.append(
             SpeakerRowOut(
                 organization_member_id=str(miembro_org.id),
@@ -565,6 +566,7 @@ async def list_event_speakers(
                 first_name=persona.first_name,
                 last_name=persona.last_name,
                 titular=titular.strip() if isinstance(titular, str) and titular.strip() else None,
+                bio=bio.strip() if isinstance(bio, str) and bio.strip() else None,
                 # Una fila por sesión aunque tenga ahí varios roles.
                 sesiones=list(
                     {

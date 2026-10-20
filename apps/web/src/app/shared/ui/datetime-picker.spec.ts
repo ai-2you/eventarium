@@ -271,9 +271,16 @@ describe('DatetimePicker', () => {
       )!;
     // Abre en el mes del evento aunque hoy quede lejos.
     expect(calendario.textContent).toContain('2030');
-    expect(dia(9).disabled).toBe(true);
-    expect(dia(10).disabled).toBe(false);
-    expect(dia(13).disabled).toBe(true);
+    // `aria-disabled`, no `disabled`: el foco y las flechas siguen pasando
+    // por ellos, pero no se pueden elegir.
+    expect(dia(9).getAttribute('aria-disabled')).toBe('true');
+    expect(dia(10).getAttribute('aria-disabled')).toBeNull();
+    expect(dia(13).getAttribute('aria-disabled')).toBe('true');
+    // La entrada del teclado (`tabindex=0`) es el primer día elegible.
+    expect(dia(10).getAttribute('tabindex')).toBe('0');
+    dia(9).click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.value()).toBe('');
 
     fixture.componentRef.setInput('value', '2030-03-12T19:30');
     await fixture.whenStable();

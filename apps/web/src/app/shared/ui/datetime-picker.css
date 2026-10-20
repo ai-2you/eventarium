@@ -359,7 +359,7 @@
   font-size: 0.8125rem;
 }
 /* Días fuera de `min`/`max`: se ven (el mes no cambia de forma), pero apagados. */
-.dt__dia:disabled,
+.dt__dia[aria-disabled='true'],
 .dt__atajo:disabled {
   opacity: 0.35;
   cursor: not-allowed;

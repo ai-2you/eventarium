@@ -181,6 +181,54 @@ describe('EventAgenda', () => {
     expect(fixture.nativeElement.textContent).toContain('dentro de las fechas y horas del evento');
   });
 
+  it('una sesión antigua fuera del evento se guarda si no se tocan sus fechas', async () => {
+    const fixture = TestBed.createComponent(EventAgenda);
+    fixture.componentRef.setInput('eventId', 'e1');
+    await avanzar(fixture);
+    http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush(sesiones());
+    flushRoster(http);
+    for (const peticion of http.match((p) => p.url === '/api/v1/events/e1/venues')) {
+      peticion.flush([]);
+    }
+    // El evento ya no cubre la sesión (2026-10-01): quedó fuera antes de la regla.
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/events/e1')
+      .flush({ starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-01-02T18:00:00Z' });
+    await avanzar(fixture);
+
+    (
+      Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+        (boton) => (boton as HTMLButtonElement).textContent?.trim() === 'Editar',
+      ) as HTMLButtonElement
+    ).click();
+    await avanzar(fixture);
+    for (const peticion of http.match((p) => p.url === '/api/v1/events/e1/venues')) {
+      peticion.flush([]);
+    }
+    http
+      .expectOne((peticion) => peticion.url === '/api/v1/events/e1')
+      .flush({ starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-01-02T18:00:00Z' });
+    await avanzar(fixture);
+    const titulo = fixture.nativeElement.querySelector('#sesion-titulo') as HTMLInputElement;
+    titulo.value = 'Charla renombrada';
+    titulo.dispatchEvent(new Event('input'));
+    await avanzar(fixture);
+    expect(fixture.nativeElement.textContent).not.toContain('Tiene que estar entre');
+    (fixture.nativeElement.querySelector('app-session-form form') as HTMLFormElement).dispatchEvent(
+      new Event('submit'),
+    );
+    await avanzar(fixture);
+
+    http
+      .expectOne((p) => p.url === '/api/v1/events/e1/sessions/s1' && p.method === 'PATCH')
+      .flush({ ...sesiones()[0], title: 'Charla renombrada' });
+    await avanzar(fixture);
+    http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush(sesiones());
+    await avanzar(fixture);
+    // Vuelve el formulario de alta, con sus propias peticiones.
+    flushVenues(http);
+  });
+
   it('editar rellena el formulario con la sesión y guarda contra su id', async () => {
     const fixture = TestBed.createComponent(EventAgenda);
     fixture.componentRef.setInput('eventId', 'e1');
@@ -195,6 +243,9 @@ describe('EventAgenda', () => {
     ) as HTMLButtonElement | undefined;
     expect(botonEditar).toBeTruthy();
     botonEditar?.click();
+    await avanzar(fixture);
+    // El formulario en línea pide sus sedes y los límites del evento al montarse.
+    flushVenues(http);
     await avanzar(fixture);
 
     // El formulario es otro componente desde la partición: lo que se comprueba
@@ -218,5 +269,32 @@ describe('EventAgenda', () => {
     await avanzar(fixture);
 
     http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush(sesiones());
+    await avanzar(fixture);
+    // Al terminar la edición vuelve el formulario de alta, con sus peticiones.
+    flushVenues(http);
+  });
+
+  it('«Editar» abre el formulario bajo su sesión y oculta el de alta', async () => {
+    const fixture = TestBed.createComponent(EventAgenda);
+    fixture.componentRef.setInput('eventId', 'e1');
+    await avanzar(fixture);
+    http.expectOne((peticion) => peticion.url === '/api/v1/events/e1/sessions').flush(sesiones());
+    flushRoster(http);
+    flushVenues(http);
+    await avanzar(fixture);
+    expect(fixture.nativeElement.querySelectorAll('app-session-form').length).toBe(1);
+
+    (
+      Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+        (boton) => (boton as HTMLButtonElement).textContent?.trim() === 'Editar',
+      ) as HTMLButtonElement
+    ).click();
+    await avanzar(fixture);
+    flushVenues(http);
+    await avanzar(fixture);
+
+    const formularios = fixture.nativeElement.querySelectorAll('app-session-form');
+    expect(formularios.length).toBe(1);
+    expect(formularios[0].closest('li')).not.toBeNull();
   });
 });

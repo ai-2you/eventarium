@@ -24126,6 +24126,17 @@
             ],
             "title": "Titular"
           },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
           "sesiones": {
             "items": {
               "$ref": "#/components/schemas/SpeakerSessionOut"

@@ -108,16 +108,16 @@ function vacio(): {
           fieldId="sesion-inicio"
           [label]="t('admin.events.agenda.inicio')"
           [required]="true"
-          [min]="limites().min"
-          [max]="limites().max"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
           [(value)]="inicio"
         />
         <app-datetime-picker
           fieldId="sesion-fin"
           [label]="t('admin.events.agenda.fin')"
           [required]="true"
-          [min]="limites().min"
-          [max]="limites().max"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
           [error]="errorDeFin()"
           [(value)]="fin"
         />
@@ -279,6 +279,12 @@ export class SessionForm implements OnInit {
   ngOnInit(): void {
     void this.cargarSedes();
     void this.cargarLimites();
+    // Montado ya con una sesión (la edición en línea de la agenda): se rellena
+    // al nacer, sin esperar a que el padre llame a `cargarSesion`.
+    const sesion = this.sesion();
+    if (sesion) {
+      this.cargarSesion(sesion);
+    }
   }
 
   /** El fin, en el momento: antes que el inicio no tiene sentido guardarlo. */
@@ -288,8 +294,21 @@ export class SessionForm implements OnInit {
       : null,
   );
 
+  /** Fechas con las que se abrió la sesión en edición (`null` en el alta). */
+  private readonly fechasCargadas = signal<{ inicio: string; fin: string } | null>(null);
+
+  /** Una sesión que ya estaba fuera del evento (anterior a esta regla) se puede
+   * seguir editando mientras no se toquen sus fechas, como en el backend: hasta
+   * entonces no se le aplican los límites. */
+  protected readonly limitesActivos = computed(() => {
+    const cargadas = this.fechasCargadas();
+    const sinCambios =
+      cargadas !== null && cargadas.inicio === this.inicio() && cargadas.fin === this.fin();
+    return sinCambios ? { min: '', max: '' } : this.limites();
+  });
+
   private fueraDelEvento(valor: string): boolean {
-    const { min, max } = this.limites();
+    const { min, max } = this.limitesActivos();
     return (min !== '' && valor < min) || (max !== '' && valor > max);
   }
 
@@ -307,6 +326,7 @@ export class SessionForm implements OnInit {
     this.titulo.set(sesion.title);
     this.inicio.set(isoAValorLocal(sesion.starts_at));
     this.fin.set(isoAValorLocal(sesion.ends_at));
+    this.fechasCargadas.set({ inicio: this.inicio(), fin: this.fin() });
     this.sala.set(sesion.room ?? '');
     this.videoPlatform.set((sesion.video_platform ?? '') as VideoPlatform);
     this.videoUrl.set(sesion.video_url ?? '');
@@ -400,6 +420,7 @@ export class SessionForm implements OnInit {
     this.videoUrl.set(vacios.video_url);
     this.materiales.set(vacios.materiales);
     this.venueId.set('');
+    this.fechasCargadas.set(null);
     this.formError.set(null);
   }
 

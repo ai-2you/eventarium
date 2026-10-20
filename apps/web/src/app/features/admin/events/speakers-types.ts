@@ -26,6 +26,8 @@ export interface SpeakerRow {
   readonly first_name: string | null;
   readonly last_name: string | null;
   readonly titular: string | null;
+  /** Biografía de su ficha, o `null` si aún no la ha escrito. */
+  readonly bio: string | null;
   readonly sesiones: readonly SpeakerSession[];
   readonly completitud: SpeakerCompletitud;
   readonly ediciones: number;

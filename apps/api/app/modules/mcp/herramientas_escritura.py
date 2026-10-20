@@ -257,11 +257,17 @@ def registrar(mcp: MCPServer) -> None:
         descripcion: str | None = None,
         categoria: str | None = None,
         etiquetas: list[str] | None = None,
+        mover_sesiones: bool = False,
     ) -> schemas.EventoResumen:
         """Cambia los datos de un evento. No cambia su estado: para eso están
         `publicar_evento`, `despublicar_evento` y `cancelar_evento`.
         `categoria`: slug de una categoría activa (cadena vacía la quita).
-        `etiquetas`: sustituye las actuales (lista vacía las quita)."""
+        `etiquetas`: sustituye las actuales (lista vacía las quita).
+        `mover_sesiones`: al cambiar `inicio`/`fin`, mueve también la agenda el
+        mismo intervalo que el inicio (para aplazar un evento). Sin él, si
+        alguna sesión quedara fuera de las fechas nuevas, no se guarda nada y
+        el error dice cuáles; vuelve a llamar con `mover_sesiones=True` o
+        ajusta antes esas sesiones."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(
@@ -285,6 +291,8 @@ def registrar(mcp: MCPServer) -> None:
         if not cambios:
             raise ErrorDeHerramienta("Indica al menos un dato que cambiar.")
         datos = _validar(EventUpdate, cambios).model_dump(exclude_unset=True)
+        if mover_sesiones:
+            datos["mover_sesiones"] = True
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
             if categoria is not None:

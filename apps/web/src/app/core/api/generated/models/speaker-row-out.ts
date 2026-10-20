@@ -8,6 +8,7 @@ import { SpeakerSessionOut } from '../models/speaker-session-out';
  * Fila de la vista agregada de ponentes de un evento.
  */
 export interface SpeakerRowOut {
+  bio?: (string | null);
   completitud: SpeakerCompletitudOut;
   ediciones: number;
   email: string;

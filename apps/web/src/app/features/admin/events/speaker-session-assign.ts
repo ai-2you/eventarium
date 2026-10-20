@@ -64,9 +64,9 @@ interface ParticipanteDeSesion {
             [label]="t('admin.events.speakers.asignar.sesion')"
             [placeholder]="t('admin.events.speakers.asignar.eligeSesion')"
             [options]="opcionesDeSesion()"
-            [hint]="avisoDeSolape()"
             [(value)]="sesionElegida"
           />
+          <p class="solape" aria-live="polite">{{ avisoDeSolape() }}</p>
           <app-select
             fieldId="asignar-rol"
             [label]="t('admin.events.speakers.asignar.rol')"
@@ -100,6 +100,9 @@ interface ParticipanteDeSesion {
     .asignar {
       display: grid;
       gap: var(--space-md);
+    }
+    .solape:empty {
+      display: none;
     }
     .acciones {
       display: flex;
@@ -150,8 +153,11 @@ export class SpeakerSessionAssign implements OnInit {
     })),
   );
 
+  // Aquí se asigna: «No participa» no es una opción (enviaría un rol vacío).
   protected readonly opcionesDeRol = computed(() =>
-    opcionesDeRol((clave) => this.transloco.translate(clave), ''),
+    opcionesDeRol((clave) => this.transloco.translate(clave), '').filter(
+      (opcion) => opcion.value !== '',
+    ),
   );
 
   protected readonly avisoDeSolape = computed(() => {
