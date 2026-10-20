@@ -31,7 +31,7 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
-    version: '0.27.17',
+    version: '0.27.18',
     fecha: '2026-10-20',
     secciones: [
       {
