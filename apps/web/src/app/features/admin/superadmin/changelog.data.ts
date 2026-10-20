@@ -31,6 +31,32 @@ export interface ChangelogVersion {
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
   {
+    version: '0.27.23',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Tipos de sesión propios de cada organización',
+            descripcion:
+              'En «Tipos de sesión» cada organización renombra, ordena, colorea y desactiva sus tipos (Charla, Taller, Descanso, Servicio y Otro de serie) y crea los suyos, como Mesa redonda o Keynote. Los que son pausa se pintan apagados y no piden ponentes. La agenda pública muestra el nombre y el color de cada tipo, y el asistente por MCP los usa por su nombre.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'La ficha de un evento con talleres ya no falla',
+            descripcion:
+              'Un evento con sesiones de tipo «Taller» daba error al abrir su ficha pública.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.27.18',
     fecha: '2026-10-20',
     secciones: [
