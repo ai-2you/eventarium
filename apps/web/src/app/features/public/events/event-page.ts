@@ -837,15 +837,16 @@ export class EventPage implements OnInit {
     () => (this.evento()?.registration_mode ?? 'free') === 'free',
   );
 
-  /** «Desde X €» con el tipo de entrada vigente más barato
-   * (`price_from_cents`/`price_currency`). `null` si el evento es gratis o,
-   * siendo de pago, no tiene ningún tipo vigente ahora mismo — el chip cae
-   * entonces a la etiqueta genérica «Entrada de pago». */
   /** Sin entradas a la venta en un evento de pago: aviso en lugar del botón. */
   protected readonly avisoVenta = computed(() => {
     const evento = this.evento();
     return evento ? avisoDeVenta(evento, null) : null;
   });
+
+  /** «Desde X €» con el tipo de entrada vigente más barato
+   * (`price_from_cents`/`price_currency`). `null` si el evento es gratis o,
+   * siendo de pago, no tiene ningún tipo vigente ahora mismo — el chip cae
+   * entonces a la etiqueta genérica «Entrada de pago». */
   protected readonly precioDesde = computed(() => {
     const evento = this.evento();
     if (!evento || evento.price_from_cents === null || evento.price_currency === null) {
