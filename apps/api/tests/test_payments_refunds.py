@@ -21,6 +21,7 @@ import stripe
 from httpx import AsyncClient
 from sqlalchemy import select
 
+from app.core.audit import AuditLog
 from app.core.config import Settings
 from app.core.database import SessionApp, SessionMaintenance, set_organization_context
 from app.modules.events.models import Event
@@ -996,3 +997,32 @@ def test_no_se_ha_anadido_ninguna_columna_a_event_tickets() -> None:
         "created_at",
         "updated_at",
     }
+
+
+async def test_reembolso_manual_deja_fila_en_audit_log(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sin esta fila no hay forma de saber quién devolvió el dinero."""
+    stripe_account_id = await _crear_organizacion_con_stripe(organizacion)
+    event_id, _, payment_id = await _crear_evento_pagado(
+        organizacion, stripe_account_id=stripe_account_id
+    )
+    monkeypatch.setattr("app.core.tasks.process_refunds_task.kiq", AsyncMock())
+    _, cabeceras = await iniciar_sesion(cliente, organizacion)
+
+    respuesta = await cliente.post(
+        f"{EVENTS}/{event_id}/payments/{payment_id}/refund", headers=cabeceras, json={}
+    )
+    assert respuesta.status_code == 202, respuesta.text
+
+    async with SessionMaintenance() as session:
+        fila = await session.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "payments.refund.requested",
+                AuditLog.entity_id == str(payment_id),
+            )
+        )
+    assert fila is not None
+    assert fila.actor_user_id == organizacion.owner_id
+    assert fila.organization_id == organizacion.id
+    assert fila.detail["refund_id"] == respuesta.json()["refund_id"]
