@@ -19,12 +19,13 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUserDep, DbDep, require_permission
 from app.core.permissions import Permission
 from app.core.ratelimit import STRIPE_SYNC_POR_IP, limit_per_ip
+from app.modules.accounting.service import auditar
 from app.modules.events import repository as events_repository
 from app.modules.events.models import Event
 from app.modules.payments import refunds_service, repository, service
@@ -441,6 +442,8 @@ async def refund_payment(
     datos: RefundRequest,
     evento: Annotated[Event, Depends(_obtener_evento_o_404)],
     session: DbDep,
+    usuario: CurrentUserDep,
+    background_tasks: BackgroundTasks,
     payment_id: str,
 ) -> RefundAcceptedResponse:
     reembolso = await refunds_service.solicitar_reembolso_manual(
@@ -449,6 +452,22 @@ async def refund_payment(
         payment_id=uuid.UUID(payment_id),
         amount_cents=datos.amount_cents,
         revoke_ticket=datos.revoke_ticket,
+    )
+    # Devolver dinero es una acción con consecuencias económicas: queda quién
+    # la pidió y cuánto, igual que las acciones de contabilidad.
+    background_tasks.add_task(
+        auditar,
+        actor_user_id=usuario.id,
+        organization_id=evento.organization_id,
+        action="payments.refund.requested",
+        entity_type="event_payment",
+        entity_id=payment_id,
+        detail={
+            "event_id": str(evento.id),
+            "refund_id": str(reembolso.id),
+            "amount_cents": reembolso.amount_cents,
+            "revoke_ticket": reembolso.revoke_ticket,
+        },
     )
 
     from app.core.tasks import process_refunds_task
