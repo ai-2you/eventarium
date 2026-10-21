@@ -59,7 +59,11 @@ from app.modules.events.models import (
     SpeakerPublicProfile,
 )
 from app.modules.events.public_deps import EVENTO_PARA_MOSTRAR, ruta_de_evento
-from app.modules.events.public_summary import categoria_publica, resumen_publico
+from app.modules.events.public_summary import (
+    campos_de_venta,
+    categoria_publica,
+    resumen_publico,
+)
 from app.modules.events.schemas import (
     PublicCategoryRef,
     PublicEventDetail,
@@ -353,12 +357,12 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
         session, evento.organization_id, evento.id
     )
     tema = await service.tema_publico_del_evento(session, evento)
-    precio = None
+    venta = None
     if evento.registration_mode == "paid":
-        precios = await payments_service.get_min_public_prices(
+        ventas = await payments_service.get_public_sales(
             session, organization_id=evento.organization_id, event_ids=[evento.id]
         )
-        precio = precios.get(evento.id)
+        venta = ventas.get(evento.id)
     return PublicEventDetail(
         visibility=evento.visibility,  # type: ignore[arg-type]
         nearby_places=[
@@ -394,9 +398,7 @@ async def detalle_publico(session: AsyncSession, evento: Event) -> PublicEventDe
         registration_mode=evento.registration_mode,  # type: ignore[arg-type]
         registration_opens_at=evento.registration_opens_at,
         reserved_count=reservadas,
-        price_from_cents=precio.tipo.price_cents if precio else None,
-        price_currency=precio.tipo.currency if precio else None,
-        price_multiple=precio.varios_precios if precio else False,
+        **campos_de_venta(evento, venta),
         latitude=float(evento.latitude) if evento.latitude is not None else None,
         longitude=float(evento.longitude) if evento.longitude is not None else None,
         theme=tema,

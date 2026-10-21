@@ -41,14 +41,12 @@ import { Input } from '../../../shared/ui/input';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { TurnstileWidget } from '../../../shared/ui/turnstile-widget';
 import type { PublicEventDetail, RegistrationMode } from './event-page.types';
+import { AvisoVentaEntradas, avisoDeVenta } from './aviso-venta-entradas';
+import { precioDelResumen, precioEnEuros } from './precio-de-inscripcion';
 import { RegistrationConsents } from './registration-consents';
 import { CODIGO_POLITICAS_CAMBIADAS } from '../../../core/policies/public-policies.service';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function precioEnEuros(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
 
 /**
  * Formulario público de inscripción a un evento (fase 3 del PRD; paso de
@@ -80,6 +78,7 @@ function precioEnEuros(cents: number): string {
   selector: 'app-registration-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AvisoVentaEntradas,
     DatePipe,
     TranslocoDirective,
     RouterLink,
@@ -135,6 +134,8 @@ function precioEnEuros(cents: number): string {
                 <app-alert tone="exito" [title]="t('inscripcion.exitoTitulo')">
                   {{ mensajeExito() }}
                 </app-alert>
+              } @else if (avisoVenta(); as aviso) {
+                <app-aviso-venta-entradas [aviso]="aviso" />
               } @else {
                 <p class="explicacion">{{ textoModo(t) }}</p>
 
@@ -577,6 +578,19 @@ export class RegistrationPage implements OnInit {
    * docstring de la clase sobre por qué esta lista basta para decidirlo. */
   protected readonly ticketTypes = signal<PublicTicketType[]>([]);
   protected readonly esCompraDePago = computed(() => this.ticketTypes().length > 0);
+  private readonly cargaDeTipos = signal<'cargando' | 'hecha' | 'fallida'>('cargando');
+  /** Evento de pago sin entradas a la venta (o aún cargándolas): aviso en vez
+   * del formulario, que sin tipos se presentaría como gratuito. */
+  protected readonly avisoVenta = computed(() => {
+    const evento = this.evento();
+    if (!evento || this.cargaDeTipos() === 'cargando') {
+      return evento?.registration_mode === 'paid'
+        ? { motivo: 'cargando' as const, fecha: null }
+        : null;
+    }
+    const fallida = this.cargaDeTipos() === 'fallida';
+    return avisoDeVenta(evento, this.ticketTypes().length, fallida);
+  });
   protected readonly ticketTypeId = signal<string | null>(null);
   protected readonly errorTicketType = signal<string | null>(null);
   protected readonly codigoDescuento = signal('');
@@ -617,10 +631,11 @@ export class RegistrationPage implements OnInit {
    * (los dos envían por `RegistrationsService.submit`), así que ahí sí basta
    * con `evento().registration_mode`, que es el dato real del backend. */
   protected readonly modoInscripcion = computed<RegistrationMode>(() => {
-    if (this.esCompraDePago()) {
+    const modo = this.evento()?.registration_mode;
+    if (this.esCompraDePago() || modo === 'paid') {
       return 'paid';
     }
-    return this.evento()?.registration_mode === 'approval' ? 'approval' : 'free';
+    return modo === 'approval' ? 'approval' : 'free';
   });
 
   private static readonly CLAVES_PASOS_POR_MODO: Record<
@@ -725,10 +740,10 @@ export class RegistrationPage implements OnInit {
   private async cargarTiposDeEntrada(): Promise<void> {
     try {
       this.ticketTypes.set(await this.checkout.getTicketTypes(this.org(), this.slug()));
+      this.cargaDeTipos.set('hecha');
     } catch {
-      // Best-effort: si esta llamada falla, el formulario se comporta como
-      // un evento gratuito. `cargarPreguntas` ya cubre el caso «evento
-      // inexistente» con su propio mensaje.
+      this.cargaDeTipos.set('fallida');
+      // `avisoVenta` muestra el error en uno de pago; «no existe», `cargarPreguntas`.
       this.ticketTypes.set([]);
     }
   }
@@ -741,19 +756,9 @@ export class RegistrationPage implements OnInit {
     return precioEnEuros(cents);
   }
 
-  /** `.summary__row` "Precio" (`inscripcion.html:178`): el más barato de los
-   * tipos de entrada vendibles, con «Desde» si hay más de uno. Sin tipos, el
-   * evento es gratuito (mismo criterio que `esCompraDePago`). */
   protected precioResumen(traducir: (clave: string) => string): string {
-    const tipos = this.ticketTypes();
-    if (tipos.length === 0) {
-      return traducir('inscripcion.resumen.gratis');
-    }
-    const masBarato = tipos.reduce((min, tipo) =>
-      tipo.price_cents < min.price_cents ? tipo : min,
-    );
-    const precio = `${this.precioEuros(masBarato.price_cents)} ${masBarato.currency.toUpperCase()}`;
-    return tipos.length > 1 ? `${traducir('inscripcion.resumen.desde')} ${precio}` : precio;
+    const esDePago = this.evento()?.registration_mode === 'paid';
+    return precioDelResumen(this.ticketTypes(), esDePago, traducir);
   }
 
   /** `.summary__row` "Plazas libres" (`inscripcion.html:179`): `null` con

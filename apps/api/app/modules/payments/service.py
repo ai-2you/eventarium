@@ -24,7 +24,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -147,6 +147,15 @@ def calcular_precio_final(
     return max(price_cents - descuento, 0)
 
 
+def tipo_puede_venderse_aun(tipo: EventTicketType, ahora: datetime) -> bool:
+    """`True` si el tipo está activo y su venta no ha terminado, aunque todavía
+    no haya empezado: basta para publicar un evento de pago y anunciarlo antes
+    de abrir la venta (`validar_tipo_vigente` decide si se puede comprar ya)."""
+    if not tipo.is_active:
+        return False
+    return tipo.sales_end_at is None or ahora <= tipo.sales_end_at
+
+
 def validar_tipo_vigente(tipo: EventTicketType, ahora: datetime) -> bool:
     """`True` si el tipo se puede vender en `ahora`: activo y dentro de su
     ventana de venta (ambos extremos opcionales)."""
@@ -214,25 +223,56 @@ class PrecioPublico:
     varios_precios: bool
 
 
-async def get_min_public_prices(
+EstadoDeVenta = Literal["open", "upcoming", "closed"]
+
+
+@dataclass(frozen=True)
+class VentaPublica:
+    """Cómo está la venta de entradas de un evento de pago para el público.
+
+    `open`: hay algún tipo vendible ahora (`precio` con el «desde»).
+    `upcoming`: ninguno vendible aún, pero alguno abre más tarde (`abre`).
+    `closed`: ni vendible ni pendiente de abrir (venta terminada o sin tipos
+    activos). La ficha y el formulario lo distinguen para no pintar nunca el
+    formulario gratuito en un evento de pago.
+    """
+
+    estado: EstadoDeVenta
+    precio: PrecioPublico | None = None
+    abre: datetime | None = None
+
+
+async def get_public_sales(
     session: AsyncSession, *, organization_id: uuid.UUID, event_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, PrecioPublico]:
-    """Precio «desde» de cada evento, para `PublicEventSummary.price_from_cents`
-    /`price_multiple`. Un evento sin ningún tipo vigente (p. ej. todos fuera
-    de su ventana de venta) no aparece en el resultado — no hay precio que
-    mostrar, mejor omitirlo que inventar un valor."""
+) -> dict[uuid.UUID, VentaPublica]:
+    """Estado de la venta y precio «desde» de cada evento de pago pedido, en una
+    sola consulta de tipos, para `PublicEventSummary`/la ficha pública. Un
+    evento sin ningún tipo vendible no tiene precio — mejor omitirlo que
+    inventar un valor —, pero sí estado (`upcoming` o `closed`)."""
     ahora = datetime.now(UTC)
     tipos = await repository.get_ticket_types_for_events(session, organization_id, event_ids)
     vigentes_por_evento: dict[uuid.UUID, list[EventTicketType]] = defaultdict(list)
+    aperturas_por_evento: dict[uuid.UUID, list[datetime]] = defaultdict(list)
     for tipo in tipos:
         if validar_tipo_vigente(tipo, ahora):
             vigentes_por_evento[tipo.event_id].append(tipo)
+        elif tipo_puede_venderse_aun(tipo, ahora) and tipo.sales_start_at is not None:
+            aperturas_por_evento[tipo.event_id].append(tipo.sales_start_at)
 
-    resultado: dict[uuid.UUID, PrecioPublico] = {}
-    for event_id, vigentes in vigentes_por_evento.items():
-        mas_barato = min(vigentes, key=lambda tipo: tipo.price_cents)
-        varios_precios = len({tipo.price_cents for tipo in vigentes}) > 1
-        resultado[event_id] = PrecioPublico(tipo=mas_barato, varios_precios=varios_precios)
+    resultado: dict[uuid.UUID, VentaPublica] = {}
+    for event_id in event_ids:
+        vigentes = vigentes_por_evento.get(event_id)
+        if vigentes:
+            mas_barato = min(vigentes, key=lambda tipo: tipo.price_cents)
+            varios_precios = len({tipo.price_cents for tipo in vigentes}) > 1
+            resultado[event_id] = VentaPublica(
+                estado="open",
+                precio=PrecioPublico(tipo=mas_barato, varios_precios=varios_precios),
+            )
+        elif aperturas := aperturas_por_evento.get(event_id):
+            resultado[event_id] = VentaPublica(estado="upcoming", abre=min(aperturas))
+        else:
+            resultado[event_id] = VentaPublica(estado="closed")
     return resultado
 
 

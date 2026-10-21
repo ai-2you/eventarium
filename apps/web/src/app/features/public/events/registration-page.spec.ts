@@ -660,4 +660,35 @@ describe('RegistrationPage', () => {
       expect(raiz.textContent).toContain('han cambiado mientras rellenabas el formulario');
     });
   });
+
+  describe('evento de pago sin entradas a la venta', () => {
+    it('anuncia cuándo abre la venta en vez del formulario gratuito', async () => {
+      configurar({ getQuestions: vi.fn().mockResolvedValue([]) });
+      const fixture = crearFixture();
+      await avanzar(fixture);
+      TestBed.inject(HttpTestingController)
+        .expectOne((peticion) =>
+          peticion.url.endsWith('/public/organizations/acme/events/iawic-2026'),
+        )
+        .flush({
+          title: 'Taller',
+          organization: { slug: 'acme', name: 'Acme', page_public: false },
+          summary: null,
+          cover_url: null,
+          theme: null,
+          registration_mode: 'paid',
+          timezone: 'Europe/Madrid',
+          ticket_sales: 'upcoming',
+          ticket_sales_opens_at: '2099-10-21T18:00:00Z',
+        });
+      await avanzar(fixture);
+
+      fixture.detectChanges();
+      const texto = fixture.nativeElement.textContent as string;
+      expect(texto).toContain('La venta de entradas abre el');
+      expect(texto).toContain('20:00');
+      expect(fixture.nativeElement.querySelector('form')).toBeNull();
+      await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+    });
+  });
 });

@@ -472,6 +472,14 @@
       "correo": "Enviar por correo",
       "copiar": "Copiar enlace",
       "copiado": "Enlace copiado"
+    },
+    "ventaEntradas": {
+      "cargando": "Cargando las entradas…",
+      "abre": "La venta de entradas abre el {{fecha}}.",
+      "cerrada": "No hay entradas a la venta en este momento.",
+      "recargar": "La venta de entradas ha cambiado desde que abriste la página.",
+      "error": "No hemos podido cargar las entradas.",
+      "botonRecargar": "Recargar la página"
     }
   },
   "registro": {

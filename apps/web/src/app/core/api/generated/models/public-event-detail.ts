@@ -46,6 +46,8 @@ export interface PublicEventDetail {
   summary: (string | null);
   tags?: Array<string>;
   theme?: (PublicTheme | null);
+  ticket_sales?: ('open' | 'upcoming' | 'closed' | null);
+  ticket_sales_opens_at?: (string | null);
   timezone: string;
   title: string;
   venues?: Array<PublicVenue>;
