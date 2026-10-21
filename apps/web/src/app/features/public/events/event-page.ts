@@ -42,6 +42,7 @@ import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-se
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
 import { DirectionsLink } from '../../../shared/ui/directions-link';
 import { EventNearbySection } from './sections/event-nearby-section';
+import { AvisoVentaEntradas, avisoDeVenta } from './aviso-venta-entradas';
 
 /** `starts_at` (UTC) al día calendario en la zona del evento, sin arrastrar la
  * zona horaria del entorno de ejecución (navegador o SSR) al agrupar por fecha:
@@ -88,6 +89,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   selector: 'app-event-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AvisoVentaEntradas,
     DatePipe,
     DirectionsLink,
     EventNearbySection,
@@ -272,10 +274,14 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
                     </div>
                   }
                   @if (!evento.cancelled) {
-                    <a class="ficha__inscribirse" [routerLink]="ruta('inscribirse')">
-                      {{ t('publico.eventos.inscribirse') }}
-                    </a>
-                    <p class="ficha__nota">{{ t('publico.eventos.ficha.sinCuenta') }}</p>
+                    @if (avisoVenta(); as aviso) {
+                      <app-aviso-venta-entradas [aviso]="aviso" />
+                    } @else {
+                      <a class="ficha__inscribirse" [routerLink]="ruta('inscribirse')">
+                        {{ t('publico.eventos.inscribirse') }}
+                      </a>
+                      <p class="ficha__nota">{{ t('publico.eventos.ficha.sinCuenta') }}</p>
+                    }
                   }
                   <p class="ficha__nota">
                     <a [routerLink]="ruta('politicas')">
@@ -830,6 +836,12 @@ export class EventPage implements OnInit {
   protected readonly entradaGratuita = computed(
     () => (this.evento()?.registration_mode ?? 'free') === 'free',
   );
+
+  /** Sin entradas a la venta en un evento de pago: aviso en lugar del botón. */
+  protected readonly avisoVenta = computed(() => {
+    const evento = this.evento();
+    return evento ? avisoDeVenta(evento, null) : null;
+  });
 
   /** «Desde X €» con el tipo de entrada vigente más barato
    * (`price_from_cents`/`price_currency`). `null` si el evento es gratis o,

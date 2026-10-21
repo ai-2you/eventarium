@@ -31,6 +31,7 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
+TicketSalesState = Literal["open", "upcoming", "closed"]
 # Horas antes del inicio a las que sale el recordatorio a los inscritos. Mismo
 # conjunto que el `CHECK` de base de datos, el MCP y el desplegable del panel.
 ReminderHours = Literal[2, 6, 12, 24, 48, 72]
@@ -634,6 +635,12 @@ class PublicEventSummary(BaseModel):
     # (el front antepone «Desde»); con un único precio —un solo tipo o varios
     # al mismo importe— este campo va en `False` y se muestra el importe solo.
     price_multiple: bool
+    # Venta de entradas de un evento de pago (`payments.VentaPublica`): `open`
+    # (se puede comprar), `upcoming` (abre en `ticket_sales_opens_at`) o
+    # `closed` (terminada o sin tipos activos). `None` si el evento no es de
+    # pago. Con él la web no confunde nunca un evento de pago con uno gratuito.
+    ticket_sales: TicketSalesState | None = None
+    ticket_sales_opens_at: datetime | None = None
 
 
 class PublicEventSession(BaseModel):
@@ -720,6 +727,9 @@ class PublicEventDetail(BaseModel):
     price_from_cents: int | None
     price_currency: str | None
     price_multiple: bool
+    # Mismo criterio que `PublicEventSummary.ticket_sales`.
+    ticket_sales: TicketSalesState | None = None
+    ticket_sales_opens_at: datetime | None = None
     # Geocodificación de `location_address`, para el mapa del evento de una
     # sola sede. `None` si no hay dirección, el evento es `online` o falló.
     latitude: float | None

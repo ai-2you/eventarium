@@ -97,11 +97,9 @@ async def _asegurar_venta_posible(
 
     `event_id` solo llega desde `update_event` (`create_event` no tiene
     todavía una fila de evento sobre la que colgar tipos de entrada). Con él,
-    exige al menos un tipo de entrada vigente: el formulario público decide
-    si un evento «es de pago» por si
-    la lista de tipos de entrada vendibles está vacía o no
-    (`registration-page.ts`), así que un evento `paid` publicado sin ninguno
-    la confundiría con uno gratuito.
+    exige al menos un tipo de entrada activo cuya venta no haya terminado,
+    aunque empiece más tarde: anunciar un evento antes de abrir la venta es lo
+    habitual, y la ficha pública dice cuándo abre (`ticket_sales`).
     """
     if status != "published" or registration_mode != "paid":
         return
@@ -122,9 +120,10 @@ async def _asegurar_venta_posible(
     if event_id is not None:
         ahora = datetime.now(UTC)
         tipos = await payments_repository.get_ticket_types(session, organization_id, event_id)
-        if not any(payments_service.validar_tipo_vigente(tipo, ahora) for tipo in tipos):
+        if not any(payments_service.tipo_puede_venderse_aun(tipo, ahora) for tipo in tipos):
             raise ConflictError(
-                "No se puede publicar un evento de pago sin ningún tipo de entrada vigente."
+                "No se puede publicar un evento de pago sin ningún tipo de entrada a la venta "
+                "ni pendiente de abrir."
             )
 
 
@@ -358,14 +357,17 @@ async def update_event(
 
     # Evaluado sobre el evento **resultante**, no el actual: un `PATCH` que
     # cambia `status` y `registration_mode` a la vez debe quedar bloqueado
-    # igual que si cada campo se editara por separado.
-    await _asegurar_venta_posible(
-        session,
-        organization_id,
-        status=datos.get("status", evento.status),
-        registration_mode=datos.get("registration_mode", evento.registration_mode),
-        event_id=evento.id,
-    )
+    # igual que si cada campo se editara por separado. Solo al **entrar** en
+    # publicado y de pago: un evento que ya vendía se puede seguir editando
+    # (una errata, el aforo) aunque su venta haya terminado.
+    if not (evento.status == "published" and evento.registration_mode == "paid"):
+        await _asegurar_venta_posible(
+            session,
+            organization_id,
+            status=datos.get("status", evento.status),
+            registration_mode=datos.get("registration_mode", evento.registration_mode),
+            event_id=evento.id,
+        )
 
     inicio = datos.get("starts_at", evento.starts_at)
     fin = datos.get("ends_at", evento.ends_at)
@@ -934,7 +936,7 @@ async def list_public_events_across_organizations(
     offset: int = 0,
 ) -> tuple[
     list[
-        tuple[Event, int, payments_service.PrecioPublico | None, str | None, PublicOrganizationRef]
+        tuple[Event, int, payments_service.VentaPublica | None, str | None, PublicOrganizationRef]
     ],
     int,
 ]:
@@ -954,7 +956,7 @@ async def list_public_events_across_organizations(
     menos un evento publicable — la resolución completa de cada una se hace
     después, fijando su contexto RLS una por una y reutilizando exactamente
     las mismas consultas que ya usa el listado de una sola organización
-    (`public_events_with_confirmed_count_query`, `get_min_public_prices`):
+    (`public_events_with_confirmed_count_query`, `get_public_sales`):
     nada de SQL nuevo por duplicar, solo repetido por organización. El número
     de organizaciones de una instalación es pequeño (no es una consulta por
     evento, es una por organización), así que el coste es aceptable para un
@@ -973,7 +975,7 @@ async def list_public_events_across_organizations(
     ).all()
 
     resultado: list[
-        tuple[Event, int, payments_service.PrecioPublico | None, str | None, PublicOrganizationRef]
+        tuple[Event, int, payments_service.VentaPublica | None, str | None, PublicOrganizationRef]
     ] = []
     total = 0
     for (organization_id,) in organizaciones:
@@ -993,7 +995,7 @@ async def list_public_events_across_organizations(
             consulta = consulta.limit(offset + limit)
         filas = (await session.execute(consulta)).all()
         ids_de_pago = [evento.id for evento, _ in filas if evento.registration_mode == "paid"]
-        precios = await payments_service.get_min_public_prices(
+        precios = await payments_service.get_public_sales(
             session, organization_id=organization_id, event_ids=ids_de_pago
         )
         # Las portadas se resuelven aquí, dentro del contexto RLS de esta
@@ -1069,7 +1071,7 @@ async def list_public_events_of_organization(
     upcoming: bool,
     limit: int,
     offset: int,
-) -> tuple[list[tuple[Event, int, payments_service.PrecioPublico | None, str | None]], int]:
+) -> tuple[list[tuple[Event, int, payments_service.VentaPublica | None, str | None]], int]:
     """Eventos publicados de **una** organización, próximos o pasados, paginados.
 
     Fija el contexto RLS de esa organización y no recorre las demás. Los
@@ -1104,7 +1106,7 @@ async def list_public_events_of_organization(
     ).all()
 
     ids_de_pago = [evento.id for evento, _ in filas if evento.registration_mode == "paid"]
-    precios = await payments_service.get_min_public_prices(
+    precios = await payments_service.get_public_sales(
         session, organization_id=organization_id, event_ids=ids_de_pago
     )
     portadas = await _resolver_portadas(session, [evento for evento, _ in filas])

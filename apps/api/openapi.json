@@ -22518,6 +22518,34 @@
             "type": "boolean",
             "title": "Price Multiple"
           },
+          "ticket_sales": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "upcoming",
+                  "closed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales"
+          },
+          "ticket_sales_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales Opens At"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -22933,6 +22961,34 @@
           "price_multiple": {
             "type": "boolean",
             "title": "Price Multiple"
+          },
+          "ticket_sales": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "upcoming",
+                  "closed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales"
+          },
+          "ticket_sales_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales Opens At"
           }
         },
         "type": "object",

@@ -111,6 +111,10 @@ export interface PublicEventDetail {
   /** `true` solo si entre los tipos vigentes hay más de un precio distinto
    * — con un único precio se muestra el importe solo, sin «Desde». */
   readonly price_multiple: boolean;
+  /** Venta de entradas de un evento de pago: `open`, `upcoming` (abre en
+   * `ticket_sales_opens_at`) o `closed`; `null` si no es de pago. */
+  readonly ticket_sales?: 'open' | 'upcoming' | 'closed' | null;
+  readonly ticket_sales_opens_at?: string | null;
   /** Plazas realmente reservadas: con `capacity`, da la ocupación de la ficha. */
   readonly reserved_count: number;
   /** Geocodificación de `location_address`; `null` si no hay dirección o falló. */
