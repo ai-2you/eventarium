@@ -14,6 +14,7 @@ financiero que nunca ocurrió. Mismo patrón que
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -39,6 +40,8 @@ from app.modules.events.models import Event
 from app.modules.sponsors.models import Sponsor
 from app.shared.errors import ConflictError, NotFoundError, ValidationDomainError
 
+logger = logging.getLogger(__name__)
+
 # Único valor admitido por el `CHECK` de BD (`models.py:89`) — el servicio
 # devuelve un 422 legible en vez de dejar que un `origin` distinto llegue a
 # provocar un `IntegrityError` crudo (500 sin traducir).
@@ -58,17 +61,24 @@ async def auditar(
     `drafts_service.py`, de ahí que sea pública y no `_auditar`): abre su propia sesión de
     mantenimiento porque `audit_log` tiene `REVOKE ALL ... FROM app_user`
     (`core/audit.py:13-20`) y ya se ejecuta fuera del ciclo de vida de la
-    sesión de la petición."""
-    async with maintenance_session() as auditoria:
-        await registrar_auditoria(
-            auditoria,
-            actor_user_id=actor_user_id,
-            organization_id=organization_id,
-            action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            detail=detail,
-        )
+    sesión de la petición.
+
+    Corre tras enviar la respuesta: si falla, nadie lo verá salvo en el log,
+    así que se registra con la acción y la entidad (como el MCP), no como un
+    error ASGI suelto."""
+    try:
+        async with maintenance_session() as auditoria:
+            await registrar_auditoria(
+                auditoria,
+                actor_user_id=actor_user_id,
+                organization_id=organization_id,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                detail=detail,
+            )
+    except Exception:
+        logger.exception("No se pudo auditar %s sobre %s %s", action, entity_type, entity_id)
 
 
 async def crear_ingreso_manual(
