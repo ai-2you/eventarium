@@ -281,6 +281,13 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     expose:
       - "80"
+    # Puerto publicado (no solo `expose`) para que EasyPanel detecte este servicio como
+    # destino válido al enrutar un dominio a un recurso Compose: su reconciliador empareja
+    # el puerto del dominio contra las entradas `ports:` del compose, no contra `expose:`.
+    # El puerto de host (18080) no se usa para servir tráfico real -eso lo hace Traefik por
+    # la red `easypanel`-, solo existe para esa detección.
+    ports:
+      - "18080:80"
     # Sonda del propio Caddy (`/healthz`), no de la API: un 503 de /api/v1/health no
     # debe dejar a `caddy` unhealthy, porque Traefik dejaría de enrutar el dominio entero.
     healthcheck:
