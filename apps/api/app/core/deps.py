@@ -150,6 +150,7 @@ class CurrentUser:
         "organization_id",
         "refresh_family",
         "notify_similar_events",
+        "locale",
     )
 
     def __init__(
@@ -161,6 +162,7 @@ class CurrentUser:
         last_name: str | None,
         is_superadmin: bool,
         organization_id: uuid.UUID,
+        locale: str,
         refresh_family: str | None = None,
         notify_similar_events: bool = False,
         platform_role: str | None = None,
@@ -174,6 +176,7 @@ class CurrentUser:
         self.organization_id = organization_id
         self.refresh_family = refresh_family
         self.notify_similar_events = notify_similar_events
+        self.locale = locale
 
 
 async def get_current_user(
@@ -196,7 +199,7 @@ async def get_current_user(
         await session.execute(
             text(
                 "SELECT id, email, first_name, last_name, is_superadmin, is_active, "
-                "notify_similar_events, platform_role FROM users WHERE id = :id"
+                "notify_similar_events, platform_role, locale FROM users WHERE id = :id"
             ),
             {"id": claims.user_id},
         )
@@ -214,6 +217,7 @@ async def get_current_user(
         refresh_family=claims.family,
         notify_similar_events=fila[6],
         platform_role=fila[7],
+        locale=fila[8],
     )
 
 
@@ -341,7 +345,7 @@ async def require_superadmin(
     fila = (
         await session.execute(
             text(
-                "SELECT id, email, first_name, last_name, is_superadmin, is_active "
+                "SELECT id, email, first_name, last_name, is_superadmin, is_active, locale "
                 "FROM users WHERE id = :id"
             ),
             {"id": claims.user_id},
@@ -358,6 +362,7 @@ async def require_superadmin(
         last_name=fila[3],
         is_superadmin=True,
         organization_id=claims.organization_id or uuid.UUID(int=0),
+        locale=fila[6],
     )
 
 
@@ -429,7 +434,7 @@ async def require_platform_staff(
         await session.execute(
             text(
                 "SELECT id, email, first_name, last_name, is_superadmin, is_active, "
-                "platform_role FROM users WHERE id = :id"
+                "platform_role, locale FROM users WHERE id = :id"
             ),
             {"id": claims.user_id},
         )
@@ -446,6 +451,7 @@ async def require_platform_staff(
         is_superadmin=fila[4],
         organization_id=claims.organization_id or uuid.UUID(int=0),
         platform_role=fila[6],
+        locale=fila[7],
     )
 
 
