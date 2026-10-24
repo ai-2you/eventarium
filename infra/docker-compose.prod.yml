@@ -16,9 +16,14 @@
 # simultáneas competirían por el mismo esquema.
 name: eventarium
 
+# events.2you.ai (rama deploy/events-2you-ai): build propio desde el código en vez de
+# la imagen de GHCR. GHCR solo publica `latest` en push a `main` o tags `v*` — no en
+# cada commit de `develop` — así que la imagen publicada queda por detrás del código
+# que de verdad se quiere probar antes de mandar la PR a Paulo. Construir aquí mismo
+# asegura que api/worker/scheduler corren exactamente el `develop` de este checkout.
 x-imagen-api: &imagen-api
-  image: ghcr.io/${GITHUB_REPOSITORY:-yosnap/eventarium}/api:${IMAGE_TAG:?falta IMAGE_TAG}
-  pull_policy: always
+  build:
+    context: ../apps/api
 
 # `env_file: ./env/.env` requeriría ese fichero *dentro del checkout* que hace el
 # orquestador (Dokploy, o cualquier CI que clona el repo y construye ahí mismo):
