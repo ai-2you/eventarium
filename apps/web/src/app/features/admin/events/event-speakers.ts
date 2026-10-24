@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import {
+  DOCUMENT,
   ChangeDetectionStrategy,
   Component,
   type OnInit,
@@ -26,6 +27,7 @@ import { Panel } from '../../../shared/ui/panel';
 import { SegmentedFilter } from '../../../shared/ui/segmented-filter';
 import { TableToolbar } from '../../../shared/ui/table-toolbar';
 import { EventRoster } from './event-roster';
+import { SpeakerSessionAssign } from './speaker-session-assign';
 import {
   type EventSpeakersView,
   type SpeakerHistoryItem,
@@ -55,6 +57,7 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
     DataTable,
     Dialog,
     EventRoster,
+    SpeakerSessionAssign,
     KpiCard,
     PageHeader,
     Panel,
@@ -146,14 +149,11 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                     @if (fila.sesiones.length === 0) {
                       <app-chip tone="espera">{{ t('admin.events.speakers.sinAsignar') }}</app-chip>
                     } @else {
-                      {{ fila.sesiones[0].titulo }}
-                      @if (fila.sesiones.length > 1) {
-                        <small class="mas">
-                          {{
-                            t('admin.events.speakers.masSesiones', { n: fila.sesiones.length - 1 })
-                          }}
-                        </small>
-                      }
+                      <ul class="sesiones">
+                        @for (sesion of fila.sesiones; track sesion.id) {
+                          <li>{{ sesion.titulo }}</li>
+                        }
+                      </ul>
                     }
                   </td>
                   <td>
@@ -178,31 +178,54 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
                     </span>
                   </td>
                   <td class="numerica">{{ fila.ediciones }}</td>
-                  <td class="acciones">
-                    @if (fila.completitud.porcentaje < 100) {
+                  <td>
+                    <div class="acciones">
+                      @if (!fila.bio) {
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          [loading]="pidiendoBio() === fila.organization_member_id"
+                          (pulsado)="pedirBio(fila)"
+                        >
+                          {{ t('admin.events.speakers.pedirBio') }}
+                        </app-button>
+                      } @else {
+                        <!-- Botón también con perfil público: mismo aspecto que el
+                             resto de acciones; abre el perfil en otra pestaña. -->
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          [ariaLabel]="
+                            fila.public_slug
+                              ? t('admin.events.speakers.verBioDe', { nombre: nombre(fila) })
+                              : null
+                          "
+                          (pulsado)="verBio(fila)"
+                        >
+                          {{ t('admin.events.speakers.verBio') }}
+                        </app-button>
+                      }
+                      @if (fila.sesiones.length === 0) {
+                        <app-button
+                          variant="secundario"
+                          type="button"
+                          [compacto]="true"
+                          (pulsado)="abrirAsignar(fila)"
+                        >
+                          {{ t('admin.events.speakers.asignarSesion') }}
+                        </app-button>
+                      }
                       <app-button
-                        variant="secundario"
+                        variant="terciario"
                         type="button"
                         [compacto]="true"
-                        [loading]="pidiendoBio() === fila.organization_member_id"
-                        (pulsado)="pedirBio(fila)"
+                        (pulsado)="abrirHistorial(fila)"
                       >
-                        {{ t('admin.events.speakers.pedirBio') }}
+                        {{ t('admin.events.speakers.historial') }}
                       </app-button>
-                    }
-                    @if (fila.sesiones.length === 0) {
-                      <a class="enlace" routerLink="/dashboard/events/{{ eventId() }}/agenda">
-                        {{ t('admin.events.speakers.asignarSesion') }}
-                      </a>
-                    }
-                    <app-button
-                      variant="terciario"
-                      type="button"
-                      [compacto]="true"
-                      (pulsado)="abrirHistorial(fila)"
-                    >
-                      {{ t('admin.events.speakers.historial') }}
-                    </app-button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -258,6 +281,32 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
         </div>
       </app-dialog>
 
+      <app-dialog #dialogoBio (cerrado)="bioAbierta.set(null)">
+        @if (bioAbierta(); as fila) {
+          <span class="rotulo-seccion">{{
+            t('admin.events.speakers.bioDe', { nombre: nombre(fila) })
+          }}</span>
+          <p class="bio">{{ fila.bio }}</p>
+          <p class="nota">{{ t('admin.events.speakers.bioSinPerfil') }}</p>
+        }
+        <app-button pie variant="secundario" type="button" (pulsado)="dialogoBio.cerrar()">
+          {{ t('comun.cerrar') }}
+        </app-button>
+      </app-dialog>
+
+      <app-dialog #dialogoAsignar (cerrado)="asignando.set(null)">
+        @if (asignando(); as fila) {
+          <span class="rotulo-seccion">{{
+            t('admin.events.speakers.asignar.titulo', { nombre: nombre(fila) })
+          }}</span>
+          <app-speaker-session-assign
+            [eventId]="eventId()"
+            [eventMemberId]="fila.event_member_id"
+            (asignado)="alCambiarRoster()"
+          />
+        }
+      </app-dialog>
+
       <app-dialog #dialogoInvitar (cerrado)="invitarAbierto.set(false)">
         <span class="rotulo-seccion">{{ t('admin.events.speakers.invitarPonente') }}</span>
         @if (invitarAbierto()) {
@@ -267,6 +316,20 @@ const SEGMENTOS = ['todas', 'incompletas', 'repiten', 'sin-sesion'] as const;
     </ng-container>
   `,
   styles: `
+    .sesiones {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 2px;
+    }
+    .bio {
+      white-space: pre-line;
+    }
+    .nota {
+      color: var(--muted);
+      font-size: var(--fs-sm);
+    }
     .kpis {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(10.625rem, 1fr));
@@ -380,11 +443,38 @@ export class EventSpeakers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
+  private readonly documento = inject(DOCUMENT);
   // Por nombre de referencia de plantilla, no por tipo: hay dos `app-dialog` en
   // la plantilla, y `viewChild.required(Dialog)` sin localizador resolvería a
   // uno cualquiera de los dos de forma ambigua.
   private readonly dialogoHistorialRef = viewChild.required<Dialog>('dialogoHistorial');
   private readonly dialogoInvitarRef = viewChild.required<Dialog>('dialogoInvitar');
+  private readonly dialogoAsignarRef = viewChild.required<Dialog>('dialogoAsignar');
+  private readonly dialogoBioRef = viewChild.required<Dialog>('dialogoBio');
+  /** Ponente cuya biografía se lee en el diálogo (sin perfil público al que llevar). */
+  protected readonly bioAbierta = signal<SpeakerRow | null>(null);
+
+  /** Con perfil público, la página del ponente en otra pestaña; sin él no hay
+   * página a la que llevar y la biografía se lee en un diálogo. */
+  protected verBio(fila: SpeakerRow): void {
+    if (fila.public_slug) {
+      this.documento.defaultView?.open(
+        `/ponentes/${encodeURIComponent(fila.public_slug)}`,
+        '_blank',
+        'noopener',
+      );
+      return;
+    }
+    this.bioAbierta.set(fila);
+    this.dialogoBioRef().abrir();
+  }
+  /** Ponente al que se está asignando sesión (monta el diálogo solo entonces). */
+  protected readonly asignando = signal<SpeakerRow | null>(null);
+
+  protected abrirAsignar(fila: SpeakerRow): void {
+    this.asignando.set(fila);
+    this.dialogoAsignarRef().abrir();
+  }
 
   protected readonly monograma = monograma;
 
@@ -474,7 +564,7 @@ export class EventSpeakers implements OnInit {
       { key: 'sesion', label: t('admin.events.speakers.columnaSesion') },
       { key: 'ficha', label: t('admin.events.speakers.columnaFicha') },
       { key: 'ediciones', label: t('admin.events.speakers.columnaEdiciones') },
-      { key: 'acciones', label: '' },
+      { key: 'acciones', label: t('admin.events.speakers.columnaAcciones') },
     ];
   });
 

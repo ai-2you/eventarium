@@ -17,11 +17,14 @@ export interface PublicParticipant {
   readonly display_name: string;
   readonly role_key: string;
   readonly public_slug: string | null;
+  /** Identificador opaco de la persona: el mismo en `speakers` y en la agenda. */
+  readonly ref: string;
 }
 
 export interface PublicEventSession {
   readonly id: string;
   readonly session_type: string;
+  readonly type?: TipoDeSesionPublico;
   readonly title: string;
   readonly description: string | null;
   readonly starts_at: string;
@@ -52,6 +55,17 @@ export interface PublicSponsorTier {
   readonly sponsors: readonly PublicSponsor[];
 }
 
+/** Un sitio que el organizador señala cerca del evento. */
+export interface PublicNearbyPlace {
+  readonly kind: 'hotel' | 'restaurant' | 'bar' | 'parking' | 'transport' | 'pharmacy' | 'other';
+  readonly custom_kind: string | null;
+  readonly name: string;
+  readonly address: string | null;
+  readonly phone: string | null;
+  readonly website: string | null;
+  readonly notes: string | null;
+}
+
 /** Sede del evento, para la vista de programa multisede. */
 export interface PublicVenue {
   readonly id: string;
@@ -63,6 +77,9 @@ export interface PublicVenue {
 }
 
 export interface PublicEventDetail {
+  readonly nearby_places?: readonly PublicNearbyPlace[];
+  /** `hidden` = «solo con enlace»: se marca `noindex`. */
+  readonly visibility?: 'public' | 'hidden' | 'private';
   readonly organization: OrganizacionPublica;
   /** Categoría activa del catálogo; `null` si no tiene o está desactivada. */
   readonly category?: { readonly slug: string; readonly name: string } | null;
@@ -94,29 +111,58 @@ export interface PublicEventDetail {
   /** `true` solo si entre los tipos vigentes hay más de un precio distinto
    * — con un único precio se muestra el importe solo, sin «Desde». */
   readonly price_multiple: boolean;
+  /** Venta de entradas de un evento de pago: `open`, `upcoming` (abre en
+   * `ticket_sales_opens_at`) o `closed`; `null` si no es de pago. */
+  readonly ticket_sales?: 'open' | 'upcoming' | 'closed' | null;
+  readonly ticket_sales_opens_at?: string | null;
   /** Plazas realmente reservadas: con `capacity`, da la ocupación de la ficha. */
   readonly reserved_count: number;
   /** Geocodificación de `location_address`; `null` si no hay dirección o falló. */
   readonly latitude: number | null;
   readonly longitude: number | null;
   readonly sessions: readonly PublicEventSession[];
+  /** Ponentes enlazados al evento, tengan o no sesión. */
+  readonly speakers?: readonly PublicParticipant[];
   /** Con 2 o más, el evento tiene programa multisede. */
   readonly venues: readonly PublicVenue[];
   readonly sponsor_tiers: readonly PublicSponsorTier[];
 }
 
-/** Claves i18n para `session_type` (`SessionType`, catálogo cerrado real en
- * `apps/api/app/modules/events/schemas.py:18`): a diferencia de `role_key`, este
- * campo sí es un enum cerrado, así que se traduce por clave sin fallback humanizado. */
+/** El tipo de una sesión, del catálogo de su organización (`SessionTypeRef`). */
+export interface TipoDeSesionPublico {
+  readonly id: string;
+  readonly name: string;
+  readonly color: string;
+  readonly is_break: boolean;
+}
+
+/** Respaldo para una respuesta sin `type` (anterior a los tipos por
+ * organización): el texto heredado traducido por su clave base. */
 const CLAVES_TIPO_SESION: Record<string, string> = {
   talk: 'publico.eventos.sesion.tipo.talk',
+  workshop: 'publico.eventos.sesion.tipo.workshop',
   break: 'publico.eventos.sesion.tipo.break',
   service: 'publico.eventos.sesion.tipo.service',
   other: 'publico.eventos.sesion.tipo.other',
 };
 
-export function claveTipoSesion(sessionType: string): string {
-  return CLAVES_TIPO_SESION[sessionType] ?? CLAVES_TIPO_SESION['other'];
+/** Nombre del tipo de una sesión: el que le dio la organización. */
+export function nombreTipoSesion(
+  sesion: { readonly type?: TipoDeSesionPublico; readonly session_type: string },
+  traducir: (clave: string) => string,
+): string {
+  return (
+    sesion.type?.name ??
+    traducir(CLAVES_TIPO_SESION[sesion.session_type] ?? CLAVES_TIPO_SESION['other']!)
+  );
+}
+
+/** Pausa (descanso, comida…): la marca el tipo; sin él, el texto heredado. */
+export function esPausa(sesion: {
+  readonly type?: TipoDeSesionPublico;
+  readonly session_type: string;
+}): boolean {
+  return sesion.type?.is_break ?? ['break', 'service'].includes(sesion.session_type);
 }
 
 /** `role_key` (`PublicParticipant.role_key`) es una etiqueta libre por

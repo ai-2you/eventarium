@@ -11,6 +11,7 @@ from app.core.locale import Locale
 from app.core.permissions import Permission
 from app.core.security import password_meets_complexity
 from app.modules.organizations.schemas import SLUG_PATTERN, PublicOrganizationRef
+from app.modules.roles.schemas import ProfileFieldResponse
 
 # Lista blanca fija de `profile_data` que se sirve en el perfil público de un
 # ponente. Nunca se vuelca `profile_data` completo: un campo a medida que una
@@ -185,11 +186,15 @@ class PublicProfileResponse(BaseModel):
 
 
 class EligibleMembershipResponse(BaseModel):
-    """Membresía propia cuyo rol declara al menos un campo publicable."""
+    """Membresía propia cuyo rol declara al menos un campo publicable, con su
+    ficha: es desde donde la persona (p. ej. un ponente) la completa."""
 
     organization_member_id: str
     role_key: str
     role_name: str
+    profile_fields: list[ProfileFieldResponse] = []
+    profile_data: dict[str, Any] = {}
+    updated_at: datetime | None = None
 
 
 class PublicProfileStateResponse(BaseModel):

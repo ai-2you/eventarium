@@ -38,6 +38,19 @@ class Categoria(BaseModel):
     nombre: str
 
 
+class SitioCercano(BaseModel):
+    id: str
+    # hotel, restaurant, bar, parking, transport, pharmacy u other.
+    tipo: str
+    # Solo con `tipo` other: el tipo con nombre libre.
+    tipo_libre: str | None
+    nombre: str
+    direccion: str | None
+    telefono: str | None
+    web: str | None
+    nota: str | None
+
+
 class Sede(BaseModel):
     id: str
     nombre: str
@@ -46,9 +59,20 @@ class Sede(BaseModel):
     enlace_panel: str | None = None
 
 
+class TipoDeSesion(BaseModel):
+    """Un tipo de sesión de la organización (ver `listar_tipos_de_sesion`)."""
+
+    id: str
+    nombre: str
+    descripcion: str | None
+    es_pausa: bool
+    clave_base: str | None
+
+
 class Sesion(BaseModel):
     id: str
     titulo: str
+    # Nombre del tipo de la organización (p. ej. «Mesa redonda»).
     tipo: str
     inicio: datetime
     fin: datetime
@@ -78,7 +102,12 @@ class EventoDetalle(EventoResumen):
     resumen: str | None
     descripcion: str | None
     zona_horaria: str
-    enlace_publico: str
+    # Sin enlace si el evento es privado: no se abre por URL.
+    enlace_publico: str | None
+    # Recordatorio por correo a los inscritos: si se envía y cuántas horas antes.
+    recordatorio: bool
+    recordatorio_horas: int
+    sitios_cercanos: list[SitioCercano] = []
     motivo_cancelacion: str | None
     sedes: list[Sede]
     sesiones: list[Sesion]

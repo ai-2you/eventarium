@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError } from '../api/error.interceptor';
 import { ApiService } from '../api/api.service';
 import { LocaleDeCuenta } from '../i18n/locale-de-cuenta';
+import { ProfileField } from '../../shared/ui/dynamic-field.model';
 
 export interface UsuarioAutenticado {
   readonly id: string;
@@ -26,6 +27,12 @@ export interface UsuarioAutenticado {
    * `organization_id`: no viaja en `UserSummary` del login, solo en
    * `CurrentUserResponse`. */
   readonly notify_similar_events?: boolean;
+  /** Permisos en la organización activa. Mismo motivo de ausencia que
+   * `organization_id`: no viaja en el login, solo en `/users/me`. `undefined`
+   * significa «todavía no cargados», nunca «sin permisos» (eso es `[]`). */
+  readonly permissions?: readonly string[];
+  /** Claves de los roles en la organización activa (p. ej. `owner`). */
+  readonly roles?: readonly string[];
 }
 
 /**
@@ -83,6 +90,10 @@ export interface MembresiaPublicable {
   readonly organization_member_id: string;
   readonly role_key: string;
   readonly role_name: string;
+  /** Ficha de esa membresía: los campos que pide su rol y lo ya guardado. */
+  readonly profile_fields?: readonly ProfileField[];
+  readonly profile_data?: Record<string, unknown>;
+  readonly updated_at?: string | null;
 }
 
 export interface EstadoDePerfilPublico {
@@ -179,11 +190,71 @@ export class AuthService {
    * (p. ej. `account-page`) llaman a esto explícitamente en vez de asumir el signal.
    */
   async loadCurrentUser(): Promise<UsuarioAutenticado> {
-    const respuesta = await firstValueFrom(
-      this.http.get<UsuarioAutenticado>(this.api.url('/users/me')),
+    const token = this.tokenEfectivo();
+    const enVuelo = this.cargaDeUsuarioEnVuelo;
+    // Solo se comparte la petición lanzada con el mismo token: una de antes de
+    // cambiar de organización traería los permisos de la otra.
+    if (enVuelo !== null && enVuelo.token === token) {
+      return enVuelo.promesa;
+    }
+    const generacionAlEmpezar = this.generacionSesion;
+    const promesa = (async () => {
+      try {
+        const respuesta = await firstValueFrom(
+          this.http.get<UsuarioAutenticado>(this.api.url('/users/me')),
+        );
+        // La sesión pudo cerrarse mientras tanto: no se resucita su usuario.
+        if (this.generacionSesion === generacionAlEmpezar && this.tokenEfectivo() === token) {
+          this.usuario.set(respuesta);
+        }
+        return respuesta;
+      } finally {
+        if (this.cargaDeUsuarioEnVuelo?.token === token) {
+          this.cargaDeUsuarioEnVuelo = null;
+        }
+      }
+    })();
+    this.cargaDeUsuarioEnVuelo = { token, promesa };
+    return promesa;
+  }
+
+  /** `/users/me` en vuelo, compartido entre quienes lo piden a la vez con el
+   * mismo token (los guards de las rutas del panel y el propio panel). */
+  private cargaDeUsuarioEnVuelo: {
+    readonly token: string | null;
+    readonly promesa: Promise<UsuarioAutenticado>;
+  } | null = null;
+
+  /** Permisos en la organización activa; `null` mientras no se han cargado. */
+  readonly permisos = computed<readonly string[] | null>(() => this.usuario()?.permissions ?? null);
+
+  /** Roles en la organización activa; `null` mientras no se han cargado. */
+  readonly roles = computed<readonly string[] | null>(() => this.usuario()?.roles ?? null);
+
+  /**
+   * El usuario con sus permisos ya cargados. Tras el login, `currentUser()` es
+   * el resumen de la respuesta, sin permisos: decidir con él trataría a
+   * cualquiera como si no pudiera nada. Si faltan, se piden (una vez).
+   */
+  async asegurarUsuarioCompleto(): Promise<UsuarioAutenticado> {
+    const actual = this.usuario();
+    if (actual?.permissions !== undefined) {
+      return actual;
+    }
+    return this.loadCurrentUser();
+  }
+
+  /** Vuelve a pedir el usuario cuando cambia la organización activa: los
+   * permisos son otros. */
+  private async recargarUsuario(): Promise<void> {
+    this.usuario.update((actual) =>
+      actual ? { ...actual, permissions: undefined, roles: undefined } : actual,
     );
-    this.usuario.set(respuesta);
-    return respuesta;
+    try {
+      await this.loadCurrentUser();
+    } catch {
+      // Sin permisos cargados, el guard volverá a pedirlos al navegar.
+    }
   }
 
   async login(email: string, password: string): Promise<void> {
@@ -490,6 +561,7 @@ export class AuthService {
       return;
     }
     this.token.set(respuesta.access_token);
+    await this.recargarUsuario();
   }
 
   async logout(): Promise<void> {
@@ -553,6 +625,7 @@ export class AuthService {
 
   /** @param deliberado si el cierre viene de `logout()` (a propósito) o de una sesión que muere sola. */
   clear(deliberado = false): void {
+    this.cargaDeUsuarioEnVuelo = null;
     this.generacionSesion++;
     this.ultimoCierreDeliberado.set(deliberado);
     this.token.set(null);

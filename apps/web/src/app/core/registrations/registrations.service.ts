@@ -70,6 +70,21 @@ export interface MyRegistrationItem {
   readonly status: string;
   /** La organización canceló el evento (no la persona). */
   readonly event_cancelled?: boolean;
+  readonly ends_at: string;
+  readonly timezone: string;
+  /** Solo con la plaza confirmada y el evento en pie: lo necesario para
+   * «añadir al calendario». */
+  readonly calendar: EventoParaCalendario | null;
+}
+
+/** `refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si no, nulo sin pago. */
+export interface VistaPreviaCancelacion {
+  readonly status: string;
+  readonly event_title: string;
+  readonly starts_at: string;
+  readonly timezone: string;
+  readonly already_started: boolean;
+  readonly refund?: 'en_curso' | 'sin_reembolso' | null;
 }
 
 /**
@@ -122,6 +137,15 @@ export class RegistrationsService {
         this.api.url('/public/registrations/confirm-waitlist-promotion'),
         { token },
       ),
+    );
+  }
+
+  /** Qué se cancelaría con el enlace, sin gastarlo (la página pide confirmación). */
+  async previewCancel(token: string): Promise<VistaPreviaCancelacion> {
+    return firstValueFrom(
+      this.http.post<VistaPreviaCancelacion>(this.api.url('/public/registrations/cancel/preview'), {
+        token,
+      }),
     );
   }
 
@@ -178,6 +202,18 @@ export class RegistrationsService {
       this.http.post<{ registrations: readonly MyRegistrationItem[] }>(
         this.api.url('/public/mis-eventos/ver'),
         { token },
+      ),
+    );
+    return respuesta.registrations;
+  }
+
+  /** «Mis eventos» con la sesión iniciada: sin enlace, del correo de la cuenta.
+   * La API responde 403 si ese correo no está verificado o durante una
+   * suplantación. */
+  async getMyAccountRegistrations(): Promise<readonly MyRegistrationItem[]> {
+    const respuesta = await firstValueFrom(
+      this.http.get<{ registrations: readonly MyRegistrationItem[] }>(
+        this.api.url('/public/mis-eventos/mios'),
       ),
     );
     return respuesta.registrations;

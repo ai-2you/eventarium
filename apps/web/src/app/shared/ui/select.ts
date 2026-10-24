@@ -612,8 +612,27 @@ export class Select {
     if (!boton) return;
     const ALTURA_MAXIMA_LISTA = 264;
     const rect = boton.getBoundingClientRect();
-    const espacioAbajo = window.innerHeight - rect.bottom;
-    this.haciaArriba.set(espacioAbajo < ALTURA_MAXIMA_LISTA);
+    const { arriba, abajo } = this.limitesVisibles(boton);
+    const espacioAbajo = abajo - rect.bottom;
+    const espacioArriba = rect.top - arriba;
+    this.haciaArriba.set(espacioAbajo < ALTURA_MAXIMA_LISTA && espacioArriba > espacioAbajo);
+  }
+
+  /** Franja vertical en la que la lista se ve entera: la ventana recortada por
+   * cada antepasado que corta o desplaza su contenido (el cuerpo de un
+   * `app-dialog`, p. ej.). Mirar solo la ventana abría la lista hacia abajo
+   * dentro de un modal y quedaba cortada por el borde del cuerpo. */
+  private limitesVisibles(elemento: HTMLElement): { arriba: number; abajo: number } {
+    let arriba = 0;
+    let abajo = window.innerHeight;
+    for (let actual = elemento.parentElement; actual; actual = actual.parentElement) {
+      if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(actual).overflowY)) {
+        const caja = actual.getBoundingClientRect();
+        arriba = Math.max(arriba, caja.top);
+        abajo = Math.min(abajo, caja.bottom);
+      }
+    }
+    return { arriba, abajo };
   }
 
   private indiceInicial(): number {

@@ -6,7 +6,9 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile, status
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.base import NO_VALUE
 
 from app.core.deps import CurrentUserDep, DbDep, PermissionsDep, require_permission
 from app.core.permissions import Permission
@@ -22,7 +24,7 @@ from app.modules.organizations import (
 from app.modules.organizations import service as organizations_service
 from app.modules.organizations.invitations_models import OrganizationInvitation
 from app.modules.organizations.metrics_schemas import MetricasDeOrganizacionOut
-from app.modules.organizations.models import OrganizationBranding, OrganizationMember
+from app.modules.organizations.models import Organization, OrganizationBranding, OrganizationMember
 from app.modules.organizations.schemas import (
     BrandingAdminResponse,
     BrandingUpdate,
@@ -30,12 +32,15 @@ from app.modules.organizations.schemas import (
     InvitationCreateResponse,
     InvitationResponse,
     MemberCreate,
+    MemberProfileUpdate,
     MemberResponse,
     MemberRoleOut,
     OrganizationResponse,
     OrganizationUpdate,
+    PublicSocialLink,
 )
 from app.modules.roles.models import Role
+from app.modules.roles.schemas import ProfileFieldResponse
 from app.modules.theme_templates import repository as theme_templates_repository
 from app.modules.theme_templates.schemas import ThemeTemplateCatalogItem
 from app.modules.users.models import User
@@ -93,6 +98,24 @@ async def get_me(usuario: CurrentUserDep, session: DbDep) -> OrganizationRespons
     organizacion = await repository.get_organization(session, usuario.organization_id)
     if organizacion is None:
         raise NotFoundError("La organización no existe.")
+    return organization_response(organizacion)
+
+
+def _redes_cargadas(organizacion: Organization) -> list[PublicSocialLink]:
+    """Las redes de la marca si ya están cargadas; sin consulta perezosa (en
+    async no se puede), que en una organización recién creada no las hay."""
+    branding = sa_inspect(organizacion).attrs.branding.loaded_value
+    if branding is NO_VALUE or branding is None:
+        return []
+    return [
+        PublicSocialLink(kind=str(e["kind"]), url=str(e["url"]), label=e.get("label"))
+        for e in branding.social_links or []
+        if e.get("kind") and e.get("url")
+    ]
+
+
+def organization_response(organizacion: Organization) -> OrganizationResponse:
+    """La organización tal y como la ve su panel (y el de la plataforma)."""
     return OrganizationResponse(
         id=str(organizacion.id),
         slug=organizacion.slug,
@@ -102,6 +125,12 @@ async def get_me(usuario: CurrentUserDep, session: DbDep) -> OrganizationRespons
         website=organizacion.website,
         contact_email=organizacion.contact_email,
         address=organizacion.address,
+        postal_code=organizacion.postal_code,
+        city=organizacion.city,
+        province=organizacion.province,
+        # `is not False`: recién creada, antes del flush, aún no tiene el valor por defecto.
+        address_public=organizacion.address_public is not False,
+        social_links=_redes_cargadas(organizacion),
         public_page_enabled=organizacion.public_page_enabled,
         is_active=organizacion.is_active,
     )
@@ -119,10 +148,19 @@ async def update_me(
     organizacion = await repository.get_organization(session, usuario.organization_id)
     if organizacion is None:
         raise NotFoundError("La organización no existe.")
-    for campo, valor in datos.model_dump(exclude_unset=True).items():
+    cambios = datos.model_dump(exclude_unset=True)
+    redes = cambios.pop("social_links", None)
+    for campo, valor in cambios.items():
         setattr(organizacion, campo, valor)
+    if redes is not None:
+        branding = await repository.get_branding(session, usuario.organization_id)
+        if branding is None:
+            branding = OrganizationBranding(organization_id=usuario.organization_id)
+            session.add(branding)
+        branding.social_links = redes
     await session.flush()
-    return await get_me(usuario, session)
+    await session.refresh(organizacion, ["branding"])
+    return organization_response(organizacion)
 
 
 @router.get(
@@ -165,7 +203,8 @@ async def update_branding(
         session.add(branding)
 
     branding.theme_template_id = theme_template_id
-    branding.social_links = [enlace.model_dump() for enlace in datos.social_links]
+    if datos.social_links is not None:
+        branding.social_links = [enlace.model_dump() for enlace in datos.social_links]
     branding.organizer_blurb = datos.organizer_blurb
     await session.flush()
     return await _branding_response(session, branding)
@@ -265,6 +304,18 @@ async def upload_logo(
     return await _branding_response(session, branding)
 
 
+def _member_role_out(miembro: OrganizationMember, rol: Role) -> MemberRoleOut:
+    return MemberRoleOut(
+        id=str(miembro.id),
+        role_id=str(rol.id),
+        role_key=rol.key,
+        role_name=rol.name,
+        profile_fields=[ProfileFieldResponse.desde_modelo(campo) for campo in rol.profile_fields],
+        profile_data=dict(miembro.profile_data or {}),
+        updated_at=miembro.updated_at,
+    )
+
+
 def _member_response_from_rows(
     persona: User, filas: list[tuple[OrganizationMember, Role]]
 ) -> MemberResponse:
@@ -273,12 +324,7 @@ def _member_response_from_rows(
         email=persona.email,
         first_name=persona.first_name,
         last_name=persona.last_name,
-        roles=[
-            MemberRoleOut(
-                id=str(miembro.id), role_id=str(rol.id), role_key=rol.key, role_name=rol.name
-            )
-            for miembro, rol in filas
-        ],
+        roles=[_member_role_out(miembro, rol) for miembro, rol in filas],
         profile_data=repository.best_profile_data(filas),
     )
 
@@ -350,6 +396,39 @@ async def create_member(
         profile_data=datos.profile_data,
     )
     return await _member_response_for_user(session, usuario.organization_id, miembro.user_id)
+
+
+@router.patch(
+    "/me/members/{organization_member_id}/profile",
+    summary="Editar la ficha de un rol de una persona",
+    description=(
+        "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un "
+        "ponente). Puede hacerlo su titular o quien tenga `members:write` y "
+        "pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por "
+        "otra persona entre medias da 409 en vez de pisarse."
+    ),
+    response_model=MemberRoleOut,
+)
+async def update_member_profile(
+    organization_member_id: uuid.UUID,
+    datos: MemberProfileUpdate,
+    usuario: CurrentUserDep,
+    session: DbDep,
+    permisos: PermissionsDep,
+) -> MemberRoleOut:
+    miembro = await members_service.update_member_profile(
+        session,
+        organization_id=usuario.organization_id,
+        actor_id=usuario.id,
+        actor_permissions=permisos,
+        organization_member_id=organization_member_id,
+        profile_data=datos.profile_data,
+        expected_updated_at=datos.expected_updated_at,
+    )
+    rol = await session.get(Role, miembro.role_id)
+    if rol is None:  # pragma: no cover - garantizado por la FK
+        raise NotFoundError("El rol de esa membresía no existe.")
+    return _member_role_out(miembro, rol)
 
 
 @router.delete(

@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import SessionApp, set_organization_context
 from app.core.permissions import Permission
+from app.core.tras_commit import despachar_tras_commit
 from app.modules.mcp.scopes import Ambito
 from app.shared.errors import DomainError
 
@@ -93,6 +94,9 @@ async def sesion(contexto: ContextoMcp) -> AsyncIterator[AsyncSession]:
             async with session.begin():
                 await set_organization_context(session, contexto.organization_id, contexto.user_id)
                 yield session
+            # Como `get_session`: los correos apuntados con `encolar_tras_commit`
+            # (p. ej. la plaza que se ofrece al subir el aforo) salen ya guardados.
+            await despachar_tras_commit(session)
     except DomainError as exc:
         # Las mismas reglas de negocio que la web (slug repetido, sesión fuera
         # del evento…), con su mensaje, en vez de un error genérico.

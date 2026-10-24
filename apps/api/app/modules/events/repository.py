@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.events.models import (
@@ -140,23 +140,6 @@ def public_events_with_confirmed_count_query(
         .order_by(Event.starts_at, Event.id)
     )
     return filtrar_por_categoria_y_etiquetas(consulta, category_slug, tags)
-
-
-async def get_public_event_by_slug(
-    session: AsyncSession, organization_id: uuid.UUID, slug: str
-) -> Event | None:
-    """`None` tanto si el slug no existe como si el evento no es público — mismo
-    404 uniforme en el router, para no filtrar por qué no está disponible."""
-    resultado: Event | None = await session.scalar(
-        select(Event).where(
-            Event.organization_id == organization_id,
-            Event.slug == slug,
-            Event.status == "published",
-            Event.visibility == "public",
-            Event.deleted_at.is_(None),
-        )
-    )
-    return resultado
 
 
 async def get_event(
@@ -326,3 +309,24 @@ async def event_member_ids(
         )
     )
     return set(filas)
+
+
+async def sugerir_etiquetas(
+    session: AsyncSession, organization_id: uuid.UUID, texto: str, *, limite: int = 10
+) -> list[str]:
+    """Etiquetas ya usadas en los eventos de la organización que contienen
+    `texto` (las que empiezan por él, primero), ordenadas por número de
+    eventos que las llevan. Sin `texto`, las más usadas."""
+    etiquetas = (
+        select(func.unnest(Event.tags).label("etiqueta"))
+        .where(Event.organization_id == organization_id, Event.deleted_at.is_(None))
+        .subquery()
+    )
+    etiqueta = etiquetas.c.etiqueta
+    consulta = select(etiqueta).group_by(etiqueta)
+    if texto:
+        consulta = consulta.where(etiqueta.contains(texto, autoescape=True)).order_by(
+            case((etiqueta.startswith(texto, autoescape=True), 0), else_=1)
+        )
+    consulta = consulta.order_by(func.count().desc(), etiqueta).limit(limite)
+    return list((await session.scalars(consulta)).all())

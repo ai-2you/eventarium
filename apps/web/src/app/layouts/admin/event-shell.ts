@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import { enlacesDeEvento } from './admin-nav';
+import { AuthService } from '../../core/auth/auth.service';
+import { enlacesDeEvento, enlacesPermitidos } from './admin-nav';
 import { EventScope } from './event-scope';
 
 /**
@@ -162,8 +163,15 @@ export class EventShell {
 
   protected readonly eventScope = inject(EventScope);
 
+  private readonly auth = inject(AuthService);
+  /** Las pestañas que la persona puede usar (`REQUISITOS_DEL_PANEL`); ninguna
+   * mientras se cargan sus permisos. */
   protected readonly enlaces = computed(() =>
-    enlacesDeEvento(this.eventId(), this.eventScope.registrationMode() === 'paid'),
+    enlacesPermitidos(
+      enlacesDeEvento(this.eventId(), this.eventScope.registrationMode() === 'paid'),
+      this.auth.permisos() ?? [],
+      this.auth.roles() ?? [],
+    ),
   );
 
   /**

@@ -83,3 +83,12 @@ class MyTicketResponse(BaseModel):
     # Solo con la plaza `confirmed`: cubre a quien llega desde el correo de
     # aprobación (que enlaza aquí) sin obligarle a haber pasado por otra pantalla.
     event: EventCalendarInfo | None = None
+
+
+class AttendanceOut(BaseModel):
+    """Estado del cierre de asistencia de un evento, con lo que necesita la
+    pantalla de check-in para ofrecerlo (sin pedir el evento con otro permiso)."""
+
+    attendance_closed_at: datetime | None
+    ends_at: datetime
+    can_close: bool

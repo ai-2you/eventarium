@@ -6,10 +6,19 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.events.categories import normalizar_etiquetas
+from app.modules.nearby.schemas import PublicNearbyPlace
 from app.modules.organizations.schemas import SLUG_PATTERN, PublicOrganizationRef
 from app.modules.sponsors.schemas import PublicSponsorTier
 from app.modules.theme_templates.schemas import PublicTheme, validar_theme_overrides
@@ -22,7 +31,17 @@ EventStatusInput = Literal["draft", "published", "archived"]
 EventVisibility = Literal["public", "hidden", "private"]
 LocationMode = Literal["in_person", "online", "hybrid"]
 RegistrationMode = Literal["free", "approval", "paid"]
-SessionType = Literal["talk", "break", "service", "other"]
+TicketSalesState = Literal["open", "upcoming", "closed"]
+# Horas antes del inicio a las que sale el recordatorio a los inscritos. Mismo
+# conjunto que el `CHECK` de base de datos, el MCP y el desplegable del panel.
+ReminderHours = Literal[2, 6, 12, 24, 48, 72]
+
+# Markdown del editor del panel (o de la API/MCP). El tope protege la ficha
+# pública, que lo convierte y sanea en el navegador de cada visitante, y el
+# propio editor, que lo carga entero.
+LONGITUD_MAXIMA_DESCRIPCION = 20000
+DescripcionDeEvento = Annotated[str, Field(max_length=LONGITUD_MAXIMA_DESCRIPCION)]
+SessionType = Literal["talk", "workshop", "break", "service", "other"]
 VideoPlatform = Literal["youtube", "vimeo", "twitch", "other"]
 
 # Dominios admitidos por plataforma declarada. Para «other» basta con `https`: no
@@ -103,16 +122,28 @@ def _etiquetas_normalizadas(valor: list[str]) -> list[str]:
     return normalizar_etiquetas(valor)
 
 
+def _zona_horaria_valida(valor: str | None) -> str | None:
+    """Una zona IANA que `zoneinfo` conozca: con otra, las horas de los correos
+    del evento no se podrían calcular."""
+    if valor is None:
+        return None
+    try:
+        ZoneInfo(valor)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError("La zona horaria no es válida: usa una del tipo «Europe/Madrid».") from exc
+    return valor
+
+
 class EventCreate(BaseModel):
     """Alta de un evento."""
 
     slug: Annotated[str, Field(min_length=2, max_length=160, pattern=SLUG_PATTERN)]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # Id de una categoría **activa** del catálogo, o `None` (sin categoría).
     category_id: str | None = None
-    # Minúsculas, máx. 5, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
+    # Minúsculas, máx. 10, 2–30 caracteres; ver `categories.normalizar_etiquetas`.
     tags: list[str] = Field(default_factory=list)
     status: EventStatusInput = "draft"
     visibility: EventVisibility = "public"
@@ -135,6 +166,14 @@ class EventCreate(BaseModel):
     # pagar antes de que su plaza reservada caduque. Rango igual al `CHECK` de
     # base de datos, para rechazar el valor en el schema y no solo allí.
     payment_checkout_window_minutes: Annotated[int, Field(ge=30, le=1439)] = 30
+    reminder_enabled: bool = True
+    # Sin valor, el servicio pone 24 h (48 h en eventos de pago).
+    reminder_hours_before: ReminderHours | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _validar_zona(cls, valor: str | None) -> str | None:
+        return _zona_horaria_valida(valor)
 
     @model_validator(mode="after")
     def _validar_fechas(self) -> EventCreate:
@@ -150,9 +189,14 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     """Campos editables de un evento. `status` incluido: así se publica o archiva."""
 
+    # Al cambiar las fechas: mover también las sesiones de la agenda el mismo
+    # intervalo que el inicio. Sin él, si alguna quedara fuera, la API responde
+    # 409 (`sesiones_fuera_de_rango`) para que el panel pregunte.
+    mover_sesiones: bool = False
+
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     summary: str | None = None
-    description: str | None = None
+    description: DescripcionDeEvento | None = None
     # `null` explícito **quita** la categoría; si el campo no viene, no cambia.
     category_id: str | None = None
     # Si no viene, no cambia; `[]` quita todas. `null` no es válido.
@@ -172,6 +216,14 @@ class EventUpdate(BaseModel):
     registration_opens_at: datetime | None = None
     email_verification_required: bool | None = None
     payment_checkout_window_minutes: Annotated[int, Field(ge=30, le=1439)] | None = None
+    reminder_enabled: bool | None = None
+    reminder_hours_before: ReminderHours | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _validar_zona(cls, valor: str | None) -> str | None:
+        return _zona_horaria_valida(valor)
+
     # Único campo de contabilidad editable desde este esquema (plan.md
     # Decisión #6): `budget_approved_at`/`contingency_fund_cents` nunca
     # viajan por aquí, solo por el servicio de `accounting`. El servicio de
@@ -215,11 +267,9 @@ class EventUpdate(BaseModel):
         # rompería la constraint `NOT NULL` — y ese `IntegrityError` lo
         # capturaba la rama de conflicto de `slug`, devolviendo un 409 con el
         # mensaje falso "ya existe un evento con el identificador «None»".
-        if (
-            "contingency_fund_percent" in self.model_fields_set
-            and self.contingency_fund_percent is None
-        ):
-            raise ValueError("`contingency_fund_percent` no admite `null`.")
+        for campo in ("contingency_fund_percent", "reminder_enabled", "reminder_hours_before"):
+            if campo in self.model_fields_set and getattr(self, campo) is None:
+                raise ValueError(f"`{campo}` no admite `null`.")
         return self
 
 
@@ -253,6 +303,9 @@ class EventResponse(BaseModel):
     registration_opens_at: datetime | None
     email_verification_required: bool
     payment_checkout_window_minutes: int
+    reminder_enabled: bool
+    reminder_hours_before: int
+    attendance_closed_at: datetime | None = None
     # Resultado de geocodificar `location_address` (Nominatim); nunca los rellena
     # el organizador directamente, ver `EventCreate`/`EventUpdate`.
     latitude: float | None
@@ -269,6 +322,18 @@ class EventResponse(BaseModel):
     theme_template_id: str | None
     # `None` significa sin personalización propia (usa la plantilla resuelta tal cual).
     theme_overrides: dict[str, Any] | None
+
+
+class EventListItem(EventResponse):
+    """Evento en el listado del panel: lo de `EventResponse` más su precio, que
+    el organizador quiere ver en la tabla sin abrir cada evento."""
+
+    # Entrada más barata entre los tipos activos, estén o no a la venta ahora
+    # (al organizador le importa el precio aunque la venta no haya abierto).
+    # `None` en un evento que no es de pago o que aún no tiene entradas.
+    price_from_cents: int | None = None
+    price_currency: str | None = None
+    price_multiple: bool = False
 
 
 class EventVenueCreate(BaseModel):
@@ -302,10 +367,73 @@ class EventVenueResponse(BaseModel):
     geocoded_at: datetime | None
 
 
-class EventSessionCreate(BaseModel):
-    """Alta de una sesión de agenda."""
+ColorDeTipo = Literal["azul", "violeta", "verde", "ambar", "rosa", "cian", "rojo", "gris"]
 
-    session_type: SessionType
+
+class SessionTypeRef(BaseModel):
+    """El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."""
+
+    id: str
+    name: str
+    color: str
+    is_break: bool
+
+
+class SessionTypeOut(SessionTypeRef):
+    """Un tipo de sesión del catálogo de la organización."""
+
+    description: str | None
+    base_key: str | None
+    display_order: int
+    is_active: bool
+    # Sesiones que lo usan: con alguna no se puede borrar, solo desactivar.
+    sesiones: int
+
+
+def _nombre_con_texto(valor: str) -> str:
+    """Sin espacios en los extremos ni dobles; solo espacios no es un nombre."""
+    limpio = " ".join(valor.split())
+    if not limpio:
+        raise ValueError("El tipo de sesión necesita un nombre.")
+    return limpio
+
+
+NombreDeTipo = Annotated[str, Field(min_length=1, max_length=60), AfterValidator(_nombre_con_texto)]
+DescripcionDeTipo = Annotated[str, Field(max_length=200)]
+
+
+class SessionTypeCreate(BaseModel):
+    name: NombreDeTipo
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo = "azul"
+    is_break: bool = False
+
+
+class SessionTypeUpdate(BaseModel):
+    name: NombreDeTipo | None = None
+    description: DescripcionDeTipo | None = None
+    color: ColorDeTipo | None = None
+    is_break: bool | None = None
+    is_active: bool | None = None
+
+
+class SessionTypeOrder(BaseModel):
+    """Todos los tipos de la organización, en el orden nuevo."""
+
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class EventSessionCreate(BaseModel):
+    """Alta de una sesión de agenda.
+
+    El tipo va por `session_type_id` (el catálogo de la organización). El texto
+    `session_type` se sigue aceptando durante la transición: se traduce al tipo
+    con esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo
+    que no es una pausa.
+    """
+
+    session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)]
     description: str | None = None
     starts_at: datetime
@@ -329,6 +457,7 @@ class EventSessionUpdate(BaseModel):
     """Campos editables de una sesión."""
 
     session_type: SessionType | None = None
+    session_type_id: str | None = None
     title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     description: str | None = None
     starts_at: datetime | None = None
@@ -351,7 +480,10 @@ class EventSessionResponse(BaseModel):
     """Sesión de agenda tal y como la ve el panel de administración."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base del tipo, u `other` en los propios), mientras
+    # haya clientes que lo lean. El tipo de verdad es `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime
@@ -419,6 +551,18 @@ class SessionParticipantsUpdate(BaseModel):
     participants: list[SessionParticipantEntry]
 
 
+class SessionParticipationOut(BaseModel):
+    """Una persona del roster en una sesión, con su horario: lo justo para que
+    el panel avise de solapes sin pedir los participantes sesión a sesión."""
+
+    event_member_id: str
+    session_id: str
+    session_title: str
+    starts_at: datetime
+    ends_at: datetime
+    role_key: str
+
+
 class SessionParticipantResponse(BaseModel):
     """Participación de una persona en una sesión, con su rol libre."""
 
@@ -444,6 +588,9 @@ class PublicParticipant(BaseModel):
     display_name: str
     role_key: str
     public_slug: str | None
+    # Identificador opaco y estable de la persona en esta organización (nunca su
+    # UUID): deja a la página juntar ponentes de la agenda y del roster sin duplicar.
+    ref: str
 
 
 class PublicEventSummary(BaseModel):
@@ -488,13 +635,21 @@ class PublicEventSummary(BaseModel):
     # (el front antepone «Desde»); con un único precio —un solo tipo o varios
     # al mismo importe— este campo va en `False` y se muestra el importe solo.
     price_multiple: bool
+    # Venta de entradas de un evento de pago (`payments.VentaPublica`): `open`
+    # (se puede comprar), `upcoming` (abre en `ticket_sales_opens_at`) o
+    # `closed` (terminada o sin tipos activos). `None` si el evento no es de
+    # pago. Con él la web no confunde nunca un evento de pago con uno gratuito.
+    ticket_sales: TicketSalesState | None = None
+    ticket_sales_opens_at: datetime | None = None
 
 
 class PublicEventSession(BaseModel):
     """Sesión de la agenda tal y como se muestra en la página pública del evento."""
 
     id: str
-    session_type: SessionType
+    # Texto heredado (clave base); el nombre, color y pausa vienen en `type`.
+    session_type: str
+    type: SessionTypeRef
     title: str
     description: str | None
     starts_at: datetime
@@ -515,6 +670,8 @@ class PublicSessionDetail(PublicEventSession):
 
     event_slug: str
     event_title: str
+    # `hidden` = «solo con enlace»: la web lo marca `noindex` en todas sus páginas.
+    visibility: EventVisibility = "public"
     organization: PublicOrganizationRef
     # Plantilla del evento padre, ya resuelta: la página la aplica igual que la
     # ficha del evento para no cambiar de aspecto al navegar dentro de él.
@@ -546,6 +703,8 @@ class PublicEventDetail(BaseModel):
     tags: list[str] = Field(default_factory=list)
     cancelled: bool = False
     cancellation_reason: str | None = None
+    # `hidden` = «solo con enlace»: la web lo marca `noindex` en todas sus páginas.
+    visibility: EventVisibility = "public"
     title: str
     summary: str | None
     description: str | None
@@ -568,6 +727,9 @@ class PublicEventDetail(BaseModel):
     price_from_cents: int | None
     price_currency: str | None
     price_multiple: bool
+    # Mismo criterio que `PublicEventSummary.ticket_sales`.
+    ticket_sales: TicketSalesState | None = None
+    ticket_sales_opens_at: datetime | None = None
     # Geocodificación de `location_address`, para el mapa del evento de una
     # sola sede. `None` si no hay dirección, el evento es `online` o falló.
     latitude: float | None
@@ -576,10 +738,14 @@ class PublicEventDetail(BaseModel):
     # el catálogo estuviera vacío, que no es un estado posible hoy.
     theme: PublicTheme | None = None
     sessions: list[PublicEventSession]
+    # Ponentes enlazados al evento, tengan o no sesión en la agenda.
+    speakers: list[PublicParticipant] = Field(default_factory=list)
     # Ordenadas por `display_order`. El frontend decide, a partir de su
     # longitud, si activa la vista de "programa por sede" (2 sedes o más) —
     # decisión de tanda 3, aquí solo se exponen los datos.
     venues: list[PublicVenue] = Field(default_factory=list)
+    # Alojamiento, restaurantes, parking… que el organizador señala cerca del evento.
+    nearby_places: list[PublicNearbyPlace] = Field(default_factory=list)
     sponsor_tiers: list[PublicSponsorTier] = Field(default_factory=list)
 
 
@@ -611,6 +777,8 @@ class SpeakerRowOut(BaseModel):
     """Fila de la vista agregada de ponentes de un evento."""
 
     organization_member_id: str
+    # Su entrada en el roster de este evento: la que se asigna a una sesión.
+    event_member_id: str
     user_id: str
     email: str
     first_name: str | None
@@ -618,6 +786,9 @@ class SpeakerRowOut(BaseModel):
     # Titular profesional de su ficha (`profile_data.titular`), para pintar
     # bajo el nombre; `None` si no lo rellenó.
     titular: str | None
+    # Biografía de su ficha, para que el equipo la lea sin salir del panel
+    # (quien ve esta vista ya puede leer los perfiles de los miembros).
+    bio: str | None = None
     sesiones: list[SpeakerSessionOut]
     completitud: SpeakerCompletitudOut
     # Eventos de esta organización donde la persona está en el roster,

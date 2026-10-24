@@ -121,6 +121,7 @@ async def test_vista_agregada_con_ficha_sesion_y_ediciones(
     fila = vista["items"][0]
     assert fila["email"] == ponente.email
     assert fila["titular"] == "Titular profesional"
+    assert fila["bio"] == "Bio del ponente"
     assert [sesion["titulo"] for sesion in fila["sesiones"]] == [sesiones[0]["title"]]
     assert fila["completitud"]["rellenas"] == 2
     assert fila["completitud"]["total"] == len(CLAVES_FICHA)

@@ -30,19 +30,7 @@ def _to_response(rol: Role) -> RoleResponse:
         is_system=rol.is_system,
         system_template_key=rol.system_template_key,
         permissions=[Permission(p.permission) for p in rol.permissions],
-        profile_fields=[
-            ProfileFieldResponse(
-                id=str(campo.id),
-                key=campo.key,
-                label=campo.label,
-                field_type=campo.field_type,
-                options=campo.options,
-                is_required=campo.is_required,
-                is_locked=campo.is_locked,
-                sort_order=campo.sort_order,
-            )
-            for campo in rol.profile_fields
-        ],
+        profile_fields=[ProfileFieldResponse.desde_modelo(campo) for campo in rol.profile_fields],
     )
 
 

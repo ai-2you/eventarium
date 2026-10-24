@@ -26,6 +26,7 @@ from app.modules.organizations.models import OrganizationMember
 from app.modules.organizations.repository import user_role_keys
 from app.modules.organizations.schemas import SLUG_PATTERN
 from app.modules.roles.models import Role
+from app.modules.roles.schemas import ProfileFieldResponse
 from app.modules.users.models import UserSocialLink
 from app.modules.users.schemas import (
     PUBLIC_PROFILE_FIELDS,
@@ -294,7 +295,14 @@ async def _membresias_publicables(
         if claves & set(PUBLIC_PROFILE_FIELDS):
             elegibles.append(
                 EligibleMembershipResponse(
-                    organization_member_id=str(miembro.id), role_key=rol.key, role_name=rol.name
+                    organization_member_id=str(miembro.id),
+                    role_key=rol.key,
+                    role_name=rol.name,
+                    profile_fields=[
+                        ProfileFieldResponse.desde_modelo(campo) for campo in rol.profile_fields
+                    ],
+                    profile_data=dict(miembro.profile_data or {}),
+                    updated_at=miembro.updated_at,
                 )
             )
     return elegibles

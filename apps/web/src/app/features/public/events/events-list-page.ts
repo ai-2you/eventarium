@@ -339,8 +339,17 @@ function normalizarCiudad(ciudad: string): string {
                       }
                       @if (evento.tags && evento.tags.length > 0) {
                         <span class="ev-etiquetas">
-                          @for (etiqueta of evento.tags; track etiqueta) {
+                          <!-- La tarjeta enseña las primeras; la ficha, todas. -->
+                          @for (
+                            etiqueta of evento.tags.slice(0, etiquetasEnTarjeta);
+                            track etiqueta
+                          ) {
                             <span class="ev-etiqueta">#{{ etiqueta }}</span>
+                          }
+                          @if (evento.tags.length > etiquetasEnTarjeta) {
+                            <span class="ev-etiqueta">
+                              +{{ evento.tags.length - etiquetasEnTarjeta }}
+                            </span>
                           }
                         </span>
                       }
@@ -646,6 +655,8 @@ export class EventsListPage implements OnInit {
   );
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
+  /** Etiquetas que caben en la fila de una tarjeta sin que se alargue. */
+  protected readonly etiquetasEnTarjeta = 5;
 
   protected readonly busqueda = signal('');
   protected readonly filtroModo = signal<FiltroModo>('todos');

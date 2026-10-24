@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.core.locale import DEFAULT_LOCALE, Locale
 from app.core.security import password_meets_complexity
+from app.modules.roles.schemas import ProfileFieldResponse
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
@@ -36,8 +37,9 @@ _RUTAS_DE_LA_APLICACION = frozenset(
         "identidad", "inscripciones", "invitacion", "legal", "legales", "mcp", "members",
         "mi-entrada", "mis-eventos", "oauth", "organization", "pago", "patrocinadores",
         "payments", "plantillas", "politicas", "ponentes", "recuperar-contrasena",
-        "registrations", "registro", "roles", "servicios", "sponsor-tiers", "stripe",
-        "suplantar", "usuarios", "verificar-correo", "verificar-inscripcion",
+        "registrations", "registro", "roles", "servicios", "session-types", "sponsor-tiers",
+        "stripe",
+        "suplantar", "usuarios", "verificar-correo", "verificar-inscripcion", "vista-previa",
     }
 )  # fmt: skip
 _RUTAS_DEL_PROXY = frozenset({"healthz", ".well-known", "media"})
@@ -98,7 +100,14 @@ class OrganizationResponse(BaseModel):
     website: str | None = None
     # str, no EmailStr: misma razón que MemberResponse.email.
     contact_email: str | None = None
+    # Calle y número; el resto de la dirección va aparte.
     address: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    province: str | None = None
+    # Si la dirección se muestra en la página pública de la organización.
+    address_public: bool = True
+    social_links: list[PublicSocialLink] = Field(default_factory=list)
     # Sin valor por defecto: un constructor que se olvide de pasarlo falla en
     # tipos en vez de devolver un `false` falso.
     public_page_enabled: bool
@@ -114,29 +123,61 @@ class OrganizationUpdate(BaseModel):
     website: Annotated[str, Field(max_length=300, pattern=r"^https?://\S+$")] | None = None
     contact_email: EmailStr | None = None
     address: Annotated[str, Field(max_length=300)] | None = None
+    # Texto libre: la plataforma no es solo de España.
+    postal_code: Annotated[str, Field(max_length=20)] | None = None
+    city: Annotated[str, Field(max_length=120)] | None = None
+    province: Annotated[str, Field(max_length=120)] | None = None
+    address_public: bool | None = None
+    social_links: list[SocialLinkInput] | None = None
     public_page_enabled: bool | None = None
 
-    @field_validator("address")
+    @field_validator("social_links")
+    @classmethod
+    def _redes(cls, valor: list[SocialLinkInput] | None) -> list[SocialLinkInput] | None:
+        return _una_por_red(valor)
+
+    @field_validator("address", "postal_code", "city", "province")
     @classmethod
     def _direccion_sin_blancos(cls, valor: str | None) -> str | None:
         # Una dirección de solo espacios se guarda como «sin dirección».
         return (valor.strip() or None) if valor is not None else None
 
-    @field_validator("public_page_enabled")
+    @field_validator("public_page_enabled", "address_public")
     @classmethod
     def _sin_null_en_el_interruptor(cls, valor: bool | None) -> bool | None:
         # Columna `NOT NULL`: un `null` explícito no significa «sin cambios»
         # (eso ya lo cubre `exclude_unset`), significa un valor inválido.
         if valor is None:
-            raise ValueError("`public_page_enabled` no admite `null`.")
+            raise ValueError("Este interruptor no admite `null`.")
         return valor
 
 
-class SocialLinkInput(BaseModel):
-    """Enlace social del organizador."""
+# Redes con icono propio, más un enlace libre con nombre (`other` + `label`).
+SocialKind = Literal["linkedin", "instagram", "x", "facebook", "youtube", "tiktok", "other"]
 
-    kind: Annotated[str, Field(min_length=1, max_length=40)]
+
+class SocialLinkInput(BaseModel):
+    """Enlace social del organizador: uno por red; `other` lleva su nombre."""
+
+    kind: SocialKind
     url: Annotated[str, Field(min_length=1, max_length=500, pattern=r"^https?://")]
+    label: Annotated[str, Field(min_length=1, max_length=40)] | None = None
+
+    @model_validator(mode="after")
+    def _nombre_solo_en_el_enlace_libre(self) -> SocialLinkInput:
+        if self.kind == "other" and not (self.label and self.label.strip()):
+            raise ValueError("El enlace libre necesita un nombre (p. ej. «Mastodon»).")
+        if self.kind != "other":
+            self.label = None
+        return self
+
+
+def _una_por_red(enlaces: list[SocialLinkInput] | None) -> list[SocialLinkInput] | None:
+    if enlaces is not None:
+        tipos = [enlace.kind for enlace in enlaces]
+        if len(tipos) != len(set(tipos)):
+            raise ValueError("Cada red solo puede aparecer una vez.")
+    return enlaces
 
 
 class BrandingUpdate(BaseModel):
@@ -146,8 +187,15 @@ class BrandingUpdate(BaseModel):
     # no exista en el catálogo es un 422 (comprobado en el router: aquí solo
     # se valida la forma del dato, no su existencia).
     theme_template_id: str | None = None
-    social_links: list[SocialLinkInput] = Field(default_factory=list)
+    # Las redes se editan en la ficha de la organización (`PATCH
+    # /organizations/me`): si no vienen aquí, no se tocan.
+    social_links: list[SocialLinkInput] | None = None
     organizer_blurb: str | None = None
+
+    @field_validator("social_links")
+    @classmethod
+    def _redes(cls, valor: list[SocialLinkInput] | None) -> list[SocialLinkInput] | None:
+        return _una_por_red(valor)
 
 
 class BrandingAdminResponse(BaseModel):
@@ -172,6 +220,20 @@ class MemberRoleOut(BaseModel):
     role_id: str
     role_key: str
     role_name: str
+    # La ficha de **este** rol (cada membresía tiene la suya) y los campos que
+    # pide, para editarla sin mezclarla con la de otro rol de la misma persona.
+    profile_fields: list[ProfileFieldResponse] = []
+    profile_data: dict[str, Any] = {}
+    # Para no pisar sin aviso lo que otra persona guardó entre medias.
+    updated_at: datetime | None = None
+
+
+class MemberProfileUpdate(BaseModel):
+    """Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de
+    los campos actuales del rol), así se puede vaciar un campo opcional."""
+
+    profile_data: dict[str, Any]
+    expected_updated_at: datetime | None = None
 
 
 class MemberResponse(BaseModel):
@@ -348,6 +410,8 @@ class CheckSlugResponse(BaseModel):
 class PublicSocialLink(BaseModel):
     kind: str
     url: str
+    # Solo en el enlace libre (`other`): su nombre.
+    label: str | None = None
 
 
 class PublicOrganizationProfile(BaseModel):
@@ -362,6 +426,10 @@ class PublicOrganizationProfile(BaseModel):
     name: str
     description: str | None
     website: str | None
+    # Dirección en partes; todas `null` si la organización no la hace pública.
     address: str | None
+    postal_code: str | None = None
+    city: str | None = None
+    province: str | None = None
     logo_url: str | None
     social_links: list[PublicSocialLink]

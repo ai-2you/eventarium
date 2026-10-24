@@ -36,7 +36,15 @@ class Organization(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     website: Mapped[str | None] = mapped_column(String(300), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # Calle y número; código postal, ciudad y provincia van aparte.
     address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    province: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # La dirección se guarda siempre; en la página pública solo si se activa.
+    address_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     # Opt-in: la página pública `/{org}` solo existe con el interruptor activado.
     public_page_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")

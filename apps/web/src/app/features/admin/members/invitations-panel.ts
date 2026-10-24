@@ -1,6 +1,15 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Dialog } from '../../../shared/ui/dialog';
+import { Select, type SelectOption } from '../../../shared/ui/select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -53,7 +62,7 @@ const TONO_POR_ESTADO: Record<EstadoInvitacion, ChipTone> = {
 @Component({
   selector: 'app-invitations-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Chip, DataTable, Input],
+  imports: [TranslocoDirective, Alert, Button, Chip, DataTable, Dialog, Input, Select],
   template: `
     <ng-container *transloco="let t">
       <section class="panel-invitaciones">
@@ -70,20 +79,16 @@ const TONO_POR_ESTADO: Record<EstadoInvitacion, ChipTone> = {
             [error]="errorEmail()"
             [(value)]="email"
           />
-          <div class="campo-select">
-            <label for="invitacion-rol">{{ t('admin.members.invitaciones.rol') }}</label>
-            <select id="invitacion-rol" [value]="roleId()" (change)="alElegirRol($event)">
-              <option value="" disabled>
-                {{ t('admin.members.invitaciones.rolRequerido') }}
-              </option>
-              @for (rol of roles(); track rol.id) {
-                <option [value]="rol.id">{{ rol.name }}</option>
-              }
-            </select>
-            @if (errorRol()) {
-              <p class="error">{{ errorRol() }}</p>
-            }
-          </div>
+          <app-select
+            fieldId="invitacion-rol"
+            [label]="t('admin.members.invitaciones.rol')"
+            [placeholder]="t('admin.members.invitaciones.rolRequerido')"
+            [required]="true"
+            [options]="opcionesDeRol()"
+            [error]="errorRol()"
+            [value]="roleId()"
+            (valueChange)="roleId.set($event)"
+          />
           <app-button type="submit" [loading]="invitando()">
             {{
               invitando()
@@ -144,6 +149,28 @@ const TONO_POR_ESTADO: Record<EstadoInvitacion, ChipTone> = {
           </app-data-table>
         }
       </section>
+
+      <app-dialog #dialogoRevocar>
+        <p>{{ t('admin.members.invitaciones.confirmarRevocar') }}</p>
+        <app-button
+          pie
+          variant="secundario"
+          type="button"
+          [disabled]="enAccion() !== null"
+          (pulsado)="dialogoRevocar.cerrar()"
+        >
+          {{ t('comun.cancelar') }}
+        </app-button>
+        <app-button
+          pie
+          variant="peligro"
+          type="button"
+          [loading]="enAccion() !== null"
+          (pulsado)="confirmarRevocacion()"
+        >
+          {{ t('admin.members.invitaciones.revocar') }}
+        </app-button>
+      </app-dialog>
     </ng-container>
   `,
   styles: `
@@ -161,18 +188,8 @@ const TONO_POR_ESTADO: Record<EstadoInvitacion, ChipTone> = {
       gap: var(--space-md);
       flex-wrap: wrap;
     }
-    .campo-select {
-      display: grid;
-      gap: var(--space-xs);
+    app-select {
       min-width: 12rem;
-    }
-    .campo-select select {
-      width: 100%;
-    }
-    .error {
-      margin: 0;
-      color: var(--danger);
-      font-size: 0.875rem;
     }
     .acciones {
       display: flex;
@@ -231,9 +248,9 @@ export class InvitationsPanel {
     }
   }
 
-  protected alElegirRol(evento: Event): void {
-    this.roleId.set((evento.target as HTMLSelectElement).value);
-  }
+  protected readonly opcionesDeRol = computed<SelectOption[]>(() =>
+    this.roles().map((rol) => ({ value: rol.id, label: rol.name })),
+  );
 
   protected tonoDe(estado: EstadoInvitacion): ChipTone {
     return TONO_POR_ESTADO[estado];
@@ -309,14 +326,20 @@ export class InvitationsPanel {
     }
   }
 
-  protected async revocar(invitationId: string): Promise<void> {
-    if (typeof window !== 'undefined') {
-      const confirmado = window.confirm(
-        this.transloco.translate('admin.members.invitaciones.confirmarRevocar'),
-      );
-      if (!confirmado) {
-        return;
-      }
+  private readonly dialogoRevocar = viewChild.required<Dialog>('dialogoRevocar');
+  private invitacionARevocar: string | null = null;
+
+  /** Pide confirmación con el modal del sistema de diseño, nunca con un
+   * diálogo nativo del navegador. */
+  protected revocar(invitationId: string): void {
+    this.invitacionARevocar = invitationId;
+    this.dialogoRevocar().abrir();
+  }
+
+  protected async confirmarRevocacion(): Promise<void> {
+    const invitationId = this.invitacionARevocar;
+    if (!invitationId || this.enAccion()) {
+      return;
     }
     this.mensaje.set(null);
     this.enAccion.set(`${invitationId}:revocar`);
@@ -330,6 +353,8 @@ export class InvitationsPanel {
       this.mostrarMensaje(error, true, 'admin.members.invitaciones.error');
     } finally {
       this.enAccion.set(null);
+      this.invitacionARevocar = null;
+      this.dialogoRevocar().cerrar();
     }
   }
 

@@ -11,6 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
+import { Select, type SelectOption } from './select';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api/api.service';
@@ -66,7 +67,7 @@ function baseDeCarpetas(kind: MediaKind): string {
 @Component({
   selector: 'app-media-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Button, Dialog, Input, MediaEditDialog],
+  imports: [TranslocoDirective, Button, Dialog, Input, MediaEditDialog, Select],
   template: `
     <ng-container *transloco="let t">
       @if (pestanasDisponibles().length > 1) {
@@ -141,15 +142,13 @@ function baseDeCarpetas(kind: MediaKind): string {
               (valueChange)="alBuscar($event)"
             />
             @if (carpetas().length > 0) {
-              <label class="carpeta-filtro">
-                {{ t('ui.media.carpetaEtiqueta') }}
-                <select (change)="alFiltrarCarpeta($event)">
-                  <option value="">{{ t('ui.media.todasLasCarpetas') }}</option>
-                  @for (carpeta of carpetas(); track carpeta.id) {
-                    <option [value]="carpeta.id">{{ carpeta.name }}</option>
-                  }
-                </select>
-              </label>
+              <app-select
+                class="carpeta-filtro"
+                [label]="t('ui.media.carpetaEtiqueta')"
+                [options]="opcionesDeCarpeta()"
+                [value]="carpetaFiltro() ?? ''"
+                (valueChange)="alFiltrarCarpeta($event)"
+              />
             }
           </div>
 
@@ -345,18 +344,8 @@ function baseDeCarpetas(kind: MediaKind): string {
       flex-wrap: wrap;
     }
     .carpeta-filtro {
-      display: grid;
-      gap: var(--space-xs);
-      font-size: var(--fs-sm);
-      color: var(--muted);
-    }
-    .carpeta-filtro select {
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      font: inherit;
-      background: var(--surface);
-      color: var(--fg);
+      display: block;
+      min-width: 12rem;
     }
     .rejilla {
       display: grid;
@@ -674,8 +663,12 @@ export class MediaFields {
     }, RETARDO_BUSQUEDA_MS);
   }
 
-  protected alFiltrarCarpeta(evento: Event): void {
-    const valor = (evento.target as HTMLSelectElement).value;
+  protected readonly opcionesDeCarpeta = computed<SelectOption[]>(() => [
+    { value: '', label: this.transloco.translate('ui.media.todasLasCarpetas') },
+    ...this.carpetas().map((carpeta) => ({ value: carpeta.id, label: carpeta.name })),
+  ]);
+
+  protected alFiltrarCarpeta(valor: string): void {
     this.carpetaFiltro.set(valor || null);
     this.bibliotecaOffset.set(0);
     void this.cargarBiblioteca();

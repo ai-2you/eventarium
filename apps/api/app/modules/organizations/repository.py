@@ -144,14 +144,19 @@ def best_profile_data(filas: list[tuple[OrganizationMember, Role]]) -> dict[str,
 
 
 async def get_member(
-    session: AsyncSession, organization_id: uuid.UUID, member_id: uuid.UUID
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    member_id: uuid.UUID,
+    *,
+    for_update: bool = False,
 ) -> OrganizationMember | None:
-    resultado: OrganizationMember | None = await session.scalar(
-        select(OrganizationMember).where(
-            OrganizationMember.id == member_id,
-            OrganizationMember.organization_id == organization_id,
-        )
+    consulta = select(OrganizationMember).where(
+        OrganizationMember.id == member_id,
+        OrganizationMember.organization_id == organization_id,
     )
+    if for_update:
+        consulta = consulta.with_for_update()
+    resultado: OrganizationMember | None = await session.scalar(consulta)
     return resultado
 
 

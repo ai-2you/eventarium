@@ -1,23 +1,42 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
-import { displayName } from '../../../core/auth/auth.service';
+import { AuthService, displayName } from '../../../core/auth/auth.service';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
 import { DataTable, DataTableColumn } from '../../../shared/ui/data-table';
+import { Dialog } from '../../../shared/ui/dialog';
+import { ProfileField } from '../../../shared/ui/dynamic-field.model';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { InvitationsPanel } from './invitations-panel';
+import { FichaGuardada, MemberProfileForm } from './member-profile-form';
 
 interface MemberRole {
   readonly id: string;
   readonly role_id: string;
   readonly role_key: string;
   readonly role_name: string;
+  readonly profile_fields?: readonly ProfileField[];
+  readonly profile_data?: Record<string, unknown>;
+  readonly updated_at?: string | null;
+}
+
+/** La ficha que se está editando en el diálogo: de quién y de qué rol. */
+interface FichaAbierta {
+  readonly persona: string;
+  readonly rol: MemberRole;
 }
 
 interface Member {
@@ -42,7 +61,17 @@ const LIMITE = 20;
 @Component({
   selector: 'app-members-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, RouterLink, Alert, Button, DataTable, PageHeader, InvitationsPanel],
+  imports: [
+    TranslocoDirective,
+    RouterLink,
+    Alert,
+    Button,
+    DataTable,
+    Dialog,
+    PageHeader,
+    InvitationsPanel,
+    MemberProfileForm,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.members.titulo')">
@@ -74,6 +103,21 @@ const LIMITE = 20;
                   @for (rol of miembro.roles; track rol.id) {
                     <li>
                       <code>{{ rol.role_key }}</code>
+                      @if (puedeEditarFicha(rol)) {
+                        <button
+                          type="button"
+                          class="editar-ficha"
+                          [attr.aria-label]="
+                            t('admin.members.ficha.editarAria', {
+                              persona: nombreDe(miembro),
+                              rol: rol.role_name,
+                            })
+                          "
+                          (click)="abrirFicha(miembro, rol)"
+                        >
+                          {{ t('admin.members.ficha.editar') }}
+                        </button>
+                      }
                       @if (miembro.roles.length > 1) {
                         <button
                           type="button"
@@ -119,6 +163,28 @@ const LIMITE = 20;
       }
 
       <app-invitations-panel />
+
+      <app-dialog #dialogoFicha (cerrado)="fichaAbierta.set(null)">
+        @if (fichaAbierta(); as ficha) {
+          <h2>
+            {{
+              t('admin.members.ficha.titulo', { persona: ficha.persona, rol: ficha.rol.role_name })
+            }}
+          </h2>
+          <app-member-profile-form
+            prefijo="ficha-miembro"
+            [organizationMemberId]="ficha.rol.id"
+            [campos]="ficha.rol.profile_fields ?? []"
+            [datos]="ficha.rol.profile_data ?? {}"
+            [updatedAt]="ficha.rol.updated_at ?? null"
+            [exigirObligatorios]="false"
+            (guardado)="alGuardarFicha($event)"
+          />
+        }
+        <app-button pie variant="secundario" type="button" (pulsado)="dialogoFicha.cerrar()">
+          {{ t('comun.cerrar') }}
+        </app-button>
+      </app-dialog>
     </ng-container>
   `,
   styles: `
@@ -151,6 +217,15 @@ const LIMITE = 20;
       line-height: 1;
       padding: 0 2px;
     }
+    .editar-ficha {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: var(--text-sm, 0.875rem);
+      padding: 0 2px;
+      text-decoration: underline;
+    }
     .quitar-rol:hover {
       color: var(--danger);
     }
@@ -164,6 +239,8 @@ export class MembersPage {
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
+  private readonly auth = inject(AuthService);
+  private readonly dialogoFicha = viewChild.required<Dialog>('dialogoFicha');
 
   protected readonly cargando = signal(true);
   protected readonly miembros = signal<Member[]>([]);
@@ -172,6 +249,10 @@ export class MembersPage {
   protected readonly limite = LIMITE;
   protected readonly error = signal<string | null>(null);
   protected readonly quitandoRolId = signal<string | null>(null);
+  protected readonly fichaAbierta = signal<FichaAbierta | null>(null);
+  private readonly puedeEditarFichas = computed(
+    () => this.auth.permisos()?.includes('members:write') ?? false,
+  );
 
   protected readonly totalPaginas = computed(() => Math.max(1, Math.ceil(this.total() / LIMITE)));
   protected readonly paginaActual = computed(() => Math.floor(this.offset() / LIMITE) + 1);
@@ -212,6 +293,35 @@ export class MembersPage {
 
   protected irAPagina(nuevoOffset: number): void {
     this.offset.set(Math.max(0, nuevoOffset));
+    void this.cargar();
+  }
+
+  /** El backend decide (rango del rol incluido); esto solo evita ofrecer un 403:
+   * la ficha del propietario solo la toca otro propietario. */
+  protected puedeEditarFicha(rol: MemberRole): boolean {
+    if (!this.puedeEditarFichas() || !rol.profile_fields?.length) return false;
+    return rol.role_key !== 'owner' || (this.auth.roles()?.includes('owner') ?? false);
+  }
+
+  protected abrirFicha(miembro: Member, rol: MemberRole): void {
+    this.fichaAbierta.set({ persona: displayName(miembro), rol });
+    this.dialogoFicha().abrir();
+  }
+
+  /** Deja la versión nueva en la fila ya mismo (reabrir el diálogo antes de que
+   * vuelva la lista no debe partir de la vieja y dar 409) y recarga la lista. */
+  protected alGuardarFicha(ficha: FichaGuardada): void {
+    const rolId = this.fichaAbierta()?.rol.id;
+    this.miembros.update((miembros) =>
+      miembros.map((miembro) => ({
+        ...miembro,
+        roles: miembro.roles.map((rol) =>
+          rol.id === rolId
+            ? { ...rol, profile_data: ficha.profile_data, updated_at: ficha.updated_at }
+            : rol,
+        ),
+      })),
+    );
     void this.cargar();
   }
 

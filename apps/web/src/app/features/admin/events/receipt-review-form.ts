@@ -20,6 +20,7 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Checkbox } from '../../../shared/ui/checkbox';
 import { Dialog } from '../../../shared/ui/dialog';
 import { Select, type SelectOption } from '../../../shared/ui/select';
@@ -90,7 +91,7 @@ function importeParaElCampo(cents: number | null): string {
 @Component({
   selector: 'app-receipt-review-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Checkbox, Dialog, Select],
+  imports: [TranslocoDirective, Alert, Button, Checkbox, DatetimePicker, Dialog, Select],
   template: `
     <ng-container *transloco="let t">
       <div class="revision">
@@ -132,19 +133,13 @@ function importeParaElCampo(cents: number | null): string {
             </p>
           </div>
 
-          <div class="campo">
-            <label [for]="id('fecha')">{{
-              t('admin.events.accounting.justificantes.revision.fecha')
-            }}</label>
-            <input
-              [id]="id('fecha')"
-              type="date"
-              [value]="fecha()"
-              [attr.aria-describedby]="descripcion('expense_date')"
-              (input)="fecha.set(alTexto($event))"
-            />
-            <p class="pista" [id]="id('fecha') + '-pista'">{{ pista('expense_date', t) }}</p>
-          </div>
+          <app-datetime-picker
+            [fieldId]="id('fecha')"
+            [soloFecha]="true"
+            [label]="t('admin.events.accounting.justificantes.revision.fecha')"
+            [hint]="pista('expense_date', t)"
+            [(value)]="fecha"
+          />
 
           <div class="campo">
             <label [for]="id('base')">{{

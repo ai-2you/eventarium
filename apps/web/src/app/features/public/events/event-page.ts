@@ -31,9 +31,18 @@ import { migasDeEvento } from '../../../shared/ui/migas-de-evento';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { ShareLinks } from '../../../shared/ui/share-links';
 import { VenueMap } from '../../../shared/ui/venue-map';
-import type { LocationMode, PublicEventDetail, RegistrationMode } from './event-page.types';
+import { MarkdownSeguro } from '../../../shared/legal/markdown-seguro';
+import type {
+  LocationMode,
+  PublicEventDetail,
+  PublicParticipant,
+  RegistrationMode,
+} from './event-page.types';
 import { type DiaDeAgenda, EventAgendaSection } from './sections/event-agenda-section';
 import { type Speaker, EventSpeakersSection } from './sections/event-speakers-section';
+import { DirectionsLink } from '../../../shared/ui/directions-link';
+import { EventNearbySection } from './sections/event-nearby-section';
+import { AvisoVentaEntradas, avisoDeVenta } from './aviso-venta-entradas';
 
 /** `starts_at` (UTC) al día calendario en la zona del evento, sin arrastrar la
  * zona horaria del entorno de ejecución (navegador o SSR) al agrupar por fecha:
@@ -63,7 +72,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
 /**
  * Página pública de un evento, sobre `evento-iawic.html` del prototipo de
  * OpenDesign: hero con ficha de datos reales, agenda por día con pestañas
- * accesibles, ponentes derivados de la agenda, patrocinadores por nivel y
+ * accesibles, ponentes (roster del evento y agenda), patrocinadores por nivel y
  * lugar — sin ningún dato que la API no devuelva (ver cabecera de
  * `event-page.types.ts`).
  *
@@ -80,7 +89,10 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   selector: 'app-event-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AvisoVentaEntradas,
     DatePipe,
+    DirectionsLink,
+    EventNearbySection,
     RouterLink,
     TranslocoDirective,
     Alert,
@@ -91,16 +103,26 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     ShareLinks,
     EventAgendaSection,
     EventSpeakersSection,
+    MarkdownSeguro,
   ],
   template: `
     <ng-container *transloco="let t">
       @if (cargando()) {
         <p class="ancho-maximo">{{ t('comun.cargando') }}</p>
+      } @else if (errorDeVistaPrevia()) {
+        <div class="ancho-maximo">
+          <app-alert tone="error">{{ t('publico.eventos.vistaPreviaError') }}</app-alert>
+        </div>
       } @else if (noEncontrado()) {
         <div class="ancho-maximo">
           <app-alert tone="error">{{ t('publico.eventos.noEncontrado') }}</app-alert>
         </div>
       } @else if (evento(); as evento) {
+        @if (eventId()) {
+          <div class="ancho-maximo aviso-vista-previa">
+            <app-alert tone="info">{{ t('publico.eventos.vistaPrevia') }}</app-alert>
+          </div>
+        }
         <article [attr.data-ambito]="ambitoDelEvento()">
           <section class="hero">
             <div class="ancho-maximo">
@@ -158,7 +180,14 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
                   <p class="hero__lede">{{ evento.summary }}</p>
                 }
                 @if (evento.description) {
-                  <p class="hero__descripcion">{{ evento.description }}</p>
+                  <!-- Markdown del editor del panel, saneado: nunca [innerHTML]
+                       directo con texto de la organización. Los saltos simples
+                       se respetan por las descripciones escritas en texto plano. -->
+                  <app-markdown-seguro
+                    class="hero__descripcion"
+                    [texto]="evento.description"
+                    [saltosDeLinea]="true"
+                  />
                 }
                 @if (!evento.cancelled) {
                   <app-share-links
@@ -245,10 +274,14 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
                     </div>
                   }
                   @if (!evento.cancelled) {
-                    <a class="ficha__inscribirse" [routerLink]="ruta('inscribirse')">
-                      {{ t('publico.eventos.inscribirse') }}
-                    </a>
-                    <p class="ficha__nota">{{ t('publico.eventos.ficha.sinCuenta') }}</p>
+                    @if (avisoVenta(); as aviso) {
+                      <app-aviso-venta-entradas [aviso]="aviso" />
+                    } @else {
+                      <a class="ficha__inscribirse" [routerLink]="ruta('inscribirse')">
+                        {{ t('publico.eventos.inscribirse') }}
+                      </a>
+                      <p class="ficha__nota">{{ t('publico.eventos.ficha.sinCuenta') }}</p>
+                    }
                   }
                   <p class="ficha__nota">
                     <a [routerLink]="ruta('politicas')">
@@ -283,7 +316,7 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
               } @else {
                 <app-event-agenda-section
                   [dias]="dias()"
-                  [org]="org()"
+                  [org]="evento.organization.slug"
                   [eventSlug]="evento.slug"
                   [eventTimezone]="evento.timezone"
                 />
@@ -345,55 +378,73 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
             </section>
           }
 
-          @if (evento.location_name || evento.location_address || evento.online_url) {
-            <section class="seccion" aria-labelledby="lugar-h2">
+          @if (
+            evento.location_name ||
+            evento.location_address ||
+            evento.online_url ||
+            (evento.location_mode !== 'online' && evento.nearby_places?.length)
+          ) {
+            <section
+              class="seccion"
+              [attr.aria-labelledby]="
+                evento.location_name || evento.location_address || evento.online_url
+                  ? 'lugar-h2'
+                  : 'cercanos-h2'
+              "
+            >
               <div class="ancho-maximo lugar__grid" appReveal>
-                <div>
-                  <span class="rotulo-seccion">{{ t('publico.eventos.lugar.rotulo') }}</span>
-                  <h2 id="lugar-h2">
-                    {{ evento.location_name || t('publico.eventos.lugar.titulo') }}
-                  </h2>
-                  @if (evento.location_address) {
-                    <p class="lugar__direccion">{{ evento.location_address }}</p>
-                  }
-                  @if (evento.location_mode !== 'in_person' && evento.online_url) {
-                    <p>
-                      <a [href]="evento.online_url" rel="noopener noreferrer" target="_blank">
-                        {{ t('publico.eventos.enlaceOnline') }}
-                      </a>
-                    </p>
-                  }
-                  @if (evento.latitude !== null && evento.longitude !== null) {
-                    <app-venue-map
-                      class="lugar__mapa"
-                      [marcadores]="[
-                        {
-                          lat: evento.latitude,
-                          lng: evento.longitude,
-                          label: evento.location_name,
-                        },
-                      ]"
-                      [ariaLabel]="
-                        t('publico.eventos.lugar.mapaAria', {
-                          lugar: evento.location_name || evento.title,
-                        })
-                      "
-                    />
-                  } @else {
-                    <!-- Sin geocodificar (sin dirección, evento online, o falló):
+                @if (evento.location_name || evento.location_address || evento.online_url) {
+                  <div>
+                    <span class="rotulo-seccion">{{ t('publico.eventos.lugar.rotulo') }}</span>
+                    <h2 id="lugar-h2">
+                      {{ evento.location_name || t('publico.eventos.lugar.titulo') }}
+                    </h2>
+                    @if (evento.location_address) {
+                      <p class="lugar__direccion">{{ evento.location_address }}</p>
+                    }
+                    @if (evento.location_mode !== 'online') {
+                      <app-directions-link
+                        [lugar]="evento.location_name"
+                        [direccion]="evento.location_address"
+                      />
+                    }
+                    @if (evento.location_mode !== 'in_person' && evento.online_url) {
+                      <p>
+                        <a [href]="evento.online_url" rel="noopener noreferrer" target="_blank">
+                          {{ t('publico.eventos.enlaceOnline') }}
+                        </a>
+                      </p>
+                    }
+                    @if (evento.latitude !== null && evento.longitude !== null) {
+                      <app-venue-map
+                        class="lugar__mapa"
+                        [marcadores]="[
+                          {
+                            lat: evento.latitude,
+                            lng: evento.longitude,
+                            label: evento.location_name,
+                          },
+                        ]"
+                        [ariaLabel]="
+                          t('publico.eventos.lugar.mapaAria', {
+                            lugar: evento.location_name || evento.title,
+                          })
+                        "
+                      />
+                    } @else {
+                      <!-- Sin geocodificar (sin dirección, evento online, o falló):
                          no se inventa un mapa ni un esquema con datos de ejemplo. -->
-                    <p class="hint pendiente lugar__mapa">
-                      {{ t('publico.eventos.datoPendiente') }}
-                    </p>
-                  }
-                </div>
-                <div>
-                  <span class="rotulo-seccion">{{ t('publico.eventos.lugar.cercaRotulo') }}</span>
-                  <h2>{{ t('publico.eventos.lugar.cercaTitulo') }}</h2>
-                  <!-- Alojamiento y locales cercanos: sin modelo de datos todavía, se
-                       declara el hueco en vez de rellenarlo con ejemplos. -->
-                  <p class="hint pendiente">{{ t('publico.eventos.lugar.cercaPendiente') }}</p>
-                </div>
+                      <p class="hint pendiente lugar__mapa">
+                        {{ t('publico.eventos.datoPendiente') }}
+                      </p>
+                    }
+                  </div>
+                }
+                @if (evento.location_mode !== 'online' && evento.nearby_places?.length) {
+                  <div>
+                    <app-event-nearby-section [sitios]="evento.nearby_places!" />
+                  </div>
+                }
               </div>
             </section>
           }
@@ -402,6 +453,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
     </ng-container>
   `,
   styles: `
+    .aviso-vista-previa {
+      margin-block: var(--sp-4);
+    }
     .hero {
       padding: var(--sp-8) 0 var(--sp-7);
       border-bottom: 1px solid var(--border);
@@ -439,9 +493,9 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
       margin-top: var(--sp-5);
     }
     .hero__descripcion {
+      display: block;
       max-width: 64ch;
       margin-top: var(--sp-5);
-      white-space: pre-line;
     }
     .hero__compartir {
       display: block;
@@ -650,8 +704,12 @@ const CLAVES_REGISTRO: Record<RegistrationMode, { clave: string; tono: ChipTone 
   `,
 })
 export class EventPage implements OnInit {
-  readonly org = input.required<string>();
-  readonly slug = input.required<string>();
+  // Sin valor en la vista previa, que llega por `eventId` (`/vista-previa/:eventId`).
+  readonly org = input<string | undefined>('');
+  readonly slug = input<string | undefined>('');
+  /** Vista previa del panel: la ficha de cualquier evento de la organización,
+   * también un borrador, desde `GET /events/{id}/preview` y solo en el navegador. */
+  readonly eventId = input<string | undefined>(undefined);
 
   private readonly http = inject(HttpClient);
   private readonly api = inject(ApiService);
@@ -668,6 +726,9 @@ export class EventPage implements OnInit {
   protected readonly evento = signal<PublicEventDetail | null>(null);
   protected readonly cargando = signal(true);
   protected readonly noEncontrado = signal(false);
+  /** En la vista previa, un fallo que no es «no existe» (permiso retirado, red,
+   * servidor): quien revisa debe saber que no es que el evento falte. */
+  protected readonly errorDeVistaPrevia = signal(false);
 
   /** Desplaza al ancla de la URL (p. ej. `#agenda-h2` desde la miga de pan
    * "Programa" de `session-page.ts`/`sponsor-page.ts`) una vez el evento ya
@@ -706,23 +767,34 @@ export class EventPage implements OnInit {
       .map(([fecha, sesiones]) => ({ fecha, sesiones }));
   });
 
-  /** Ponentes reales derivados de la agenda: no existe ningún endpoint
-   * aparte de la agenda, así que se agrupan los participantes con perfil
-   * público (`public_slug`), sin duplicar a quien participa en varias
-   * sesiones (se queda con el primer rol con el que aparece). */
+  /** Los ponentes enlazados al evento (`speakers`, tengan o no sesión) y, tras
+   * ellos, quien sale en la agenda sin estar en ese roster (moderación, etc.)
+   * solo si tiene perfil público: en la agenda ya sale con su nombre, y aquí no
+   * se presenta como ponente a quien no lo es. Cada grupo, por nombre. Se deduplica por `ref`, que la API hace igual en los
+   * dos sitios: quien participa en varias sesiones se queda con su primer rol. */
   protected readonly ponentes = computed<Speaker[]>(() => {
+    const evento = this.evento();
     const vistos = new Map<string, Speaker>();
-    for (const sesion of this.evento()?.sessions ?? []) {
-      for (const persona of sesion.participants) {
-        if (persona.public_slug && !vistos.has(persona.public_slug)) {
-          vistos.set(persona.public_slug, {
-            publicSlug: persona.public_slug,
-            displayName: persona.display_name,
-            roleKey: persona.role_key,
-          });
-        }
+    const anadir = (personas: readonly PublicParticipant[]): void => {
+      const nuevas = personas
+        .filter((persona) => !vistos.has(persona.ref))
+        .sort((a, b) => a.display_name.localeCompare(b.display_name, 'es'));
+      for (const persona of nuevas) {
+        if (vistos.has(persona.ref)) continue;
+        vistos.set(persona.ref, {
+          ref: persona.ref,
+          publicSlug: persona.public_slug,
+          displayName: persona.display_name,
+          roleKey: persona.role_key,
+        });
       }
-    }
+    };
+    anadir(evento?.speakers ?? []);
+    anadir(
+      (evento?.sessions ?? [])
+        .flatMap((sesion) => sesion.participants)
+        .filter((persona) => persona.public_slug !== null),
+    );
     return [...vistos.values()];
   });
 
@@ -743,7 +815,12 @@ export class EventPage implements OnInit {
 
   /** Ruta hacia otra página de este mismo evento. */
   protected ruta(...resto: string[]): string[] {
-    return rutaEvento(this.org(), this.slug(), ...resto);
+    const evento = this.evento();
+    return rutaEvento(
+      evento?.organization.slug ?? this.org() ?? '',
+      evento?.slug ?? this.slug() ?? '',
+      ...resto,
+    );
   }
 
   protected readonly formato = computed(() => {
@@ -759,6 +836,12 @@ export class EventPage implements OnInit {
   protected readonly entradaGratuita = computed(
     () => (this.evento()?.registration_mode ?? 'free') === 'free',
   );
+
+  /** Sin entradas a la venta en un evento de pago: aviso en lugar del botón. */
+  protected readonly avisoVenta = computed(() => {
+    const evento = this.evento();
+    return evento ? avisoDeVenta(evento, null) : null;
+  });
 
   /** «Desde X €» con el tipo de entrada vigente más barato
    * (`price_from_cents`/`price_currency`). `null` si el evento es gratis o,
@@ -813,6 +896,11 @@ export class EventPage implements OnInit {
   }
 
   private async cargar(): Promise<void> {
+    const eventId = this.eventId();
+    if (eventId) {
+      await this.cargarVistaPrevia(eventId);
+      return;
+    }
     const clave = makeStateKey<PublicEventDetail>(`public-event:${this.org()}:${this.slug()}`);
     const transferido = this.transferState.get(clave, null);
     if (transferido) {
@@ -824,9 +912,12 @@ export class EventPage implements OnInit {
 
     try {
       const evento = await firstValueFrom(
-        this.http.get<PublicEventDetail>(this.api.url(apiEvento(this.org(), this.slug())), {
-          headers: this.api.serverForwardHeaders(),
-        }),
+        this.http.get<PublicEventDetail>(
+          this.api.url(apiEvento(this.org() ?? '', this.slug() ?? '')),
+          {
+            headers: this.api.serverForwardHeaders(),
+          },
+        ),
       );
       this.aplicar(evento);
       if (this.api.isServer) {
@@ -844,7 +935,26 @@ export class EventPage implements OnInit {
     }
   }
 
-  private aplicar(evento: PublicEventDetail): void {
+  /** Sin `TransferState` ni SSR: la ruta se pinta en el navegador, que es quien
+   * tiene la sesión del equipo. */
+  private async cargarVistaPrevia(eventId: string): Promise<void> {
+    try {
+      const evento = await firstValueFrom(
+        this.http.get<PublicEventDetail>(this.api.url(`/events/${eventId}/preview`)),
+      );
+      this.aplicar(evento, { vistaPrevia: true });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.noEncontrado.set(true);
+      } else {
+        this.errorDeVistaPrevia.set(true);
+      }
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  private aplicar(evento: PublicEventDetail, { vistaPrevia = false } = {}): void {
     this.evento.set(evento);
     // La plantilla del evento se inyecta al llegar el dato, no al construir el
     // componente: en SSR el `document` no existe al construirlo, y quitarla
@@ -855,6 +965,8 @@ export class EventPage implements OnInit {
       description: evento.summary ?? this.transloco.translate('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug),
+      // «Solo con enlace»: se abre por su URL, pero los buscadores no deben indexarlo.
+      noIndexar: vistaPrevia || evento.visibility === 'hidden',
     });
   }
 }

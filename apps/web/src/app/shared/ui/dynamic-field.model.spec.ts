@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { ProfileField, validateDynamicFieldValue } from './dynamic-field.model';
+import {
+  ProfileField,
+  validateDynamicFieldValue,
+  validateDynamicFields,
+} from './dynamic-field.model';
 
 function campo(sobrescribir: Partial<ProfileField> = {}): ProfileField {
   return {
@@ -57,5 +61,36 @@ describe('validateDynamicFieldValue', () => {
     const definicion = campo({ field_type: 'boolean' });
     expect(validateDynamicFieldValue(definicion, 'true')).toContain('verdadero');
     expect(validateDynamicFieldValue(definicion, true)).toBeNull();
+  });
+});
+
+describe('límites de longitud', () => {
+  it('indica el máximo y la longitud actual, como la API', () => {
+    const area = campo({ label: 'Biografía', field_type: 'textarea' });
+    expect(validateDynamicFieldValue(area, 'a'.repeat(5000))).toBeNull();
+    expect(validateDynamicFieldValue(area, 'a'.repeat(5001))).toBe(
+      '«Biografía» admite como máximo 5000 caracteres (ahora tiene 5001).',
+    );
+    expect(validateDynamicFieldValue(campo(), 'a'.repeat(301))).toContain('300');
+  });
+
+  it('cuenta caracteres sin los espacios de los extremos, como la API', () => {
+    const corto = campo({ field_type: 'text' });
+    expect(validateDynamicFieldValue(corto, `${'😀'.repeat(300)}   `)).toBeNull();
+  });
+
+  it('quien completa una ficha ajena puede dejar un obligatorio vacío', () => {
+    const bio = campo({ is_required: true });
+    expect(validateDynamicFieldValue(bio, '', { exigirObligatorios: false })).toBeNull();
+  });
+});
+
+describe('validateDynamicFields', () => {
+  it('da el error de cada campo por su clave', () => {
+    const campos = [campo({ key: 'bio', is_required: true }), campo({ key: 'web' })];
+    expect(validateDynamicFields(campos, { web: 'x' })).toEqual({
+      bio: '«Campo» es obligatorio.',
+      web: null,
+    });
   });
 });

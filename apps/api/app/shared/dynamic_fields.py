@@ -12,6 +12,17 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _URL = re.compile(r"^https?://\S+$")
 _PHONE = re.compile(r"^[+0-9 ().-]{6,30}$")
 
+# Topes por tipo de campo: estos datos los escriben también personas invitadas
+# (la ficha de un ponente) y se sirven en su perfil público.
+_LONGITUD_MAXIMA = {"text": 300, "textarea": 5000, "url": 500, "email": 254}
+
+
+def _exigir_longitud(etiqueta: str, valor: str, maximo: int) -> None:
+    if len(valor) > maximo:
+        raise ValidationDomainError(
+            f"«{etiqueta}» admite como máximo {maximo} caracteres (tiene {len(valor)})."
+        )
+
 
 class FieldSpec(Protocol):
     """Definición de un campo, compatible con `RoleProfileField` y sus plantillas."""
@@ -30,16 +41,20 @@ def _validar_valor(spec: FieldSpec, valor: Any) -> Any:
     if tipo in {"text", "textarea"}:
         if not isinstance(valor, str):
             raise ValidationDomainError(f"«{etiqueta}» debe ser texto.")
-        return valor.strip()
+        limpio = valor.strip()
+        _exigir_longitud(etiqueta, limpio, _LONGITUD_MAXIMA[tipo])
+        return limpio
 
     if tipo == "email":
         if not isinstance(valor, str) or not _EMAIL.match(valor.strip()):
             raise ValidationDomainError(f"«{etiqueta}» debe ser un correo electrónico válido.")
+        _exigir_longitud(etiqueta, valor.strip(), _LONGITUD_MAXIMA["email"])
         return valor.strip()
 
     if tipo == "url":
         if not isinstance(valor, str) or not _URL.match(valor.strip()):
             raise ValidationDomainError(f"«{etiqueta}» debe ser una URL que empiece por http(s).")
+        _exigir_longitud(etiqueta, valor.strip(), _LONGITUD_MAXIMA["url"])
         return valor.strip()
 
     if tipo == "phone":

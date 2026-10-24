@@ -49,7 +49,9 @@ function eventoDetalle() {
         video_platform: null,
         video_url: null,
         materials: [],
-        participants: [{ display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana' }],
+        participants: [
+          { display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana', ref: 'r-ana' },
+        ],
       },
     ],
     venues: [],
@@ -109,6 +111,29 @@ describe('EventPage', () => {
     );
     expect(fixture.nativeElement.textContent).toContain('IA Week in Cascais 2026');
     expect(fixture.nativeElement.textContent).not.toContain('Cargando');
+  });
+
+  it('pinta la descripción como Markdown saneado, sin el HTML hostil que pudiera traer', async () => {
+    const clave = makeStateKey<PublicEventDetail>('public-event:acme:iawic-2026');
+    TestBed.inject(TransferState).set(clave, {
+      ...eventoDetalle(),
+      description:
+        '**Programa** completo\nsegunda línea\n\n<img src="x" onerror="alert(1)"> [web](javascript:alert(1))',
+    } as PublicEventDetail);
+
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    await avanzar(fixture);
+    await avanzar(fixture);
+
+    const descripcion = fixture.nativeElement.querySelector('.hero__descripcion') as HTMLElement;
+    expect(descripcion.querySelector('strong')?.textContent).toBe('Programa');
+    expect(descripcion.querySelector('br')).not.toBeNull();
+    expect(descripcion.innerHTML).not.toContain('<img');
+    expect(descripcion.innerHTML).not.toContain('onerror');
+    expect(descripcion.innerHTML).not.toMatch(/javascript:/i);
   });
 
   it('muestra el evento en tema claro sin violaciones de accesibilidad', async () => {
@@ -207,6 +232,73 @@ describe('EventPage', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('lista los ponentes del roster aunque no tengan sesión, sin enlace si no tienen perfil y sin duplicar', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({
+        ...eventoDetalle(),
+        // Quien solo modera (sin perfil público) sale en la agenda, no aquí.
+        sessions: eventoDetalle().sessions.map((sesion) => ({
+          ...sesion,
+          participants: [
+            ...sesion.participants,
+            {
+              display_name: 'Carlos Moderador',
+              role_key: 'moderator',
+              public_slug: null,
+              ref: 'r-carlos',
+            },
+          ],
+        })),
+        speakers: [
+          { display_name: 'Ana Ponente', role_key: 'speaker', public_slug: 'ana', ref: 'r-ana' },
+          { display_name: 'Bea Sin Perfil', role_key: 'speaker', public_slug: null, ref: 'r-bea' },
+        ],
+      });
+    await avanzar(fixture);
+
+    const rejilla = fixture.nativeElement.querySelector(
+      'app-event-speakers-section',
+    ) as HTMLElement;
+    const fichas = Array.from(rejilla.querySelectorAll('.ponente')) as HTMLElement[];
+    expect(fichas.map((ficha) => ficha.querySelector('strong')?.textContent)).toEqual([
+      'Ana Ponente',
+      'Bea Sin Perfil',
+    ]);
+    expect(fichas[0]!.tagName).toBe('A');
+    expect(fichas[1]!.tagName).toBe('DIV');
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('la agenda muestra el tipo con el nombre que le dio la organización', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    const base = eventoDetalle();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({
+        ...base,
+        sessions: base.sessions.map((sesion) => ({
+          ...sesion,
+          type: { id: 't9', name: 'Mesa redonda', color: 'rosa', is_break: false },
+        })),
+      });
+    await avanzar(fixture);
+
+    const chip = fixture.nativeElement.querySelector('app-session-type-chip') as HTMLElement;
+    expect(chip.textContent?.trim()).toBe('Mesa redonda');
+  });
+
   it('cambia de día de agenda con las flechas del teclado en las pestañas', async () => {
     const fixture = TestBed.createComponent(EventPage);
     fixture.componentRef.setInput('org', 'acme');
@@ -275,6 +367,24 @@ describe('EventPage', () => {
     await esperarSinViolacionesDeAccesibilidad(raiz);
   });
 
+  it('un evento «solo con enlace» se muestra pero no se indexa', async () => {
+    const robots = () =>
+      document.querySelector('meta[name="robots"]')?.getAttribute('content') ?? null;
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('org', 'acme');
+    fixture.componentRef.setInput('slug', 'iawic-2026');
+    fixture.detectChanges();
+    http
+      .expectOne(
+        (peticion) => peticion.url === '/api/v1/public/organizations/acme/events/iawic-2026',
+      )
+      .flush({ ...eventoDetalle(), visibility: 'hidden' });
+    await avanzar(fixture);
+
+    expect(fixture.nativeElement.querySelector('#agenda-h2')).not.toBeNull();
+    expect(robots()).toBe('noindex, nofollow');
+  });
+
   it('la categoría y las etiquetas son enlaces que filtran el directorio', async () => {
     const fixture = TestBed.createComponent(EventPage);
     fixture.componentRef.setInput('org', 'acme');
@@ -298,6 +408,19 @@ describe('EventPage', () => {
       '/eventos?etiqueta=ia',
       '/eventos?etiqueta=datos',
     ]);
+    await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
+  });
+
+  it('en vista previa carga la ficha del panel y avisa de que es una vista previa', async () => {
+    const fixture = TestBed.createComponent(EventPage);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.detectChanges();
+    http.expectOne('/api/v1/events/e1/preview').flush(eventoDetalle());
+    await avanzar(fixture);
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('Vista previa');
+    expect(texto).toContain('IA Week in Cascais 2026');
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 

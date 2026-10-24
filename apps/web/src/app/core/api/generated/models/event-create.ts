@@ -19,6 +19,8 @@ export interface EventCreate {
   payment_checkout_window_minutes?: number;
   registration_mode?: 'free' | 'approval' | 'paid';
   registration_opens_at?: (string | null);
+  reminder_enabled?: boolean;
+  reminder_hours_before?: (2 | 6 | 12 | 24 | 48 | 72 | null);
   slug: string;
   starts_at: string;
   status?: 'draft' | 'published' | 'archived';

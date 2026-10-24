@@ -20,6 +20,7 @@ import { MediaElegida, MediaPicker } from '../../../shared/ui/media-picker';
 import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
 import { PORTADA_ACEPTADOS } from '../../../shared/uploads/image-upload-constraints';
 import { EventCancelCard } from './event-cancel-card';
+import { EventNearbyPlaces } from './event-nearby-places';
 
 type EventStatus = 'draft' | 'published' | 'archived' | 'cancelled';
 
@@ -37,89 +38,132 @@ interface EventoResumen {
  * de sastre con todo el evento a la vez, en vez del formulario de datos que
  * su nombre promete.
  *
- * `event-form.ts` delega aquí en cuanto hay un `eventId` — este componente carga sus
+ * `event-form.ts` delega aquí en cuanto hay un `eventId` y proyecta su formulario,
+ * que esta ficha coloca junto a portada y estado — este componente carga sus
  * propios datos a partir de él, igual que ya hace cada sección con la suya, en vez de
  * heredarlos del padre.
  */
 @Component({
   selector: 'app-event-details',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Card, MediaPicker, EventCancelCard],
+  imports: [
+    EventNearbyPlaces,
+    TranslocoDirective,
+    Alert,
+    Button,
+    Card,
+    MediaPicker,
+    EventCancelCard,
+  ],
   template: `
     <ng-container *transloco="let t">
-      @if (cargando()) {
-        <p>{{ t('comun.cargando') }}</p>
-      } @else {
-        <div class="fila-superior">
-          <app-card [heading]="t('admin.events.formulario.portada')">
-            <app-media-picker
-              #portadaPicker
-              [etiqueta]="t('admin.events.formulario.portada')"
-              [aceptados]="PORTADA_ACEPTADOS"
-              kind="events"
-              variante="ancha"
-              [url]="portadaUrl()"
-              (mediaElegido)="asignarPortada($event, portadaPicker)"
-            />
-            @if (errorPortada(); as mensaje) {
-              <app-alert tone="error">{{ mensaje }}</app-alert>
-            }
-          </app-card>
+      <!-- El formulario de datos llega proyectado desde \`event-form.ts\` y queda
+           fuera del @if: no debe esperar a que carguen portada y estado. -->
+      <div class="principal">
+        <div class="principal__formulario"><ng-content /></div>
 
-          <app-card [heading]="t('admin.events.formulario.estadoActual')">
-            <p>
-              {{ t('admin.events.estado' + capitaliza(estadoActual())) }}
-            </p>
-            <div class="acciones-estado">
-              @if (estadoActual() === 'draft') {
-                <app-button
-                  type="button"
-                  variant="secundario"
-                  [loading]="cambiandoEstado()"
-                  (pulsado)="cambiarEstado('published')"
-                >
-                  {{ t('admin.events.formulario.publicar') }}
-                </app-button>
-              }
-              @if (estadoActual() !== 'archived' && estadoActual() !== 'cancelled') {
-                <app-button
-                  type="button"
-                  variant="peligro"
-                  [loading]="cambiandoEstado()"
-                  (pulsado)="cambiarEstado('archived')"
-                >
-                  {{ t('admin.events.formulario.archivar') }}
-                </app-button>
+        <aside class="lateral">
+          @if (cargando()) {
+            <p>{{ t('comun.cargando') }}</p>
+          } @else {
+            <div class="estado-cancelar">
+              <app-card [heading]="t('admin.events.formulario.estadoActual')">
+                <p>
+                  {{ t('admin.events.estado' + capitaliza(estadoActual())) }}
+                </p>
+                <div class="acciones-estado">
+                  @if (estadoActual() === 'draft') {
+                    <app-button
+                      type="button"
+                      variant="secundario"
+                      [loading]="cambiandoEstado()"
+                      (pulsado)="cambiarEstado('published')"
+                    >
+                      {{ t('admin.events.formulario.publicar') }}
+                    </app-button>
+                  }
+                  @if (estadoActual() !== 'archived' && estadoActual() !== 'cancelled') {
+                    <app-button
+                      type="button"
+                      variant="peligro"
+                      [loading]="cambiandoEstado()"
+                      (pulsado)="cambiarEstado('archived')"
+                    >
+                      {{ t('admin.events.formulario.archivar') }}
+                    </app-button>
+                  }
+                </div>
+                @if (errorEstado(); as mensaje) {
+                  <app-alert tone="error">{{ mensaje }}</app-alert>
+                }
+              </app-card>
+              @if (estadoActual() === 'published' || estadoActual() === 'cancelled') {
+                <app-event-cancel-card
+                  [eventId]="eventId()"
+                  [yaCancelado]="estadoActual() === 'cancelled'"
+                  (cancelacionConfirmada)="estadoActual.set('cancelled')"
+                  (eliminado)="alEliminar()"
+                />
               }
             </div>
-            @if (errorEstado(); as mensaje) {
-              <app-alert tone="error">{{ mensaje }}</app-alert>
-            }
-          </app-card>
 
-          @if (estadoActual() === 'published' || estadoActual() === 'cancelled') {
-            <app-event-cancel-card
-              [eventId]="eventId()"
-              [yaCancelado]="estadoActual() === 'cancelled'"
-              (cancelacionConfirmada)="estadoActual.set('cancelled')"
-              (eliminado)="alEliminar()"
-            />
+            <app-card [heading]="t('admin.events.formulario.portada')">
+              <app-media-picker
+                #portadaPicker
+                [etiqueta]="t('admin.events.formulario.portada')"
+                [aceptados]="PORTADA_ACEPTADOS"
+                kind="events"
+                variante="ancha"
+                [url]="portadaUrl()"
+                [permitirQuitar]="true"
+                [quitando]="quitandoPortada()"
+                (mediaElegido)="asignarPortada($event, portadaPicker)"
+                (quitado)="quitarPortada()"
+              />
+              @if (errorPortada(); as mensaje) {
+                <app-alert tone="error">{{ mensaje }}</app-alert>
+              }
+            </app-card>
+
+            <app-event-nearby-places [eventId]="eventId()" />
           }
-        </div>
-      }
+        </aside>
+      </div>
     </ng-container>
   `,
   styles: `
+    /* El formulario a la izquierda (3/5 del ancho) y, a la derecha, estado y
+     * cancelar el evento en una fila; debajo, la portada y «Qué hay cerca». */
     :host {
       display: block;
     }
-    /* Portada y estado caben de sobra una junto a la otra: antes iban
-     * apiladas a todo el ancho de la página sin motivo. */
-    .fila-superior {
+    .principal {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
       gap: var(--space-lg);
       align-items: start;
+    }
+    .lateral {
+      display: grid;
+      gap: var(--space-lg);
+      min-width: 0;
+    }
+    /* Estado y cancelar lado a lado mientras quepan; si no, uno bajo otro.
+     * Con la misma altura: cada host se estira a la fila y, al ser rejilla,
+     * estira también la tarjeta que lleva dentro. */
+    .estado-cancelar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+      gap: var(--space-lg);
+    }
+    .estado-cancelar > * {
+      display: grid;
+    }
+    /* Sin sitio para la columna lateral, todo baja tras el formulario. */
+    @media (max-width: 75rem) {
+      .principal {
+        grid-template-columns: minmax(0, 1fr);
+      }
     }
     .acciones-estado {
       display: flex;
@@ -141,6 +185,7 @@ export class EventDetails implements OnInit {
   protected readonly cambiandoEstado = signal(false);
   protected readonly errorEstado = signal<string | null>(null);
   protected readonly errorPortada = signal<string | null>(null);
+  protected readonly quitandoPortada = signal(false);
 
   protected readonly estadoActual = signal<EventStatus>('draft');
   protected readonly portadaUrl = signal<string | null>(null);
@@ -190,6 +235,28 @@ export class EventDetails implements OnInit {
       );
     } finally {
       this.cambiandoEstado.set(false);
+    }
+  }
+
+  /** Desasigna la portada en el servidor (`DELETE /events/{id}/cover`): la
+   * imagen sigue en la biblioteca. Sin previsualización optimista: el
+   * selector solo vuelve a vacío cuando la API lo confirma. */
+  protected async quitarPortada(): Promise<void> {
+    this.errorPortada.set(null);
+    this.quitandoPortada.set(true);
+    try {
+      const actualizado = await firstValueFrom(
+        this.http.delete<EventoResumen>(this.api.url(`/events/${this.eventId()}/cover`)),
+      );
+      this.portadaUrl.set(actualizado.cover_url);
+    } catch (error) {
+      this.errorPortada.set(
+        error instanceof ApiError
+          ? error.message
+          : this.transloco.translate('admin.events.formulario.error'),
+      );
+    } finally {
+      this.quitandoPortada.set(false);
     }
   }
 

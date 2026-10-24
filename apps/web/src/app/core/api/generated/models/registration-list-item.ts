@@ -6,6 +6,7 @@
  * Fila del listado de inscripciones del panel de organizador.
  */
 export interface RegistrationListItem {
+  absences_count?: number;
   confirmed_at: (string | null);
   created_at: string;
   email: string;

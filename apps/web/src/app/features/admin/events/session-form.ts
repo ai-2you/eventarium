@@ -9,6 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslocoDirective, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -16,17 +17,26 @@ import { ApiService } from '../../../core/api/api.service';
 import { ApiError } from '../../../core/api/error.interceptor';
 import { Alert } from '../../../shared/ui/alert';
 import { Button } from '../../../shared/ui/button';
+import { DatetimePicker } from '../../../shared/ui/datetime-picker';
 import { Input } from '../../../shared/ui/input';
 import { Select, type SelectOption } from '../../../shared/ui/select';
-import { capitalizarClaveDeTraduccion } from '../../../shared/text/capitalizar-clave-de-traduccion';
 import { isoAValorLocal } from './datetime-local';
 
-export type SessionType = 'talk' | 'break' | 'service' | 'other';
 type VideoPlatform = '' | 'youtube' | 'vimeo' | 'twitch' | 'other';
+
+/** El tipo de una sesión tal y como lo pinta la agenda (`SessionTypeRef`). */
+export interface TipoDeSesionRef {
+  readonly id: string;
+  readonly name: string;
+  readonly color: string;
+  readonly is_break: boolean;
+}
 
 export interface EventSession {
   readonly id: string;
-  readonly session_type: SessionType;
+  /** Texto heredado (clave base); el tipo de verdad es `type`. */
+  readonly session_type: string;
+  readonly type?: TipoDeSesionRef;
   readonly title: string;
   readonly starts_at: string;
   readonly ends_at: string;
@@ -44,10 +54,14 @@ interface EventVenueOption {
   readonly name: string;
 }
 
-const SESSION_TYPES: readonly SessionType[] = ['talk', 'break', 'service', 'other'];
+/** Un tipo del catálogo de la organización, con lo que pide el formulario. */
+interface TipoDelCatalogo extends TipoDeSesionRef {
+  readonly description: string | null;
+  readonly is_active: boolean;
+}
 
 function vacio(): {
-  session_type: SessionType;
+  session_type: string;
   title: string;
   starts_at: string;
   ends_at: string;
@@ -57,7 +71,7 @@ function vacio(): {
   materiales: string;
 } {
   return {
-    session_type: 'talk',
+    session_type: '',
     title: '',
     starts_at: '',
     ends_at: '',
@@ -78,7 +92,7 @@ function vacio(): {
 @Component({
   selector: 'app-session-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, Alert, Button, Input, Select],
+  imports: [TranslocoDirective, RouterLink, Alert, Button, DatetimePicker, Input, Select],
   template: `
     <ng-container *transloco="let t">
       <form (submit)="guardar($event)" novalidate class="formulario">
@@ -94,8 +108,18 @@ function vacio(): {
           fieldId="sesion-tipo"
           [label]="t('admin.events.agenda.tipo')"
           [options]="opcionesDeTipo()"
+          [hint]="ayudaDeTipo()"
           [(value)]="tipo"
         />
+        <!-- Otra pestaña: navegar aquí perdería lo escrito en el formulario. -->
+        <a
+          class="gestionar-tipos"
+          routerLink="/dashboard/session-types"
+          target="_blank"
+          [attr.aria-label]="t('admin.events.agenda.gestionarTiposAria')"
+        >
+          <span aria-hidden="true">＋</span> {{ t('admin.events.agenda.gestionarTipos') }}
+        </a>
 
         <app-input
           fieldId="sesion-titulo"
@@ -103,18 +127,21 @@ function vacio(): {
           [required]="true"
           [(value)]="titulo"
         />
-        <app-input
+        <app-datetime-picker
           fieldId="sesion-inicio"
-          type="datetime-local"
           [label]="t('admin.events.agenda.inicio')"
           [required]="true"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
           [(value)]="inicio"
         />
-        <app-input
+        <app-datetime-picker
           fieldId="sesion-fin"
-          type="datetime-local"
           [label]="t('admin.events.agenda.fin')"
           [required]="true"
+          [min]="limitesActivos().min"
+          [max]="limitesActivos().max"
+          [error]="errorDeFin()"
           [(value)]="fin"
         />
         <app-input fieldId="sesion-sala" [label]="t('admin.events.agenda.sala')" [(value)]="sala" />
@@ -176,6 +203,19 @@ function vacio(): {
     </ng-container>
   `,
   styles: `
+    /* Ámbar suave, como un aviso y no un error: se ve que se puede pulsar. */
+    .gestionar-tipos {
+      justify-self: start;
+      margin-top: calc(-1 * var(--space-sm));
+      color: var(--tipo-ambar);
+      font-size: var(--fs-sm);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+    .gestionar-tipos:hover {
+      text-decoration-style: solid;
+    }
     .formulario {
       display: grid;
       gap: var(--space-md);
@@ -223,10 +263,16 @@ export class SessionForm implements OnInit {
   private readonly api = inject(ApiService);
   private readonly transloco = inject(TranslocoService);
 
-  protected readonly tiposDisponibles = SESSION_TYPES;
+  /** El catálogo de la organización (también los desactivados: la sesión en
+   * edición puede tener uno, y debe seguir pudiéndose guardar con él). */
+  protected readonly catalogo = signal<readonly TipoDelCatalogo[]>([]);
   protected readonly guardando = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly sedes = signal<EventVenueOption[]>([]);
+  /** Rango del evento en hora local (la misma que usan los campos y la que se
+   * convierte a UTC al guardar): la sesión tiene que caer dentro. Vacío hasta
+   * cargar el evento, y entonces sin límite: el backend lo vuelve a exigir. */
+  protected readonly limites = signal<{ min: string; max: string }>({ min: '', max: '' });
 
   private readonly valoresIniciales = vacio();
   // Tipado como `string`, no `SessionType`/`VideoPlatform`: `app-select` exige
@@ -247,11 +293,15 @@ export class SessionForm implements OnInit {
     ...this.sedes().map((sede) => ({ value: sede.id, label: sede.name })),
   ]);
 
+  /** Los activos, más el que ya tiene la sesión aunque esté desactivado. */
   protected readonly opcionesDeTipo = computed<SelectOption[]>(() =>
-    this.tiposDisponibles.map((opcion) => ({
-      value: opcion,
-      label: this.transloco.translate('admin.events.agenda.tipo' + this.capitaliza(opcion)),
-    })),
+    this.catalogo()
+      .filter((tipo) => tipo.is_active || tipo.id === this.tipo())
+      .map((tipo) => ({ value: tipo.id, label: tipo.name })),
+  );
+
+  protected readonly ayudaDeTipo = computed(
+    () => this.catalogo().find((tipo) => tipo.id === this.tipo())?.description ?? null,
   );
 
   protected readonly opcionesDeVideoPlatform = computed<SelectOption[]>(() => [
@@ -270,6 +320,39 @@ export class SessionForm implements OnInit {
 
   ngOnInit(): void {
     void this.cargarSedes();
+    void this.cargarLimites();
+    void this.cargarTipos();
+    // Montado ya con una sesión (la edición en línea de la agenda): se rellena
+    // al nacer, sin esperar a que el padre llame a `cargarSesion`.
+    const sesion = this.sesion();
+    if (sesion) {
+      this.cargarSesion(sesion);
+    }
+  }
+
+  /** El fin, en el momento: antes que el inicio no tiene sentido guardarlo. */
+  protected readonly errorDeFin = computed(() =>
+    this.inicio() && this.fin() && this.fin() <= this.inicio()
+      ? this.transloco.translate('admin.events.agenda.finAntesDeInicio')
+      : null,
+  );
+
+  /** Fechas con las que se abrió la sesión en edición (`null` en el alta). */
+  private readonly fechasCargadas = signal<{ inicio: string; fin: string } | null>(null);
+
+  /** Una sesión que ya estaba fuera del evento (anterior a esta regla) se puede
+   * seguir editando mientras no se toquen sus fechas, como en el backend: hasta
+   * entonces no se le aplican los límites. */
+  protected readonly limitesActivos = computed(() => {
+    const cargadas = this.fechasCargadas();
+    const sinCambios =
+      cargadas !== null && cargadas.inicio === this.inicio() && cargadas.fin === this.fin();
+    return sinCambios ? { min: '', max: '' } : this.limites();
+  });
+
+  private fueraDelEvento(valor: string): boolean {
+    const { min, max } = this.limitesActivos();
+    return (min !== '' && valor < min) || (max !== '' && valor > max);
   }
 
   /** La sesión en edición, si la hay: quien consume lee esto, no el input crudo. */
@@ -282,10 +365,11 @@ export class SessionForm implements OnInit {
       this.limpiar();
       return;
     }
-    this.tipo.set(sesion.session_type);
+    this.tipo.set(sesion.type?.id ?? '');
     this.titulo.set(sesion.title);
     this.inicio.set(isoAValorLocal(sesion.starts_at));
     this.fin.set(isoAValorLocal(sesion.ends_at));
+    this.fechasCargadas.set({ inicio: this.inicio(), fin: this.fin() });
     this.sala.set(sesion.room ?? '');
     this.videoPlatform.set((sesion.video_platform ?? '') as VideoPlatform);
     this.videoUrl.set(sesion.video_url ?? '');
@@ -303,10 +387,6 @@ export class SessionForm implements OnInit {
     this.cancelada.emit();
   }
 
-  protected capitaliza(valor: string): string {
-    return capitalizarClaveDeTraduccion(valor);
-  }
-
   protected alTextarea(evento: Event): string {
     return (evento.target as HTMLTextAreaElement).value;
   }
@@ -319,9 +399,18 @@ export class SessionForm implements OnInit {
       this.formError.set(this.transloco.translate('admin.events.agenda.camposRequeridos'));
       return;
     }
+    if (this.errorDeFin()) {
+      this.formError.set(this.errorDeFin());
+      return;
+    }
+    if (this.fueraDelEvento(this.inicio()) || this.fueraDelEvento(this.fin())) {
+      this.formError.set(this.transloco.translate('admin.events.agenda.fueraDelEvento'));
+      return;
+    }
 
     const payload = {
-      session_type: this.tipo() as SessionType,
+      // Sin tipo elegido, la API pone el primero activo que no es pausa.
+      session_type_id: this.tipo() || null,
       title: this.titulo().trim(),
       starts_at: new Date(this.inicio()).toISOString(),
       ends_at: new Date(this.fin()).toISOString(),
@@ -362,7 +451,7 @@ export class SessionForm implements OnInit {
 
   private limpiar(): void {
     const vacios = vacio();
-    this.tipo.set(vacios.session_type);
+    this.tipo.set(this.tipoPorDefecto());
     this.titulo.set(vacios.title);
     this.inicio.set(vacios.starts_at);
     this.fin.set(vacios.ends_at);
@@ -371,6 +460,7 @@ export class SessionForm implements OnInit {
     this.videoUrl.set(vacios.video_url);
     this.materiales.set(vacios.materiales);
     this.venueId.set('');
+    this.fechasCargadas.set(null);
     this.formError.set(null);
   }
 
@@ -380,6 +470,48 @@ export class SessionForm implements OnInit {
       .map((linea) => linea.trim())
       .filter((linea) => linea.length > 0)
       .map((url) => ({ url }));
+  }
+
+  private tipoPorDefecto(): string {
+    const tipos = this.catalogo();
+    return (
+      (
+        tipos.find((tipo) => tipo.is_active && !tipo.is_break) ??
+        tipos.find((tipo) => tipo.is_active)
+      )?.id ?? ''
+    );
+  }
+
+  private async cargarTipos(): Promise<void> {
+    try {
+      const tipos = await firstValueFrom(
+        this.http.get<TipoDelCatalogo[]>(this.api.url('/organizations/me/session-types')),
+      );
+      this.catalogo.set(tipos);
+      // Alta sin tipo elegido: el primero activo que no es una pausa, como la API.
+      if (!this.tipo()) {
+        this.tipo.set(this.tipoPorDefecto());
+      }
+    } catch {
+      // Sin catálogo el desplegable queda vacío y la API elige el tipo por defecto.
+    }
+  }
+
+  private async cargarLimites(): Promise<void> {
+    try {
+      const evento = await firstValueFrom(
+        this.http.get<{ starts_at: string; ends_at: string }>(
+          this.api.url(`/events/${this.eventId()}`),
+        ),
+      );
+      this.limites.set({
+        min: isoAValorLocal(evento.starts_at, { redondearArriba: true }),
+        max: isoAValorLocal(evento.ends_at),
+      });
+    } catch {
+      // Sin el evento no hay límites en el formulario; el backend sigue
+      // rechazando una sesión fuera de sus fechas.
+    }
   }
 
   private async cargarSedes(): Promise<void> {

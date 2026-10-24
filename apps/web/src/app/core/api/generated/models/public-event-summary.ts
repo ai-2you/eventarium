@@ -33,6 +33,8 @@ export interface PublicEventSummary {
   starts_at: string;
   summary: (string | null);
   tags?: Array<string>;
+  ticket_sales?: ('open' | 'upcoming' | 'closed' | null);
+  ticket_sales_opens_at?: (string | null);
   timezone: string;
   title: string;
 }

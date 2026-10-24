@@ -3,9 +3,10 @@
 
 
 /**
- * Enlace social del organizador.
+ * Enlace social del organizador: uno por red; `other` lleva su nombre.
  */
 export interface SocialLinkInput {
-  kind: string;
+  kind: 'linkedin' | 'instagram' | 'x' | 'facebook' | 'youtube' | 'tiktok' | 'other';
+  label?: (string | null);
   url: string;
 }

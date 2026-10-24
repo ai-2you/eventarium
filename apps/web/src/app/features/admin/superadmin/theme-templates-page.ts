@@ -23,6 +23,7 @@ import { Input } from '../../../shared/ui/input';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RadioGroup } from '../../../shared/ui/radio';
 import { ThemeTemplatePreview } from './theme-template-preview';
+import { slugify } from '../../../core/texto/slug';
 
 type ModoDeTema = 'dark' | 'light';
 
@@ -39,20 +40,6 @@ interface FormularioDePlantilla {
  * minúsculas y dígitos, con guiones simples como separador. */
 const PATRON_CLAVE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LONGITUD_MAXIMA_CLAVE = 40;
-
-/** Slug por defecto a partir del nombre: minúsculas, sin diacríticos, espacios y
- * símbolos convertidos en un único guion. Es solo una propuesta editable, nunca la
- * validación final (esa la hace `PATRON_CLAVE` contra lo que quede en el campo). */
-function slugificar(valor: string): string {
-  return valor
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, LONGITUD_MAXIMA_CLAVE);
-}
 
 function formularioVacio(): FormularioDePlantilla {
   const modoVacio = (): Record<string, string> =>
@@ -753,7 +740,10 @@ export class ThemeTemplatesPage {
     this.formulario.update((actual) => ({
       ...actual,
       name: valor,
-      key: !actual.id && !this.claveEditadaManualmente() ? slugificar(valor) : actual.key,
+      key:
+        !actual.id && !this.claveEditadaManualmente()
+          ? slugify(valor, LONGITUD_MAXIMA_CLAVE)
+          : actual.key,
     }));
   }
 

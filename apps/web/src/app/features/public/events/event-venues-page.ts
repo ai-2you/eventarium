@@ -33,6 +33,7 @@ import type { PublicEventDetail, PublicEventSession, PublicVenue } from './event
 import { type EstiloDeSede, estiloDeSede } from './venue-colors';
 import { VenueGridSection } from './sections/venue-grid-section';
 import { VenueListSection } from './sections/venue-list-section';
+import { DirectionsLink } from '../../../shared/ui/directions-link';
 
 /** Día de programa ya agrupado: fecha calendario en la zona del evento. */
 interface DiaDePrograma {
@@ -67,6 +68,7 @@ function fechaEnZona(iso: string, zona: string): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
+    DirectionsLink,
     RouterLink,
     TranslocoDirective,
     Alert,
@@ -121,6 +123,7 @@ function fechaEnZona(iso: string, zona: string): string {
                         }
                         {{ sede.address }}
                       </p>
+                      <app-directions-link [lugar]="sede.name" [direccion]="sede.address" />
                     </div>
                   }
                 </div>
@@ -576,6 +579,7 @@ export class EventVenuesPage implements OnInit {
       description: evento.summary ?? this.traducir('publico.eventos.sinResumen'),
       image: evento.cover_url,
       canonica: urlEvento(evento.organization.slug, evento.slug, 'programa'),
+      noIndexar: evento.visibility === 'hidden',
     });
   }
 }

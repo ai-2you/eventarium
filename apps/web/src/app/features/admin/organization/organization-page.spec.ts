@@ -174,6 +174,71 @@ describe('OrganizationPage', () => {
       expect(fixture.nativeElement.querySelector('a.publica__ver')).not.toBeNull();
     });
 
+    it('envía la dirección por partes, su casilla y las redes', async () => {
+      const fixture = await abrir({
+        ...ORGANIZACION,
+        postal_code: null,
+        city: null,
+        province: null,
+        address_public: true,
+        social_links: [],
+      });
+      const escribir = (id: string, valor: string) => {
+        const campo = fixture.nativeElement.querySelector(`#${id}`) as HTMLInputElement;
+        campo.value = valor;
+        campo.dispatchEvent(new Event('input'));
+      };
+      const porAutocompletado = (valor: string) =>
+        [...fixture.nativeElement.querySelectorAll('input')].find(
+          (i) => (i as HTMLInputElement).autocomplete === valor,
+        ) as HTMLInputElement;
+      for (const [auto, valor] of [
+        ['postal-code', '46001'],
+        ['address-level2', 'Valencia'],
+      ]) {
+        const campo = porAutocompletado(auto);
+        campo.value = valor;
+        campo.dispatchEvent(new Event('input'));
+      }
+      escribir('red-instagram', 'https://instagram.com/acme');
+      escribir('red-libre-nombre', 'Mastodon');
+      escribir('red-libre-url', 'https://mastodon.social/@acme');
+      await avanzar(fixture);
+
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+      const peticion = http.expectOne('/api/v1/organizations/me');
+      expect(peticion.request.body).toMatchObject({
+        postal_code: '46001',
+        city: 'Valencia',
+        address_public: true,
+        social_links: [
+          { kind: 'instagram', url: 'https://instagram.com/acme' },
+          { kind: 'other', url: 'https://mastodon.social/@acme', label: 'Mastodon' },
+        ],
+      });
+      peticion.flush(ORGANIZACION);
+      await avanzar(fixture);
+      await avanzar(fixture);
+    });
+
+    it('no guarda un enlace libre a medias', async () => {
+      const fixture = await abrir({ ...ORGANIZACION, social_links: [] });
+      const campo = fixture.nativeElement.querySelector('#red-libre-nombre') as HTMLInputElement;
+      campo.value = 'Mastodon';
+      campo.dispatchEvent(new Event('input'));
+      await avanzar(fixture);
+      (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+        new Event('submit'),
+      );
+      await avanzar(fixture);
+
+      http.expectNone((p) => p.method === 'PATCH');
+      expect(fixture.nativeElement.textContent).toContain('necesita nombre y dirección');
+    });
+
     it('rechaza una web que no empiece por http:// o https://, sin llamar al API', async () => {
       const fixture = await abrir(ORGANIZACION);
       const web = fixture.nativeElement.querySelector('input[type="url"]') as HTMLInputElement;

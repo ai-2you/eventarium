@@ -17,14 +17,13 @@ export type { MediaElegida, MediaKind };
  * — ahí sí hace falta, para no ocupar el espacio del campo con el dropzone
  * entero solo por sustituir una imagen que ya se ve bien.
  *
- * Sin "Quitar" a propósito: ninguno de los 4 endpoints de asignación
- * (logo de organización, identidad de plataforma, portada de evento, logo
- * de patrocinador) admite desasignar (no hay contrato `{media_id: null}`),
- * así que un botón "Quitar" que solo limpiara el campo local sería
- * engañoso — la imagen seguiría asignada de verdad en el servidor y
- * reaparecería al recargar o al guardar (hallazgo de code-review). Enviar
- * una imagen a la papelera SIGUE siendo una acción real, pero vive dentro
- * del modal de biblioteca (`MediaFields`), no aquí.
+ * "Quitar" solo aparece con `permitirQuitar`, y solo debe activarlo quien
+ * tenga un endpoint que desasigne de verdad (hoy, la portada de evento con
+ * `DELETE /events/{id}/cover`): un botón que solo limpiara el campo local
+ * sería engañoso — la imagen seguiría asignada en el servidor y reaparecería
+ * al recargar. El picker solo emite `quitado`; el consumidor llama a su
+ * endpoint y, si va bien, pone `url` a `null`. Enviar una imagen a la
+ * papelera es otra cosa y vive dentro del modal de biblioteca (`MediaFields`).
  */
 @Component({
   selector: 'app-media-picker',
@@ -45,6 +44,16 @@ export type { MediaElegida, MediaKind };
             <app-button variant="secundario" type="button" (pulsado)="abrir()">
               {{ t('ui.media.cambiar') }}
             </app-button>
+            @if (permitirQuitar()) {
+              <app-button
+                variant="peligro"
+                type="button"
+                [loading]="quitando()"
+                (pulsado)="quitado.emit()"
+              >
+                {{ t('ui.media.quitar') }}
+              </app-button>
+            }
           </div>
         </div>
       } @else {
@@ -110,7 +119,9 @@ export type { MediaElegida, MediaKind };
       margin-bottom: var(--space-sm);
     }
     .campo-ancho .acciones {
-      display: block;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
     }
     .acciones {
       display: grid;
@@ -130,6 +141,10 @@ export class MediaPicker {
   readonly kind = input.required<MediaKind>();
   /** Si el consumidor puede elegir/subir por URL (ver `MediaFields`). */
   readonly permitirUrl = input(true);
+  /** Muestra "Quitar" junto a "Cambiar" (ver comentario de la clase). */
+  readonly permitirQuitar = input(false);
+  /** Mientras el consumidor desasigna la imagen en el servidor. */
+  readonly quitando = input(false);
 
   /** La URL de la imagen a previsualizar, en doble enlace — el consumidor la
    * inicializa con lo que ya tenga guardado (p. ej. `branding.logo_url`). */
@@ -144,6 +159,8 @@ export class MediaPicker {
    * quien prefiera reaccionar a la elección (p. ej. subir de inmediato)
    * en vez de leer los signals tras el hecho. */
   readonly mediaElegido = output<MediaElegida>();
+  /** Se pulsó "Quitar": el consumidor desasigna la imagen en su endpoint. */
+  readonly quitado = output<void>();
 
   private readonly dialogo = viewChild.required(MediaDialog);
   private anterior: { url: string | null; mediaId: string | null } | null = null;

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.modules.events.models import Event
 from app.modules.events.schemas import PublicCategoryRef, PublicEventSummary
 from app.modules.organizations.schemas import PublicOrganizationRef
@@ -19,7 +21,7 @@ def categoria_publica(evento: Event) -> PublicCategoryRef | None:
 def resumen_publico(
     evento: Event,
     reservadas: int,
-    precio: payments_service.PrecioPublico | None,
+    venta: payments_service.VentaPublica | None,
     cover_url: str | None,
     organizacion: PublicOrganizationRef,
 ) -> PublicEventSummary:
@@ -42,7 +44,26 @@ def resumen_publico(
         registration_opens_at=evento.registration_opens_at,
         capacity=evento.capacity,
         reserved_count=reservadas,
-        price_from_cents=precio.tipo.price_cents if precio else None,
-        price_currency=precio.tipo.currency if precio else None,
-        price_multiple=precio.varios_precios if precio else False,
+        **campos_de_venta(evento, venta),
     )
+
+
+def campos_de_venta(evento: Event, venta: payments_service.VentaPublica | None) -> dict[str, Any]:
+    """Precio «desde» y estado de la venta para el resumen y la ficha públicos.
+
+    La apertura que se anuncia es la más tardía entre la del tipo de entrada y
+    la de la inscripción del evento (`registration_opens_at`): antes de ambas
+    no se puede comprar, así que anunciar la primera prometería una hora en la
+    que el formulario sigue cerrado.
+    """
+    precio = venta.precio if venta else None
+    abre = venta.abre if venta else None
+    if abre is not None and evento.registration_opens_at is not None:
+        abre = max(abre, evento.registration_opens_at)
+    return {
+        "price_from_cents": precio.tipo.price_cents if precio else None,
+        "price_currency": precio.tipo.currency if precio else None,
+        "price_multiple": precio.varios_precios if precio else False,
+        "ticket_sales": venta.estado if venta else None,
+        "ticket_sales_opens_at": abre,
+    }

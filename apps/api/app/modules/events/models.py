@@ -25,6 +25,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     Numeric,
     String,
@@ -80,6 +81,10 @@ class Event(Base, TimestampMixin):
             "payment_checkout_window_minutes BETWEEN 30 AND 1439",
             name="ck_events_payment_checkout_window_minutes_rango",
         ),
+        CheckConstraint(
+            "reminder_hours_before IN (2, 6, 12, 24, 48, 72)",
+            name="ck_events_reminder_hours_before",
+        ),
         # Biblioteca de medios (plan `260918-1944`): FK compuesta, mismo
         # motivo que las demás de este fichero.
         ForeignKeyConstraint(
@@ -103,7 +108,7 @@ class Event(Base, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("event_categories.id", ondelete="RESTRICT"), nullable=True
     )
     category: Mapped[EventCategory | None] = relationship(lazy="selectin")
-    # Etiquetas libres, normalizadas en minúsculas (máx. 5; ver `normalizar_etiquetas`).
+    # Etiquetas libres, normalizadas en minúsculas (máx. 10; ver `normalizar_etiquetas`).
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, default=list, server_default=text("'{}'")
     )
@@ -157,6 +162,19 @@ class Event(Base, TimestampMixin):
     # evento — ver decisión de validación, sesión 1, del plan de la fase 6.
     payment_checkout_window_minutes: Mapped[int] = mapped_column(
         Integer, nullable=False, default=30
+    )
+    # Recordatorio a los inscritos confirmados antes del evento (activado por
+    # defecto; 48 h en los de pago, a tiempo de cancelar con reembolso).
+    reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    reminder_hours_before: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=24, server_default=text("24")
+    )
+    # Cuándo cerró el organizador la asistencia: solo entonces cuentan las
+    # ausencias del evento (un check-in a medias no marca a nadie).
+    attendance_closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     # Geocodificación de `location_address` con Nominatim (mismo mecanismo que
     # `EventVenue`, ver ahí la justificación completa). `null` mientras no haya
@@ -213,6 +231,58 @@ class Event(Base, TimestampMixin):
     )
 
 
+class SessionType(Base, TimestampMixin):
+    """Tipo de sesión de la agenda, propio de cada organización (Charla, Taller,
+    Mesa redonda…). Cada organización nace con unos base (`base_key`) que puede
+    renombrar, desactivar o ampliar; los propios no tienen `base_key`."""
+
+    __tablename__ = "session_types"
+    __table_args__ = (
+        # Para la FK compuesta de `EventSession.session_type_id`.
+        UniqueConstraint("id", "organization_id", name="uq_session_types_id_organization_id"),
+        # «Taller» y «taller » son el mismo tipo dentro de una organización.
+        Index(
+            "uq_session_types_organization_id_nombre",
+            "organization_id",
+            text("lower(btrim(name))"),
+            unique=True,
+        ),
+        Index(
+            "uq_session_types_organization_id_base_key",
+            "organization_id",
+            "base_key",
+            unique=True,
+            postgresql_where=text("base_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=new_uuid7)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Clave de la paleta cerrada (`session_types.PALETA`): contraste garantizado en
+    # tema claro y oscuro, nunca un color libre.
+    color: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Pausa (descanso, comida…): se pinta apagada en la agenda y no pide ponentes.
+    is_break: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    # talk | workshop | break | service | other en los base; `null` en los propios.
+    # Empareja datos antiguos y alias del MCP aunque el nombre se haya cambiado.
+    base_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    display_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+
+
 class EventSession(Base, TimestampMixin):
     """Sesión de la agenda de un evento: charla, descanso, servicio u otro."""
 
@@ -237,6 +307,13 @@ class EventSession(Base, TimestampMixin):
             name="fk_event_sessions_venue_id_organization_id",
             ondelete="SET NULL",
         ),
+        # Sin `ondelete`: un tipo en uso no se borra (el servicio lo explica con
+        # un 409 antes de llegar aquí); se desactiva.
+        ForeignKeyConstraint(
+            ["session_type_id", "organization_id"],
+            ["session_types.id", "session_types.organization_id"],
+            name="fk_event_sessions_session_type_id_organization_id",
+        ),
         UniqueConstraint("id", "organization_id", name="uq_event_sessions_id_organization_id"),
     )
 
@@ -247,8 +324,21 @@ class EventSession(Base, TimestampMixin):
     # o espacio concreto dentro de esa sede, texto libre sin relación con `venue`.
     # `null`: eventos de una sola sede no necesitan asignar una sede a cada sesión.
     venue_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
-    # talk | break | service | other
+    # Texto heredado (talk | workshop | break | service | other): durante la
+    # transición guarda la `base_key` del tipo (u `other` en los propios) para
+    # los clientes que aún lo leen. La verdad es `session_type_id`.
     session_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    session_type_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), nullable=False, index=True
+    )
+    # Se carga con la sesión (una tabla pequeña): pintar el tipo nunca es N+1.
+    tipo: Mapped[SessionType] = relationship(
+        SessionType,
+        primaryjoin="EventSession.session_type_id == SessionType.id",
+        foreign_keys=[session_type_id],
+        lazy="joined",
+        viewonly=True,
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -799,6 +799,60 @@
         }
       }
     },
+    "/api/v1/organizations/me/members/{organization_member_id}/profile": {
+      "patch": {
+        "tags": [
+          "organizaciones"
+        ],
+        "summary": "Editar la ficha de un rol de una persona",
+        "description": "Sustituye los datos de perfil de esa membresía (p. ej. la biografía de un ponente). Puede hacerlo su titular o quien tenga `members:write` y pudiera conceder ese rol. Con `expected_updated_at`, un cambio hecho por otra persona entre medias da 409 en vez de pisarse.",
+        "operationId": "update_member_profile_api_v1_organizations_me_members__organization_member_id__profile_patch",
+        "parameters": [
+          {
+            "name": "organization_member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Member Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberRoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/me/members/{organization_member_id}": {
       "delete": {
         "tags": [
@@ -4142,7 +4196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EventResponse_"
+                  "$ref": "#/components/schemas/Page_EventListItem_"
                 }
               }
             }
@@ -4182,6 +4236,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/tags": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Sugerir etiquetas ya usadas",
+        "description": "Etiquetas de los eventos de la organización que contienen `q` (primero las que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta el autocompletado del campo de etiquetas.",
+        "operationId": "suggest_event_tags_api_v1_events_tags_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Suggest Event Tags Api V1 Events Tags Get"
                 }
               }
             }
@@ -4326,6 +4429,49 @@
         }
       }
     },
+    "/api/v1/events/{event_id}/preview": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Vista previa de la ficha pública de un evento",
+        "description": "La ficha tal y como la verá el público, en cualquier estado (también un\nborrador): para revisarla antes de publicar. Solo para el equipo.",
+        "operationId": "preview_event_api_v1_events__event_id__preview_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEventDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/cover": {
       "put": {
         "tags": [
@@ -4354,6 +4500,47 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Quitar la portada del evento",
+        "description": "Deja el evento sin portada. Una imagen de la biblioteca de medios sigue en la biblioteca; solo se borra el objeto de una portada legada, que no tiene otro dueño.",
+        "operationId": "remove_cover_api_v1_events__event_id__cover_delete",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4901,6 +5088,52 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/participations": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Participaciones del roster en las sesiones del evento",
+        "operationId": "list_event_participations_api_v1_events__event_id__participations_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionParticipationOut"
+                  },
+                  "title": "Response List Event Participations Api V1 Events  Event Id  Participations Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -5941,7 +6174,7 @@
           "público"
         ],
         "summary": "Ver la ficha pública de un patrocinador",
-        "description": "Anidado bajo el evento, mismo criterio que la sesión: exige `published` + `public` además de que el patrocinador pertenezca a este evento. Nunca lleva el importe de la aportación (ver `PublicSponsor`).",
+        "description": "Anidado bajo el evento, mismo criterio que la sesión: exige `published` y visibilidad `public` o `hidden` (solo con enlace) además de que el patrocinador pertenezca a este evento. Nunca lleva el importe de la aportación (ver `PublicSponsor`).",
         "operationId": "get_public_sponsor_api_v1_public_organizations__org_slug__events__slug__sponsors__sponsor_id__get",
         "parameters": [
           {
@@ -6000,7 +6233,7 @@
           "público"
         ],
         "summary": "Ver el detalle de una sesión publicada",
-        "description": "Anidado bajo el evento: exige que el evento sea `published` + `public` además de que la propia sesión le pertenezca. Sin este anidamiento, un `id` de sesión (UUIDv7, con entropía reducida frente a un v4 dentro de una ventana de tiempo conocida) sería enumerable y filtraría agendas de eventos sin publicar.",
+        "description": "Anidado bajo el evento: exige que el evento sea `published` y `public` o `hidden` además de que la propia sesión le pertenezca. Sin este anidamiento, un `id` de sesión (UUIDv7, con entropía reducida frente a un v4 dentro de una ventana de tiempo conocida) sería enumerable y filtraría agendas de eventos sin publicar.",
         "operationId": "get_public_session_api_v1_public_organizations__org_slug__events__slug__sessions__session_id__get",
         "parameters": [
           {
@@ -7166,13 +7399,55 @@
         }
       }
     },
+    "/api/v1/public/registrations/cancel/preview": {
+      "post": {
+        "tags": [
+          "público"
+        ],
+        "summary": "Ver qué se cancelaría con un enlace de autocancelación",
+        "description": "No consume el token: devuelve el evento, si ya ha empezado y si se devolvería el pago, para que la persona confirme antes de cancelar.",
+        "operationId": "preview_cancel_registration_api_v1_public_registrations_cancel_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/registrations/cancel": {
       "post": {
         "tags": [
           "público"
         ],
         "summary": "Cancelar una inscripción por autocancelación",
-        "description": "Consume el token del enlace de cancelación (un solo uso). Si liberaba una plaza confirmada, promueve automáticamente a la lista de espera.",
+        "description": "Consume el token del enlace de cancelación (un solo uso). Si liberaba una plaza confirmada, promueve automáticamente a la lista de espera. Una vez empezado el evento responde 409 sin gastar el enlace.",
         "operationId": "cancel_registration_api_v1_public_registrations_cancel_post",
         "requestBody": {
           "content": {
@@ -7285,6 +7560,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/mis-eventos/mios": {
+      "get": {
+        "tags": [
+          "público"
+        ],
+        "summary": "Listar «Mis eventos» con la sesión iniciada",
+        "description": "Las inscripciones del correo de la cuenta, sin enlace mágico. Exige el correo verificado (403 si no) y no se sirve durante una suplantación: el personal de plataforma no debe ver las inscripciones personales de la persona suplantada.",
+        "operationId": "mis_eventos_de_la_cuenta_api_v1_public_mis_eventos_mios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyRegistrationsResponse"
                 }
               }
             }
@@ -7541,6 +7838,133 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/attendance": {
+      "get": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Estado del cierre de asistencia de un evento",
+        "operationId": "get_attendance_api_v1_events__event_id__attendance_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/attendance/close": {
+      "post": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Cerrar la asistencia de un evento terminado",
+        "description": "Declara completo el check-in: desde entonces, quien estaba confirmado y no se escaneó cuenta como ausencia en el historial de la organización. Solo tras el fin del evento; se puede reabrir durante 7 días.",
+        "operationId": "close_attendance_api_v1_events__event_id__attendance_close_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/attendance/reopen": {
+      "post": {
+        "tags": [
+          "entradas"
+        ],
+        "summary": "Reabrir la asistencia de un evento",
+        "operationId": "reopen_attendance_api_v1_events__event_id__attendance_reopen_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
                 }
               }
             }
@@ -7826,6 +8250,213 @@
         }
       }
     },
+    "/api/v1/organizations/me/session-types": {
+      "get": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Listar los tipos de sesión de la organización",
+        "operationId": "list_session_types_api_v1_organizations_me_session_types_get",
+        "parameters": [
+          {
+            "name": "activos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Activos"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionTypeOut"
+                  },
+                  "title": "Response List Session Types Api V1 Organizations Me Session Types Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Crear un tipo de sesión",
+        "operationId": "create_session_type_api_v1_organizations_me_session_types_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/order": {
+      "put": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Reordenar los tipos de sesión",
+        "description": "Recibe **todos** los tipos en el orden nuevo; si cambiaron entretanto, 409.",
+        "operationId": "reorder_session_types_api_v1_organizations_me_session_types_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/me/session-types/{tipo_id}": {
+      "patch": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Editar un tipo de sesión",
+        "operationId": "update_session_type_api_v1_organizations_me_session_types__tipo_id__patch",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionTypeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTypeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "eventos"
+        ],
+        "summary": "Borrar un tipo de sesión que no se usa",
+        "description": "Con sesiones que lo usan responde 409: hay que desactivarlo.",
+        "operationId": "delete_session_type_api_v1_organizations_me_session_types__tipo_id__delete",
+        "parameters": [
+          {
+            "name": "tipo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/events/{event_id}/sponsors": {
       "get": {
         "tags": [
@@ -8072,6 +8703,317 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places": {
+      "get": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Listar los sitios cercanos de un evento",
+        "operationId": "list_nearby_places_api_v1_events__event_id__nearby_places_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response List Nearby Places Api V1 Events  Event Id  Nearby Places Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Añadir un sitio cercano",
+        "operationId": "create_nearby_place_api_v1_events__event_id__nearby_places_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyPlaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/order": {
+      "put": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Reordenar los sitios cercanos",
+        "operationId": "order_nearby_places_api_v1_events__event_id__nearby_places_order_put",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response Order Nearby Places Api V1 Events  Event Id  Nearby Places Order Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/copy-from/{source_event_id}": {
+      "post": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Copiar los sitios cercanos de otro evento",
+        "description": "Añade al final copias de los sitios de otro evento de la misma organización.",
+        "operationId": "copy_nearby_places_api_v1_events__event_id__nearby_places_copy_from__source_event_id__post",
+        "parameters": [
+          {
+            "name": "source_event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Event Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbyPlaceResponse"
+                  },
+                  "title": "Response Copy Nearby Places Api V1 Events  Event Id  Nearby Places Copy From  Source Event Id  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/nearby-places/{place_id}": {
+      "patch": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Editar un sitio cercano",
+        "operationId": "update_nearby_place_api_v1_events__event_id__nearby_places__place_id__patch",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NearbyPlaceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyPlaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sitios cercanos"
+        ],
+        "summary": "Quitar un sitio cercano",
+        "operationId": "delete_nearby_place_api_v1_events__event_id__nearby_places__place_id__delete",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Place Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -10908,6 +11850,26 @@
   },
   "components": {
     "schemas": {
+      "AbsenceOut": {
+        "properties": {
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_title",
+          "starts_at"
+        ],
+        "title": "AbsenceOut",
+        "description": "Un evento al que la persona no se presentó."
+      },
       "AcceptedPolicyOut": {
         "properties": {
           "version_id": {
@@ -11706,6 +12668,39 @@
         ],
         "title": "AprobarIn"
       },
+      "AttendanceOut": {
+        "properties": {
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "can_close": {
+            "type": "boolean",
+            "title": "Can Close"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attendance_closed_at",
+          "ends_at",
+          "can_close"
+        ],
+        "title": "AttendanceOut",
+        "description": "Estado del cierre de asistencia de un evento, con lo que necesita la\npantalla de check-in para ofrecerlo (sin pedir el evento con otro permiso)."
+      },
       "AuditLogEntry": {
         "properties": {
           "id": {
@@ -12053,10 +13048,17 @@
             "title": "Theme Template Id"
           },
           "social_links": {
-            "items": {
-              "$ref": "#/components/schemas/SocialLinkInput"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Social Links"
           },
           "organizer_blurb": {
@@ -12332,6 +13334,56 @@
         ],
         "title": "BudgetSummaryOut",
         "description": "Resumen numérico de presupuesto/contingencia de un evento — insumo del\npanel de la fase 5, expuesto ya en esta fase (plan.md, arquitectura de la\nfase 3: \"expuestos en el endpoint de resumen\")."
+      },
+      "CancelPreviewResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "already_started": {
+            "type": "boolean",
+            "title": "Already Started"
+          },
+          "refund": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en_curso",
+                  "sin_reembolso"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "event_title",
+          "starts_at",
+          "timezone",
+          "already_started"
+        ],
+        "title": "CancelPreviewResponse",
+        "description": "Lo que se va a cancelar, para confirmarlo antes de gastar el enlace.\n\n`refund`: `en_curso` si se devolvería el pago, `sin_reembolso` si hay pago\npero la política de plazo no lo devuelve, o nulo si no hay nada que\ndevolver (evento gratuito, o inscripción ya cancelada)."
       },
       "CancelRegistrationRequest": {
         "properties": {
@@ -13623,6 +14675,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -13632,7 +14710,7 @@
           "role_name"
         ],
         "title": "EligibleMembershipResponse",
-        "description": "Membresía propia cuyo rol declara al menos un campo publicable."
+        "description": "Membresía propia cuyo rol declara al menos un campo publicable, con su\nficha: es desde donde la persona (p. ej. un ponente) la completa."
       },
       "EmailSettingsIn": {
         "properties": {
@@ -14222,7 +15300,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -14387,6 +15466,30 @@
             "minimum": 30.0,
             "title": "Payment Checkout Window Minutes",
             "default": 30
+          },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled",
+            "default": true
+          },
+          "reminder_hours_before": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  2,
+                  6,
+                  12,
+                  24,
+                  48,
+                  72
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Hours Before"
           }
         },
         "type": "object",
@@ -14425,6 +15528,381 @@
         ],
         "title": "EventInvitationCreate",
         "description": "Invitación de ponente desde el evento (fase 3 del plan de invitaciones).\n\nSin `role_id`, el rol es `speaker` — el flujo por defecto. Se puede\nindicar otro (p. ej. un moderador) si el organizador lo necesita."
+      },
+      "EventListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCategoryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "location_mode": {
+            "type": "string",
+            "enum": [
+              "in_person",
+              "online",
+              "hybrid"
+            ],
+            "title": "Location Mode"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "location_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "online_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Url"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "registration_mode": {
+            "type": "string",
+            "enum": [
+              "free",
+              "approval",
+              "paid"
+            ],
+            "title": "Registration Mode"
+          },
+          "registration_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Opens At"
+          },
+          "email_verification_required": {
+            "type": "boolean",
+            "title": "Email Verification Required"
+          },
+          "payment_checkout_window_minutes": {
+            "type": "integer",
+            "title": "Payment Checkout Window Minutes"
+          },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "type": "integer",
+            "title": "Reminder Hours Before"
+          },
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "contingency_fund_percent": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Contingency Fund Percent"
+          },
+          "budget_approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Approved At"
+          },
+          "contingency_fund_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contingency Fund Cents"
+          },
+          "accounting_currency": {
+            "type": "string",
+            "title": "Accounting Currency"
+          },
+          "theme_template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Template Id"
+          },
+          "theme_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme Overrides"
+          },
+          "price_from_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price From Cents"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_multiple": {
+            "type": "boolean",
+            "title": "Price Multiple",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "description",
+          "cover_url",
+          "status",
+          "visibility",
+          "timezone",
+          "starts_at",
+          "ends_at",
+          "location_mode",
+          "location_name",
+          "location_address",
+          "city",
+          "online_url",
+          "capacity",
+          "registration_mode",
+          "registration_opens_at",
+          "email_verification_required",
+          "payment_checkout_window_minutes",
+          "reminder_enabled",
+          "reminder_hours_before",
+          "latitude",
+          "longitude",
+          "contingency_fund_percent",
+          "budget_approved_at",
+          "contingency_fund_cents",
+          "accounting_currency",
+          "theme_template_id",
+          "theme_overrides"
+        ],
+        "title": "EventListItem",
+        "description": "Evento en el listado del panel: lo de `EventResponse` más su precio, que\nel organizador quiere ver en la tabla sin abrir cada evento."
       },
       "EventMemberCreate": {
         "properties": {
@@ -14785,6 +16263,26 @@
             "type": "integer",
             "title": "Payment Checkout Window Minutes"
           },
+          "reminder_enabled": {
+            "type": "boolean",
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "type": "integer",
+            "title": "Reminder Hours Before"
+          },
+          "attendance_closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Closed At"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -14886,6 +16384,8 @@
           "registration_opens_at",
           "email_verification_required",
           "payment_checkout_window_minutes",
+          "reminder_enabled",
+          "reminder_hours_before",
           "latitude",
           "longitude",
           "contingency_fund_percent",
@@ -14901,14 +16401,33 @@
       "EventSessionCreate": {
         "properties": {
           "session_type": {
-            "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "talk",
+                  "workshop",
+                  "break",
+                  "service",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "type": "string",
@@ -15005,13 +16524,12 @@
         },
         "type": "object",
         "required": [
-          "session_type",
           "title",
           "starts_at",
           "ends_at"
         ],
         "title": "EventSessionCreate",
-        "description": "Alta de una sesión de agenda."
+        "description": "Alta de una sesión de agenda.\n\nEl tipo va por `session_type_id` (el catálogo de la organización). El texto\n`session_type` se sigue aceptando durante la transición: se traduce al tipo\ncon esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo\nque no es una pausa."
       },
       "EventSessionResponse": {
         "properties": {
@@ -15021,13 +16539,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -15126,6 +16641,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -15149,6 +16665,7 @@
                 "type": "string",
                 "enum": [
                   "talk",
+                  "workshop",
                   "break",
                   "service",
                   "other"
@@ -15159,6 +16676,17 @@
               }
             ],
             "title": "Session Type"
+          },
+          "session_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Type Id"
           },
           "title": {
             "anyOf": [
@@ -15315,6 +16843,11 @@
       },
       "EventUpdate": {
         "properties": {
+          "mover_sesiones": {
+            "type": "boolean",
+            "title": "Mover Sesiones",
+            "default": false
+          },
           "title": {
             "anyOf": [
               {
@@ -15342,7 +16875,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               {
                 "type": "null"
@@ -15571,6 +17105,36 @@
               }
             ],
             "title": "Payment Checkout Window Minutes"
+          },
+          "reminder_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Enabled"
+          },
+          "reminder_hours_before": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  2,
+                  6,
+                  12,
+                  24,
+                  48,
+                  72
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Hours Before"
           },
           "contingency_fund_percent": {
             "anyOf": [
@@ -17323,6 +18887,33 @@
         "title": "MemberCreate",
         "description": "Alta de un miembro por correo electrónico."
       },
+      "MemberProfileUpdate": {
+        "properties": {
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data"
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_data"
+        ],
+        "title": "MemberProfileUpdate",
+        "description": "Nueva ficha de una membresía. Sustituye a la anterior entera (dentro de\nlos campos actuales del rol), así se puede vaciar un campo opcional."
+      },
       "MemberResponse": {
         "properties": {
           "user_id": {
@@ -17397,6 +18988,32 @@
           "role_name": {
             "type": "string",
             "title": "Role Name"
+          },
+          "profile_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldResponse"
+            },
+            "type": "array",
+            "title": "Profile Fields",
+            "default": []
+          },
+          "profile_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile Data",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "type": "object",
@@ -17689,6 +19306,25 @@
             "type": "boolean",
             "title": "Event Cancelled",
             "default": false
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "calendar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventCalendarInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -17698,7 +19334,9 @@
           "starts_at",
           "organization_name",
           "organization",
-          "status"
+          "status",
+          "ends_at",
+          "timezone"
         ],
         "title": "MyRegistrationItem",
         "description": "Una inscripción tal como la ve el listado de «Mis eventos»."
@@ -17753,6 +19391,319 @@
         ],
         "title": "MyTicketResponse",
         "description": "`/mi-entrada` (fase 4, fase 4 de trabajo): qué mostrar y si hay QR que pedir."
+      },
+      "NearbyPlaceCreate": {
+        "properties": {
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+?[0-9 ().-]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "NearbyPlaceCreate"
+      },
+      "NearbyPlaceOrder": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "NearbyPlaceOrder"
+      },
+      "NearbyPlaceResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "custom_kind",
+          "name",
+          "address",
+          "phone",
+          "website",
+          "notes",
+          "display_order",
+          "updated_at"
+        ],
+        "title": "NearbyPlaceResponse"
+      },
+      "NearbyPlaceUpdate": {
+        "properties": {
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+?[0-9 ().-]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hotel",
+                  "restaurant",
+                  "bar",
+                  "parking",
+                  "transport",
+                  "pharmacy",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "NearbyPlaceUpdate"
       },
       "OcupacionOut": {
         "properties": {
@@ -18219,6 +20170,51 @@
             ],
             "title": "Address"
           },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "type": "boolean",
+            "title": "Address Public",
+            "default": true
+          },
+          "social_links": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSocialLink"
+            },
+            "type": "array",
+            "title": "Social Links"
+          },
           "public_page_enabled": {
             "type": "boolean",
             "title": "Public Page Enabled"
@@ -18367,6 +20363,67 @@
             ],
             "title": "Address"
           },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "address_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Public"
+          },
+          "social_links": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SocialLinkInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Social Links"
+          },
           "public_page_enabled": {
             "anyOf": [
               {
@@ -18414,11 +20471,11 @@
         ],
         "title": "Page[AuditLogEntry]"
       },
-      "Page_EventResponse_": {
+      "Page_EventListItem_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/EventResponse"
+              "$ref": "#/components/schemas/EventListItem"
             },
             "type": "array",
             "title": "Items"
@@ -18443,7 +20500,7 @@
           "limit",
           "offset"
         ],
-        "title": "Page[EventResponse]"
+        "title": "Page[EventListItem]"
       },
       "Page_MediaResponse_": {
         "properties": {
@@ -20306,6 +22363,16 @@
             ],
             "title": "Cancellation Reason"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -20461,6 +22528,34 @@
             "type": "boolean",
             "title": "Price Multiple"
           },
+          "ticket_sales": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "upcoming",
+                  "closed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales"
+          },
+          "ticket_sales_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales Opens At"
+          },
           "latitude": {
             "anyOf": [
               {
@@ -20500,12 +22595,26 @@
             "type": "array",
             "title": "Sessions"
           },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/PublicParticipant"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
           "venues": {
             "items": {
               "$ref": "#/components/schemas/PublicVenue"
             },
             "type": "array",
             "title": "Venues"
+          },
+          "nearby_places": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNearbyPlace"
+            },
+            "type": "array",
+            "title": "Nearby Places"
           },
           "sponsor_tiers": {
             "items": {
@@ -20584,13 +22693,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -20687,6 +22793,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -20864,6 +22971,34 @@
           "price_multiple": {
             "type": "boolean",
             "title": "Price Multiple"
+          },
+          "ticket_sales": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "upcoming",
+                  "closed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales"
+          },
+          "ticket_sales_opens_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Sales Opens At"
           }
         },
         "type": "object",
@@ -20889,6 +23024,94 @@
         ],
         "title": "PublicEventSummary",
         "description": "Evento tal y como aparece en el listado público.\n\n`reserved_count` es el número de plazas realmente reservadas: `confirmed` +\n`pending_payment` dentro de su ventana de pago + promociones de lista de\nespera dentro de su ventana de confirmación — misma regla que\n`registrations.repository.count_reserved_registrations`. Nunca se expone el\ndetalle de qué estado concreto ocupa cada plaza, solo el agregado."
+      },
+      "PublicNearbyPlace": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hotel",
+              "restaurant",
+              "bar",
+              "parking",
+              "transport",
+              "pharmacy",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "custom_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "custom_kind",
+          "name",
+          "address",
+          "phone",
+          "website",
+          "notes"
+        ],
+        "title": "PublicNearbyPlace",
+        "description": "Lo que ve el público: sin auditoría ni orden interno."
       },
       "PublicOrganizationProfile": {
         "properties": {
@@ -20932,6 +23155,39 @@
               }
             ],
             "title": "Address"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
           },
           "logo_url": {
             "anyOf": [
@@ -21009,13 +23265,18 @@
               }
             ],
             "title": "Public Slug"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
           }
         },
         "type": "object",
         "required": [
           "display_name",
           "role_key",
-          "public_slug"
+          "public_slug",
+          "ref"
         ],
         "title": "PublicParticipant",
         "description": "Participante tal y como se muestra en las páginas públicas.\n\nNunca lleva el correo — a diferencia de `SessionParticipantResponse`, que es\npara el panel de administración. `public_slug` solo está presente si esa\npersona activó su perfil público; si no, es `None` y la página no enlaza a\nningún sitio."
@@ -21122,13 +23383,10 @@
           },
           "session_type": {
             "type": "string",
-            "enum": [
-              "talk",
-              "break",
-              "service",
-              "other"
-            ],
             "title": "Session Type"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionTypeRef"
           },
           "title": {
             "type": "string",
@@ -21228,6 +23486,16 @@
             "type": "string",
             "title": "Event Title"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"
           },
@@ -21246,6 +23514,7 @@
         "required": [
           "id",
           "session_type",
+          "type",
           "title",
           "description",
           "starts_at",
@@ -21272,6 +23541,17 @@
           "url": {
             "type": "string",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -21503,6 +23783,16 @@
           "event_title": {
             "type": "string",
             "title": "Event Title"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "hidden",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
           },
           "organization": {
             "$ref": "#/components/schemas/PublicOrganizationRef"
@@ -22068,6 +24358,11 @@
             ],
             "title": "Waitlist Promotion Expires At"
           },
+          "absences_count": {
+            "type": "integer",
+            "title": "Absences Count",
+            "default": 0
+          },
           "approved_at": {
             "anyOf": [
               {
@@ -22120,6 +24415,14 @@
                 "type": "null"
               }
             ]
+          },
+          "absences": {
+            "items": {
+              "$ref": "#/components/schemas/AbsenceOut"
+            },
+            "type": "array",
+            "title": "Absences",
+            "default": []
           }
         },
         "type": "object",
@@ -22221,6 +24524,11 @@
               }
             ],
             "title": "Waitlist Promotion Expires At"
+          },
+          "absences_count": {
+            "type": "integer",
+            "title": "Absences Count",
+            "default": 0
           }
         },
         "type": "object",
@@ -23216,12 +25524,297 @@
         "title": "SessionParticipantsUpdate",
         "description": "Reemplazo completo de la lista de participantes de una sesión.\n\n`expected_updated_at` es el `updated_at` de la sesión que el cliente tenía\ncargado: si no coincide con el actual, la petición falla con 409 en vez de\nsobrescribir en silencio el trabajo de otra persona."
       },
+      "SessionParticipationOut": {
+        "properties": {
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "session_title": {
+            "type": "string",
+            "title": "Session Title"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "role_key": {
+            "type": "string",
+            "title": "Role Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_member_id",
+          "session_id",
+          "session_title",
+          "starts_at",
+          "ends_at",
+          "role_key"
+        ],
+        "title": "SessionParticipationOut",
+        "description": "Una persona del roster en una sesión, con su horario: lo justo para que\nel panel avise de solapes sin pedir los participantes sesión a sesión."
+      },
+      "SessionTypeCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "azul",
+              "violeta",
+              "verde",
+              "ambar",
+              "rosa",
+              "cian",
+              "rojo",
+              "gris"
+            ],
+            "title": "Color",
+            "default": "azul"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SessionTypeCreate"
+      },
+      "SessionTypeOrder": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "SessionTypeOrder",
+        "description": "Todos los tipos de la organización, en el orden nuevo."
+      },
+      "SessionTypeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "base_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Key"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "sesiones": {
+            "type": "integer",
+            "title": "Sesiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break",
+          "description",
+          "base_key",
+          "display_order",
+          "is_active",
+          "sesiones"
+        ],
+        "title": "SessionTypeOut",
+        "description": "Un tipo de sesión del catálogo de la organización."
+      },
+      "SessionTypeRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "is_break": {
+            "type": "boolean",
+            "title": "Is Break"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "is_break"
+        ],
+        "title": "SessionTypeRef",
+        "description": "El tipo de una sesión, tal y como se pinta (panel y páginas públicas)."
+      },
+      "SessionTypeUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "azul",
+                  "violeta",
+                  "verde",
+                  "ambar",
+                  "rosa",
+                  "cian",
+                  "rojo",
+                  "gris"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "is_break": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Break"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "SessionTypeUpdate"
+      },
       "SocialLinkInput": {
         "properties": {
           "kind": {
             "type": "string",
-            "maxLength": 40,
-            "minLength": 1,
+            "enum": [
+              "linkedin",
+              "instagram",
+              "x",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "other"
+            ],
             "title": "Kind"
           },
           "url": {
@@ -23230,6 +25823,19 @@
             "minLength": 1,
             "pattern": "^https?://",
             "title": "Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -23238,7 +25844,7 @@
           "url"
         ],
         "title": "SocialLinkInput",
-        "description": "Enlace social del organizador."
+        "description": "Enlace social del organizador: uno por red; `other` lleva su nombre."
       },
       "SocialLinkResponse": {
         "properties": {
@@ -23417,6 +26023,10 @@
             "type": "string",
             "title": "Organization Member Id"
           },
+          "event_member_id": {
+            "type": "string",
+            "title": "Event Member Id"
+          },
           "user_id": {
             "type": "string",
             "title": "User Id"
@@ -23458,6 +26068,17 @@
             ],
             "title": "Titular"
           },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
           "sesiones": {
             "items": {
               "$ref": "#/components/schemas/SpeakerSessionOut"
@@ -23487,6 +26108,7 @@
         "type": "object",
         "required": [
           "organization_member_id",
+          "event_member_id",
           "user_id",
           "email",
           "first_name",

@@ -16,7 +16,8 @@ from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from app.core.cleanup import sweep_unverified_accounts
 from app.core.config import get_settings
-from app.core.email import EmailAttachment, get_email_provider
+from app.core.email import get_email_provider
+from app.core.email_template import neutralizar_texto_de_usuario
 from app.core.tenant import base_url_de_organizacion
 
 # Registro de todas las tablas en `Base.metadata` antes de que cualquier tarea
@@ -33,6 +34,7 @@ from app.modules.accounting import models as _accounting_models  # noqa: F401
 from app.modules.events import models as _event_models  # noqa: F401
 from app.modules.legal import models as _legal_models  # noqa: F401
 from app.modules.media import models as _media_models  # noqa: F401
+from app.modules.nearby import models as _nearby_models  # noqa: F401
 from app.modules.organizations import models as _organization_models  # noqa: F401
 from app.modules.payments import models as _payment_models  # noqa: F401
 from app.modules.policies import models as _policy_models  # noqa: F401
@@ -40,7 +42,7 @@ from app.modules.registrations import models as _registration_models  # noqa: F4
 from app.modules.roles import models as _role_models  # noqa: F401
 from app.modules.sponsors import models as _sponsor_models  # noqa: F401
 from app.modules.tickets import models as _ticket_models  # noqa: F401
-from app.modules.tickets.service import generar_imagen_qr
+from app.modules.tickets.service import adjunto_qr
 from app.modules.users import models as _user_models  # noqa: F401
 
 _settings = get_settings()
@@ -301,23 +303,13 @@ async def send_registration_confirmed_email(
         to=to_email,
         subject="Tu inscripción está confirmada",
         body=_cuerpo_con_cancelacion(
-            "Tu inscripción ha quedado confirmada. ¡Te esperamos! Adjuntamos tu "
-            "entrada con el código QR: muéstrala en la puerta el día del evento.\n\n"
-            f"Si pierdes este correo, puedes volver a verla aquí:\n{enlace_mi_entrada}",
+            "Tu inscripción ha quedado confirmada. ¡Te esperamos! Tu entrada es el "
+            "código QR de este correo: muéstrala en la puerta el día del evento.\n\n"
+            "Si pierdes este correo o no ves la imagen, puedes volver a verla aquí:\n"
+            f"{enlace_mi_entrada}",
             enlace_cancelacion,
         ),
-        attachments=(
-            [
-                EmailAttachment(
-                    filename="entrada.png",
-                    content=generar_imagen_qr(qr_token),
-                    maintype="image",
-                    subtype="png",
-                )
-            ]
-            if qr_token is not None
-            else []
-        ),
+        attachments=[adjunto_qr(qr_token)] if qr_token is not None else [],
     )
 
 
@@ -377,6 +369,78 @@ async def send_registration_rejected_email(
 
 
 @broker.task(retry_on_error=True, max_retries=5)
+async def send_registration_pending_approval_email(to_email: str, organization_id: str) -> None:
+    """Inscripción recibida en un evento con aprobación: queda a la espera de
+    que el organizador la acepte o la rechace (ambos casos tienen su correo)."""
+    await get_email_provider().send(
+        to=to_email,
+        subject="Hemos recibido tu inscripción",
+        body=(
+            "Hola,\n\n"
+            "Hemos recibido tu inscripción. El organizador del evento la revisará y te "
+            "avisaremos por correo en cuanto la apruebe o la rechace."
+        ),
+    )
+
+
+_ESTADO_PARA_EL_ORGANIZADOR = {
+    "confirmed": "confirmada",
+    "waitlisted": "en lista de espera (el aforo está completo)",
+    "pending_approval": "pendiente de tu aprobación",
+}
+
+
+@broker.task(retry_on_error=True, max_retries=5)
+async def send_registration_received_organizer_email(
+    to_email: str,
+    organization_id: str,
+    event_id: str,
+    registration_id: str,
+    event_title: str,
+    participant_name: str,
+    participant_email: str,
+    status: str,
+    paid: bool = False,
+) -> None:
+    """Aviso a quien gestiona las inscripciones de una organización: alguien
+    se ha inscrito (o ha pagado su entrada). Un destinatario por tarea, para
+    que un reintento no reenvíe a quien ya lo recibió.
+
+    El enlace al panel va en la **primera** línea: es la URL que la plantilla
+    convierte en botón (`detectar_accion`), y el nombre del participante lo
+    escribe un anónimo — se neutraliza para que no pueda ocupar ese lugar.
+    """
+    base = await base_url_de_organizacion(uuid.UUID(organization_id))
+    enlace = f"{base}/dashboard/events/{event_id}/registrations/{registration_id}"
+    titulo = neutralizar_texto_de_usuario(event_title)
+    pendiente = status == "pending_approval"
+    if pendiente:
+        asunto = f"Inscripción pendiente de aprobar en {titulo}"
+        entrada = f"Alguien quiere inscribirse en «{titulo}» y necesita tu aprobación."
+    elif paid:
+        asunto = f"Entrada pagada en {titulo}"
+        entrada = f"Se ha pagado una entrada de «{titulo}»."
+    else:
+        asunto = f"Nueva inscripción en {titulo}"
+        entrada = f"Hay una inscripción nueva en «{titulo}»."
+    estado = _ESTADO_PARA_EL_ORGANIZADOR.get(status, status)
+    await get_email_provider().send(
+        to=to_email,
+        subject=asunto,
+        body=(
+            f"{enlace}\n\n"
+            f"{entrada}\n\n"
+            f"Nombre: {neutralizar_texto_de_usuario(participant_name)}\n"
+            # El correo llega validado como dirección (sin espacios ni esquema):
+            # se deja tal cual para que se pueda copiar o pulsar.
+            f"Correo: {participant_email}\n"
+            f"Estado: {estado}"
+            + ("\n\nAbre la inscripción para aprobarla o rechazarla." if pendiente else "")
+        ),
+    )
+
+
+@broker.task(retry_on_error=True, max_retries=5)
 async def send_registration_cancelled_email(
     to_email: str, organization_id: str, reembolso: str | None = None
 ) -> None:
@@ -397,6 +461,11 @@ async def send_registration_cancelled_email(
     if reembolso == "en_curso":
         cuerpo += (
             "\n\nEstamos tramitando el reembolso de tu pago; lo recibirás en los "
+            "próximos días en el mismo medio de pago."
+        )
+    elif reembolso == "reembolsado":
+        cuerpo += (
+            "\n\nSe te ha devuelto el importe completo de tu pago; lo verás en los "
             "próximos días en el mismo medio de pago."
         )
     elif reembolso == "sin_reembolso":
@@ -477,6 +546,25 @@ async def send_registration_payment_link_email(
             enlace_cancelacion,
         ),
     )
+
+
+@broker.task(schedule=[{"cron": "*/10 * * * *"}])
+async def dispatch_event_reminders_task() -> None:
+    """Cada 10 minutos: reclama las inscripciones a las que ya les toca el
+    recordatorio y encola su envío (`app/modules/reminders/service.py`)."""
+    from app.modules.reminders.service import procesar_recordatorios
+
+    await procesar_recordatorios()
+
+
+@broker.task
+async def send_event_reminder_task(registration_id: str) -> None:
+    """Recordatorio de una inscripción ya reclamada: vuelve a comprobarla y lo
+    envía. Si falla, su reclamación caduca a los 30 minutos y se reintenta
+    entonces (sin reintento inmediato: el correo podría haber salido ya)."""
+    from app.modules.reminders.service import enviar_recordatorio
+
+    await enviar_recordatorio(uuid.UUID(registration_id))
 
 
 @broker.task(schedule=[{"cron": "* * * * *"}])
@@ -645,7 +733,7 @@ async def send_waitlist_promotion_email(
         body=(
             "Hola,\n\n"
             "Se ha liberado una plaza y te toca a ti. Confirma tu inscripción antes "
-            f"de {expira_el} desde este enlace:\n{enlace_confirmar}\n\n"
+            f"del {expira_el} (hora del evento) desde este enlace:\n{enlace_confirmar}\n\n"
             "Si no confirmas a tiempo, pasaremos a la siguiente persona en la lista "
             "de espera.\n\n"
             f"Si ya no quieres asistir, cancela tu inscripción aquí:\n{enlace_cancelacion}"
@@ -665,7 +753,8 @@ async def send_speaker_bio_request_email(
     no crea credenciales ni enlaces de acceso, solo recuerda la tarea.
     """
     base = await base_url_de_organizacion(uuid.UUID(organization_id))
-    enlace = f"{base}/dashboard/account"
+    # El ancla lleva directo a la ficha de ponente dentro de la cuenta.
+    enlace = f"{base}/dashboard/account#ficha"
     await get_email_provider().send(
         to=to_email,
         subject=f"Falta tu ficha para «{event_name}»",

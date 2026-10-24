@@ -46,6 +46,10 @@ async function crearComponente(eventId = 'e1'): Promise<ComponentFixture<EventCh
  * arranque: el resto del flujo se prueba llamando a `encolarEscaneo`
  * directamente, como si un dispositivo real ya hubiera decodificado un QR. */
 function silenciarCargaInicial(http: HttpTestingController): void {
+  // El bloque de cierre de asistencia pide el evento: uno futuro, que no lo muestra.
+  http
+    .expectOne((peticion) => peticion.url === '/api/v1/events/e1/attendance')
+    .flush({ ends_at: '2999-01-01T00:00:00Z', can_close: true, attendance_closed_at: null });
   http
     .expectOne((peticion) => peticion.url === '/api/v1/events/e1/registrations/stats')
     .flush({

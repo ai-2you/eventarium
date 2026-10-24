@@ -100,6 +100,28 @@ describe('EventRegistrations', () => {
     await esperarSinViolacionesDeAccesibilidad(fixture.nativeElement);
   });
 
+  it('marca con una etiqueta a quien faltó a eventos anteriores, en singular y en plural', async () => {
+    const fixture = TestBed.createComponent(EventRegistrations);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.detectChanges();
+    flushCargaInicial(
+      http,
+      pagina([
+        { ...ITEMS[0], id: 'r1', absences_count: 1 },
+        { ...ITEMS[0], id: 'r2', email: 'otra@example.com', absences_count: 3 },
+        { ...ITEMS[0], id: 'r3', email: 'sin@example.com', absences_count: 0 },
+      ]),
+    );
+    await avanzar(fixture);
+
+    const etiquetas = Array.from(fixture.nativeElement.querySelectorAll('app-chip')).map((chip) =>
+      (chip as HTMLElement).textContent?.trim(),
+    );
+    expect(etiquetas).toContain('Faltó a 1 evento');
+    expect(etiquetas).toContain('Faltó a 3 eventos');
+    expect(etiquetas.filter((texto) => texto?.startsWith('Faltó'))).toHaveLength(2);
+  });
+
   it('la tabla usa app-data-table con caption y el estado va en un chip con texto', async () => {
     const fixture = TestBed.createComponent(EventRegistrations);
     fixture.componentRef.setInput('eventId', 'e1');

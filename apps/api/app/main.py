@@ -35,6 +35,7 @@ from app.modules.events.cancel_router import router as events_cancel_router
 from app.modules.events.categories_router import router as event_categories_router
 from app.modules.events.public_router import router as events_public_router
 from app.modules.events.router import router as events_router
+from app.modules.events.session_types_router import router as session_types_router
 from app.modules.health.router import router as health_router
 from app.modules.legal.router import router_cookie_consent as cookie_consent_router
 from app.modules.legal.router import router_public as legal_public_router
@@ -51,6 +52,7 @@ from app.modules.mcp.server import crear_servidor as crear_servidor_mcp
 from app.modules.media.router import folders_router as media_folders_router
 from app.modules.media.router import router as media_router
 from app.modules.metrics.router import router as metrics_router
+from app.modules.nearby.router import router as nearby_router
 from app.modules.organizations.invitations_public_router import (
     router as invitations_public_router,
 )
@@ -206,7 +208,9 @@ def create_app() -> FastAPI:
     api.include_router(tickets_router)
     api.include_router(tickets_public_router)
     api.include_router(sponsor_tiers_router)
+    api.include_router(session_types_router)
     api.include_router(sponsors_router)
+    api.include_router(nearby_router)
     api.include_router(media_router)
     api.include_router(media_folders_router)
     api.include_router(payments_router)

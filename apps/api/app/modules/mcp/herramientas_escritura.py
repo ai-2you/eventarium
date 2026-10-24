@@ -37,7 +37,7 @@ from app.core.config import get_settings
 from app.core.database import maintenance_session
 from app.core.permissions import Permission
 from app.core.storage import get_storage
-from app.modules.events import cancelacion
+from app.modules.events import cancelacion, session_types
 from app.modules.events import categories as events_categories
 from app.modules.events import service as events_service
 from app.modules.events.schemas import (
@@ -168,7 +168,7 @@ def _sesion_out(sesion_agenda: Any) -> schemas.Sesion:  # noqa: ANN401 - EventSe
     return schemas.Sesion(
         id=str(sesion_agenda.id),
         titulo=sesion_agenda.title,
-        tipo=sesion_agenda.session_type,
+        tipo=sesion_agenda.tipo.name,
         inicio=sesion_agenda.starts_at,
         fin=sesion_agenda.ends_at,
         sala=sesion_agenda.room,
@@ -196,12 +196,17 @@ def registrar(mcp: MCPServer) -> None:
         zona_horaria: str = "Europe/Madrid",
         categoria: str | None = None,
         etiquetas: list[str] | None = None,
+        recordatorio: bool | None = None,
+        recordatorio_horas: int | None = None,
     ) -> schemas.EventoResumen:
         """Crea un evento **en borrador**. La persona lo revisa y lo publica
         desde Eventarium (o con `publicar_evento`, si la conexión lo permite).
         `formato`: in_person, online o hybrid. `modo_inscripcion`: free,
         approval o paid. `categoria`: slug de una categoría activa (ver
-        `listar_categorias`). `etiquetas`: hasta 5, de 2 a 30 caracteres."""
+        `listar_categorias`). `etiquetas`: hasta 10, de 2 a 30 caracteres.
+        `recordatorio`: si se avisa a los inscritos antes del evento (por
+        defecto, sí); `recordatorio_horas`: 2, 6, 12, 24, 48 o 72 horas antes
+        (por defecto 24, o 48 en eventos de pago)."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         if contexto.event_ids is not None:
@@ -226,6 +231,8 @@ def registrar(mcp: MCPServer) -> None:
                 description=descripcion,
                 timezone=zona_horaria,
                 tags=etiquetas,
+                reminder_enabled=recordatorio,
+                reminder_hours_before=recordatorio_horas,
             ),
         ).model_dump(exclude_unset=True)
         datos["status"] = "draft"
@@ -257,11 +264,22 @@ def registrar(mcp: MCPServer) -> None:
         descripcion: str | None = None,
         categoria: str | None = None,
         etiquetas: list[str] | None = None,
+        mover_sesiones: bool = False,
+        recordatorio: bool | None = None,
+        recordatorio_horas: int | None = None,
     ) -> schemas.EventoResumen:
         """Cambia los datos de un evento. No cambia su estado: para eso están
         `publicar_evento`, `despublicar_evento` y `cancelar_evento`.
         `categoria`: slug de una categoría activa (cadena vacía la quita).
-        `etiquetas`: sustituye las actuales (lista vacía las quita)."""
+        `etiquetas`: sustituye las actuales (lista vacía las quita).
+        `mover_sesiones`: al cambiar `inicio`/`fin`, mueve también la agenda el
+        mismo intervalo que el inicio (para aplazar un evento). Sin él, si
+        alguna sesión quedara fuera de las fechas nuevas, no se guarda nada y
+        el error dice cuáles; vuelve a llamar con `mover_sesiones=True` o
+        ajusta antes esas sesiones. `recordatorio` y `recordatorio_horas`:
+        como en `crear_evento`. `visibilidad`: `public` (sale en listados y
+        buscadores), `hidden` (solo con enlace: se abre por su URL, no sale en
+        ningún listado ni en buscadores; no es secreto) o `private` (no se abre)."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(
@@ -279,12 +297,16 @@ def registrar(mcp: MCPServer) -> None:
             summary=resumen,
             description=descripcion,
             tags=etiquetas,
+            reminder_enabled=recordatorio,
+            reminder_hours_before=recordatorio_horas,
         )
         if categoria is not None:
             cambios["category_id"] = None  # se resuelve con la sesión abierta
         if not cambios:
             raise ErrorDeHerramienta("Indica al menos un dato que cambiar.")
         datos = _validar(EventUpdate, cambios).model_dump(exclude_unset=True)
+        if mover_sesiones:
+            datos["mover_sesiones"] = True
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
             if categoria is not None:
@@ -354,19 +376,20 @@ def registrar(mcp: MCPServer) -> None:
         titulo: str,
         inicio: datetime,
         fin: datetime,
-        tipo: str = "talk",
+        tipo: str | None = None,
         sala: str | None = None,
         descripcion: str | None = None,
         sede_id: str | None = None,
     ) -> schemas.Sesion:
-        """Añade una sesión a la agenda. `tipo`: talk, break, service u other.
-        Debe caer dentro de las fechas del evento."""
+        """Añade una sesión a la agenda; debe caer dentro de las fechas del evento.
+        `tipo`: nombre, id o clave base (talk, workshop, break, service, other) de un
+        tipo activo de la organización (ver `listar_tipos_de_sesion`); sin él, el
+        primero activo que no es una pausa."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         datos = _validar(
             EventSessionCreate,
             _sin_nulos(
-                session_type=tipo,
                 title=titulo,
                 starts_at=inicio,
                 ends_at=fin,
@@ -377,6 +400,9 @@ def registrar(mcp: MCPServer) -> None:
         ).model_dump(exclude_unset=True)
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
+            if tipo:
+                elegido = await session_types.por_texto(session, contexto.organization_id, tipo)
+                datos["session_type_id"] = str(elegido.id)
             nueva = await events_service.create_session(
                 session, organization_id=contexto.organization_id, event_id=evento.id, datos=datos
             )
@@ -398,11 +424,11 @@ def registrar(mcp: MCPServer) -> None:
         descripcion: str | None = None,
         sede_id: str | None = None,
     ) -> schemas.Sesion:
-        """Cambia una sesión de la agenda del evento indicado."""
+        """Cambia una sesión de la agenda del evento indicado. `tipo`: nombre, id o
+        clave base de un tipo activo de la organización."""
         contexto = await preparar()
         contexto.exigir_ambito(Ambito.EVENTOS_EDITAR)
         cambios = _sin_nulos(
-            session_type=tipo,
             title=titulo,
             starts_at=inicio,
             ends_at=fin,
@@ -410,11 +436,14 @@ def registrar(mcp: MCPServer) -> None:
             description=descripcion,
             venue_id=sede_id,
         )
-        if not cambios:
+        if not cambios and not tipo:
             raise ErrorDeHerramienta("Indica al menos un dato que cambiar.")
         datos = _validar(EventSessionUpdate, cambios).model_dump(exclude_unset=True)
         async with sesion(contexto) as session:
             evento = await _evento_permitido(session, contexto, event_id)
+            if tipo:
+                elegido = await session_types.por_texto(session, contexto.organization_id, tipo)
+                datos["session_type_id"] = str(elegido.id)
             cambiada = await events_service.update_session(
                 session,
                 organization_id=contexto.organization_id,

@@ -16,24 +16,28 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
 
-from app.core.deps import SessionDep
+from app.core.deps import SessionDep, VerifiedUserDep, get_token_claims
 from app.core.ratelimit import (
     CANCELACION_INSCRIPCION_POR_IP,
     CONFIRMACION_PROMOCION_POR_IP,
     INSCRIPCION_POR_IP,
+    MIS_EVENTOS_MIOS_POR_IP,
     MIS_EVENTOS_SOLICITAR_POR_IP,
     MIS_EVENTOS_VER_POR_IP,
     PUBLICO_POR_IP,
     VERIFICACION_INSCRIPCION_POR_IP,
+    VISTA_CANCELACION_POR_IP,
     limit_per_ip,
 )
+from app.core.security import AccessTokenClaims
 from app.core.turnstile import require_turnstile
 from app.modules.events.models import Event
 from app.modules.events.public_deps import EVENTO_PARA_INSCRIBIR, ruta_de_evento
 from app.modules.policies import service as policies_service
-from app.modules.registrations import repository, service
+from app.modules.registrations import cancel_preview, mis_eventos_service, repository, service
 from app.modules.registrations.calendar import calendario_de_inscripcion
 from app.modules.registrations.schemas import (
+    CancelPreviewResponse,
     CancelRegistrationRequest,
     CancelRegistrationResponse,
     ConfirmWaitlistPromotionRequest,
@@ -47,7 +51,7 @@ from app.modules.registrations.schemas import (
     VerifyRegistrationRequest,
     VerifyRegistrationResponse,
 )
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, PermissionDeniedError
 
 router = APIRouter(prefix="/public", tags=["público"])
 
@@ -174,11 +178,28 @@ async def confirm_waitlist_promotion(
 
 
 @router.post(
+    "/registrations/cancel/preview",
+    summary="Ver qué se cancelaría con un enlace de autocancelación",
+    description=(
+        "No consume el token: devuelve el evento, si ya ha empezado y si se devolvería "
+        "el pago, para que la persona confirme antes de cancelar."
+    ),
+    response_model=CancelPreviewResponse,
+    dependencies=[limit_per_ip("vista-cancelacion", VISTA_CANCELACION_POR_IP)],
+)
+async def preview_cancel_registration(
+    datos: CancelRegistrationRequest, session: SessionDep
+) -> CancelPreviewResponse:
+    return await cancel_preview.vista_previa_de_cancelacion(session, token=datos.token)
+
+
+@router.post(
     "/registrations/cancel",
     summary="Cancelar una inscripción por autocancelación",
     description=(
         "Consume el token del enlace de cancelación (un solo uso). Si liberaba una "
-        "plaza confirmada, promueve automáticamente a la lista de espera."
+        "plaza confirmada, promueve automáticamente a la lista de espera. Una vez "
+        "empezado el evento responde 409 sin gastar el enlace."
     ),
     response_model=CancelRegistrationResponse,
     dependencies=[limit_per_ip("cancelar-inscripcion", CANCELACION_INSCRIPCION_POR_IP)],
@@ -204,7 +225,7 @@ async def solicitar_mis_eventos(
     datos: MisEventosSolicitarRequest, request: Request, session: SessionDep
 ) -> RegistrationMessageResponse:
     await require_turnstile(request, datos.turnstile_token)
-    await service.request_mis_eventos_access(session, email=str(datos.email))
+    await mis_eventos_service.request_mis_eventos_access(session, email=str(datos.email))
     return RegistrationMessageResponse(
         message="Si ese correo tiene inscripciones, en breve recibirás un enlace."
     )
@@ -225,5 +246,30 @@ async def solicitar_mis_eventos(
 async def ver_mis_eventos(
     datos: MisEventosVerRequest, session: SessionDep
 ) -> MyRegistrationsResponse:
-    registrations = await service.list_mis_eventos(session, token=datos.token)
+    registrations = await mis_eventos_service.list_mis_eventos(session, token=datos.token)
+    return MyRegistrationsResponse(registrations=registrations)
+
+
+@router.get(
+    "/mis-eventos/mios",
+    summary="Listar «Mis eventos» con la sesión iniciada",
+    description=(
+        "Las inscripciones del correo de la cuenta, sin enlace mágico. Exige el "
+        "correo verificado (403 si no) y no se sirve durante una suplantación: "
+        "el personal de plataforma no debe ver las inscripciones personales de "
+        "la persona suplantada."
+    ),
+    response_model=MyRegistrationsResponse,
+    dependencies=[limit_per_ip("mis-eventos-mios", MIS_EVENTOS_MIOS_POR_IP)],
+)
+async def mis_eventos_de_la_cuenta(
+    usuario: VerifiedUserDep,
+    claims: Annotated[AccessTokenClaims, Depends(get_token_claims)],
+    session: SessionDep,
+) -> MyRegistrationsResponse:
+    if claims.impersonated_by is not None:
+        raise PermissionDeniedError("«Mis eventos» no está disponible durante una suplantación.")
+    registrations = await mis_eventos_service.list_mis_eventos_de_cuenta(
+        session, email_verificado=usuario.email
+    )
     return MyRegistrationsResponse(registrations=registrations)

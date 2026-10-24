@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import type { PublicEventSession, PublicVenue } from '../event-page.types';
+import { type PublicEventSession, type PublicVenue, esPausa } from '../event-page.types';
 import { estiloDeSede } from '../venue-colors';
 
 /** Franja de la parrilla, en minutos: el prototipo usa 30 (`evento-multisede.html:207`). */
@@ -114,7 +114,7 @@ function hhmm(minutosTotales: number): string {
               <div
                 class="ses"
                 [class.ses--descanso]="bloque.esDescanso"
-                [style.border-left-color]="estiloDeSede(bloque.indiceOriginal).borde"
+                [style.border-color]="estiloDeSede(bloque.indiceOriginal).borde"
                 [style.gridColumn]="bloque.columna + 2"
                 [style.gridRow]="bloque.fila + 2 + ' / span ' + bloque.franjas"
               >
@@ -188,14 +188,15 @@ function hhmm(minutosTotales: number): string {
       padding: 10px 13px;
       overflow: hidden;
       background-color: var(--surface);
-      border-left: 2px solid var(--faint);
+      /* Borde completo del color de la sede, nunca una franja lateral. */
+      border: 1px solid var(--faint);
       transition:
         background-color 0.15s,
         border-color 0.15s;
     }
     .ses:hover {
       background-color: var(--surface-hi);
-      border-left-color: var(--fg);
+      border-color: var(--fg);
     }
     .ses strong {
       font-size: var(--fs-sm);
@@ -210,7 +211,7 @@ function hhmm(minutosTotales: number): string {
     }
     .ses--descanso {
       background-color: var(--surface-2);
-      border-left-style: dashed;
+      border-style: dashed;
     }
     .ses--descanso strong {
       color: var(--muted);
@@ -285,7 +286,7 @@ export class VenueGridSection {
         franjas: Math.max(1, Math.round((fin - inicio) / FRANJA_MINUTOS)),
         horaInicio: hhmm(inicio),
         horaFin: hhmm(fin),
-        esDescanso: sesion.session_type === 'break',
+        esDescanso: esPausa(sesion),
       });
     }
 

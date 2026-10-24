@@ -11,10 +11,10 @@ import {
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
 
-import { Chip } from '../../../../shared/ui/chip';
+import { SessionTypeChip } from '../../../../shared/ui/session-type-chip';
 import { Panel } from '../../../../shared/ui/panel';
 import { rutaEvento } from '../../../../core/routing/rutas-publicas';
-import { claveTipoSesion, type PublicEventSession } from '../event-page.types';
+import { type PublicEventSession, esPausa, nombreTipoSesion } from '../event-page.types';
 
 export interface DiaDeAgenda {
   readonly fecha: string;
@@ -39,7 +39,7 @@ export interface DiaDeAgenda {
 @Component({
   selector: 'app-event-agenda-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, TranslocoDirective, Chip, Panel],
+  imports: [DatePipe, RouterLink, TranslocoDirective, SessionTypeChip, Panel],
   template: `
     <ng-container *transloco="let t">
       <div class="dias" role="tablist" [attr.aria-label]="t('publico.eventos.diasAria')">
@@ -73,7 +73,7 @@ export interface DiaDeAgenda {
             </p>
             <ul class="sesiones">
               @for (sesion of dia.sesiones; track sesion.id) {
-                <li class="slot">
+                <li class="slot" [class.slot--pausa]="esPausa(sesion)">
                   <span class="slot__hora">
                     {{ sesion.starts_at | date: 'shortTime' : eventTimezone() }}
                   </span>
@@ -107,7 +107,11 @@ export interface DiaDeAgenda {
                     }
                   </div>
                   <div class="slot__meta">
-                    <app-chip>{{ t(claveTipoSesion(sesion.session_type)) }}</app-chip>
+                    <app-session-type-chip
+                      [nombre]="nombreTipo(sesion, t)"
+                      [color]="sesion.type?.color ?? 'gris'"
+                      [pausa]="esPausa(sesion)"
+                    />
                     <a
                       class="ficha"
                       [routerLink]="rutaEvento(org(), eventSlug(), 'sesiones', sesion.id)"
@@ -191,6 +195,18 @@ export interface DiaDeAgenda {
     .slot:last-child {
       border-bottom: 0;
     }
+    /* Descansos y servicios: un fondo distinto a lo ancho del panel (el margen
+       negativo compensa el relleno del tabpanel). El fondo ya marca la fila, así
+       que sobran el separador de encima (el de la fila anterior) y el suyo. */
+    .slot--pausa {
+      margin-inline: calc(-1 * var(--sp-5));
+      padding-inline: var(--sp-5);
+      background-color: var(--surface-hi);
+      border-bottom: 0;
+    }
+    .slot:has(+ .slot--pausa) {
+      border-bottom: 0;
+    }
     .slot__hora {
       font-family: var(--font-mono);
       font-size: var(--fs-sm);
@@ -253,7 +269,8 @@ export class EventAgendaSection {
   protected readonly diaActivo = signal(0);
   private readonly pestanas = viewChildren<ElementRef<HTMLButtonElement>>('pestana');
 
-  protected readonly claveTipoSesion = claveTipoSesion;
+  protected readonly nombreTipo = nombreTipoSesion;
+  protected readonly esPausa = esPausa;
 
   constructor() {
     effect(() => {

@@ -64,7 +64,7 @@ def _payload_evento(slug: str, **overrides: object) -> dict:
     payload = {
         "slug": slug,
         "title": f"Evento {slug}",
-        "starts_at": AHORA.isoformat(),
+        "starts_at": (AHORA + timedelta(hours=6)).isoformat(),
         "ends_at": (AHORA + timedelta(days=2)).isoformat(),
         "location_mode": "in_person",
     }

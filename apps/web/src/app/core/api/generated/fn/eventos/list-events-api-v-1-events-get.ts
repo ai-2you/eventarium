@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PageEventResponse } from '../../models/page-event-response';
+import { PageEventListItem } from '../../models/page-event-list-item';
 
 export interface ListEventsApiV1EventsGet$Params {
   status?: ('draft' | 'published' | 'archived' | 'cancelled' | null);
@@ -23,7 +23,7 @@ export interface ListEventsApiV1EventsGet$Params {
   offset?: number;
 }
 
-export function listEventsApiV1EventsGet(http: HttpClient, rootUrl: string, params?: ListEventsApiV1EventsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<PageEventResponse>> {
+export function listEventsApiV1EventsGet(http: HttpClient, rootUrl: string, params?: ListEventsApiV1EventsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<PageEventListItem>> {
   const rb = new RequestBuilder(rootUrl, listEventsApiV1EventsGet.PATH, 'get');
   if (params) {
     rb.query('status', params.status, {});
@@ -36,7 +36,7 @@ export function listEventsApiV1EventsGet(http: HttpClient, rootUrl: string, para
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<PageEventResponse>;
+      return r as StrictHttpResponse<PageEventListItem>;
     })
   );
 }

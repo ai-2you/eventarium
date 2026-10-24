@@ -61,11 +61,13 @@ import { markdownToSafeHtml } from './sanitize-markdown';
 })
 export class MarkdownSeguro {
   readonly texto = input.required<string>();
+  /** Ver `OpcionesMarkdown.saltos`. */
+  readonly saltosDeLinea = input(false);
 
   private readonly hidratado = signal(false);
 
   protected readonly html = computed(() =>
-    this.hidratado() ? markdownToSafeHtml(this.texto()) : null,
+    this.hidratado() ? markdownToSafeHtml(this.texto(), { saltos: this.saltosDeLinea() }) : null,
   );
 
   constructor() {

@@ -125,7 +125,7 @@ async def test_sin_textos_la_pagina_publica_devuelve_lista_vacia(
 
 @pytest.mark.parametrize(
     ("status", "visibility"),
-    [("draft", "public"), ("published", "hidden"), ("published", "private")],
+    [("draft", "public"), ("published", "private")],
 )
 async def test_la_pagina_publica_no_revela_eventos_no_publicables(
     cliente: AsyncClient, organizacion: OrganizacionDePrueba, status: str, visibility: str
@@ -133,6 +133,13 @@ async def test_la_pagina_publica_no_revela_eventos_no_publicables(
     await _crear_evento(organizacion, "no-publicable", status=status, visibility=visibility)
     respuesta = await cliente.get(_publicas("no-publicable"))
     assert respuesta.status_code == 404
+
+
+async def test_un_evento_solo_con_enlace_muestra_sus_politicas(
+    cliente: AsyncClient, organizacion: OrganizacionDePrueba
+) -> None:
+    await _crear_evento(organizacion, "solo-con-enlace", status="published", visibility="hidden")
+    assert (await cliente.get(_publicas("solo-con-enlace"))).status_code == 200
 
 
 async def test_la_pagina_publica_tiene_limite_por_ip(
@@ -327,6 +334,47 @@ async def test_reactivar_una_compra_abandonada_guarda_la_aceptacion_nueva(
     consentimiento = await _consentimiento("vuelve@example.com")
     assert consentimiento is not None
     assert [str(i) for i in consentimiento.accepted_policy_version_ids] == nuevos
+
+
+async def test_reactivar_una_compra_abandonada_empieza_un_ciclo_nuevo(
+    cliente: AsyncClient,
+    organizacion: OrganizacionDePrueba,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakeStripeClient,
+) -> None:
+    """La lista de espera o la aprobación del intento anterior no cuentan: al
+    pagar este, el organizador recibe su aviso de entrada pagada."""
+    evento, tipo = await _preparar_evento_de_pago(cliente, organizacion, monkeypatch, "ciclo")
+    fake.v1.checkout.sessions.create_async.return_value = _sesion_creada()
+    payload = _payload("ciclo@example.com", ticket_type_id=tipo["id"])
+    vigentes = await _ids_vigentes(cliente, evento["slug"])
+    primera = await cliente.post(
+        _url_checkout(evento["slug"]), json={**payload, "accepted_policy_version_ids": vigentes}
+    )
+    assert primera.status_code == 200, primera.text
+    async with SessionMaintenance() as session:
+        registro = await session.scalar(
+            select(EventRegistration).where(EventRegistration.email == "ciclo@example.com")
+        )
+        assert registro is not None
+        registro.status = "cancelled"
+        registro.waitlist_promoted_at = datetime.now(UTC)
+        registro.approved_at = datetime.now(UTC)
+        await session.commit()
+
+    fake.v1.checkout.sessions.create_async.return_value = _sesion_creada("cs_test_ciclo")
+    reactivada = await cliente.post(
+        _url_checkout(evento["slug"]), json={**payload, "accepted_policy_version_ids": vigentes}
+    )
+
+    assert reactivada.status_code == 200, reactivada.text
+    async with SessionMaintenance() as session:
+        registro = await session.scalar(
+            select(EventRegistration).where(EventRegistration.email == "ciclo@example.com")
+        )
+        assert registro is not None
+        assert registro.waitlist_promoted_at is None
+        assert registro.approved_at is None
 
 
 # --- Panel --------------------------------------------------------------------

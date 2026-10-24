@@ -4,6 +4,11 @@
 
 /**
  * Alta de una sesión de agenda.
+ *
+ * El tipo va por `session_type_id` (el catálogo de la organización). El texto
+ * `session_type` se sigue aceptando durante la transición: se traduce al tipo
+ * con esa clave base (`talk`, `workshop`…). Sin ninguno, el primer tipo activo
+ * que no es una pausa.
  */
 export interface EventSessionCreate {
   description?: (string | null);
@@ -12,7 +17,8 @@ export interface EventSessionCreate {
 [key: string]: any;
 }>;
   room?: (string | null);
-  session_type: 'talk' | 'break' | 'service' | 'other';
+  session_type?: ('talk' | 'workshop' | 'break' | 'service' | 'other' | null);
+  session_type_id?: (string | null);
   sort_order?: number;
   starts_at: string;
   title: string;

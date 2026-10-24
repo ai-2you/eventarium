@@ -31,6 +31,7 @@ import { Button } from '../../../shared/ui/button';
 import { Card } from '../../../shared/ui/card';
 import { Input } from '../../../shared/ui/input';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { EventAttendanceClose } from './event-attendance-close';
 
 /** Estado de un resultado en la lista visible — `pending` no existe en la API,
  * es el estado óptimista mientras el escaneo espera a sincronizarse. */
@@ -98,13 +99,24 @@ const VEREDICTO_POR_RESULTADO: Record<ResultadoUiEstado, EstadoVeredicto> = {
 @Component({
   selector: 'app-event-check-in',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoDirective, DatePipe, Alert, Button, Card, Input, PageHeader],
+  imports: [
+    TranslocoDirective,
+    DatePipe,
+    Alert,
+    Button,
+    Card,
+    EventAttendanceClose,
+    Input,
+    PageHeader,
+  ],
   template: `
     <ng-container *transloco="let t">
       <app-page-header [rotulo]="t('admin.events.checkIn.titulo')">
         {{ t('admin.events.checkIn.cabeceraInicio') }}
         <span class="mark">{{ t('admin.events.checkIn.cabeceraMarca') }}</span>
       </app-page-header>
+
+      <app-event-attendance-close [eventId]="eventId()" />
 
       <app-card [heading]="t('admin.events.checkIn.titulo')">
         <div class="contador" role="status">

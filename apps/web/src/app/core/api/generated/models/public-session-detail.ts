@@ -4,6 +4,7 @@
 import { PublicOrganizationRef } from '../models/public-organization-ref';
 import { PublicParticipant } from '../models/public-participant';
 import { PublicTheme } from '../models/public-theme';
+import { SessionTypeRef } from '../models/session-type-ref';
 
 /**
  * La misma sesión, con el enlace a su evento padre para la página propia.
@@ -20,11 +21,13 @@ export interface PublicSessionDetail {
   organization: PublicOrganizationRef;
   participants: Array<PublicParticipant>;
   room: (string | null);
-  session_type: 'talk' | 'break' | 'service' | 'other';
+  session_type: string;
   starts_at: string;
   theme?: (PublicTheme | null);
   title: string;
+  type: SessionTypeRef;
   venue_id: (string | null);
   video_platform: ('youtube' | 'vimeo' | 'twitch' | 'other' | null);
   video_url: (string | null);
+  visibility?: 'public' | 'hidden' | 'private';
 }

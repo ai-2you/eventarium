@@ -11,6 +11,8 @@
  * principio del array en cada release con cambios visibles.
  */
 
+import { CHANGELOG_ANTERIOR } from './changelog-anterior.data';
+
 export type ChangelogCategoria = 'agregado' | 'modificado' | 'corregido';
 
 export interface ChangelogItem {
@@ -30,6 +32,286 @@ export interface ChangelogVersion {
 }
 
 export const CHANGELOG: readonly ChangelogVersion[] = [
+  {
+    version: '0.29.0',
+    fecha: '2026-10-21',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Cómo llegar',
+            descripcion:
+              'La ficha de un evento presencial, y cada sede del programa, tienen un enlace que abre Google Maps con la ruta hasta el lugar desde donde esté la persona.',
+          },
+          {
+            titulo: 'Qué hay cerca',
+            descripcion:
+              'En la ficha del evento del panel se añaden hoteles, restaurantes, bares, parkings, transporte, farmacias u otros sitios con dirección, teléfono, web y una nota, se ordenan y se copian de otro evento. La ficha pública los muestra agrupados por tipo. También por MCP.',
+          },
+          {
+            titulo: 'Dirección y redes de la organización',
+            descripcion:
+              'La ficha de la organización guarda calle, código postal, ciudad y provincia (con una casilla para mostrarla o no en la página pública) y las redes: LinkedIn, Instagram, X, Facebook, YouTube, TikTok y un enlace libre con nombre. Las redes ya no se editan en «Marca».',
+          },
+          {
+            titulo: '«Mis eventos» con la sesión iniciada',
+            descripcion:
+              'Quien tiene cuenta con el correo verificado ve sus inscripciones al entrar en «Mis eventos», sin pedir el enlace por correo. Se separan en Próximos y Pasados, con la hora en la zona del evento y «Añadir a mi calendario» en cada plaza confirmada.',
+          },
+          {
+            titulo: 'Quitar la portada de un evento',
+            descripcion:
+              'La portada de un evento se puede quitar desde su ficha del panel; la imagen sigue en la biblioteca de medios.',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Página pública de la organización renovada',
+            descripcion:
+              'El logo se ve grande en la mitad izquierda y los datos a la derecha (apilado en el móvil), con la dirección en líneas y las redes como botones con su icono.',
+          },
+          {
+            titulo: 'Ficha del evento en dos columnas',
+            descripcion:
+              'Al editar un evento, el formulario queda a la izquierda y el estado, la cancelación, la portada y «Qué hay cerca» en una columna a la derecha.',
+          },
+          {
+            titulo: 'Descansos visibles en la agenda',
+            descripcion:
+              'En la agenda pública, los descansos y servicios llevan un fondo propio para que se note la parada en el programa.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Avisos de plaza libre más fiables',
+            descripcion:
+              'El correo que ofrece una plaza de la lista de espera sale cuando el cambio ya está guardado, también al subir el aforo desde el asistente MCP. Y las pausas de la agenda ya no admiten ponentes tampoco por la API.',
+          },
+          {
+            titulo: 'El enlace de «Mis eventos» ya no sale caducado',
+            descripcion:
+              'Al abrir el enlace del correo, la página lo daba por usado antes de mostrar las inscripciones y pedía uno nuevo.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.28.0',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Recordatorio a los inscritos antes del evento',
+            descripcion:
+              'Cada evento puede enviar un correo a sus inscritos confirmados de 2 horas a 3 días antes (1 día por defecto; 2 en los de pago, a tiempo de cancelar con devolución). Lleva la fecha y la hora del evento, el lugar o el enlace, la entrada con su QR y un enlace para cancelar si no se puede ir, y avisa de que las ausencias sin avisar pueden tenerse en cuenta. Se activa o desactiva en el formulario del evento.',
+          },
+          {
+            titulo: 'Cierre de asistencia e historial de ausencias',
+            descripcion:
+              'Tras un evento presencial, quien hace el check-in cierra la asistencia (y puede reabrirla durante 7 días). Desde entonces, quien estaba confirmado, recibió el recordatorio y no se presentó sin cancelar aparece en las inscripciones con «Faltó a N eventos» de la organización en los últimos 12 meses. Nada se bloquea solo: decide el organizador. El formulario de inscripción lo informa.',
+          },
+          {
+            titulo: 'Eventos «solo con enlace»',
+            descripcion:
+              'Además de Público y Privado, un evento puede ser «Solo con enlace»: lo abre e inscribe quien tenga la URL, pero no sale en la página de la organización, en el directorio ni en los buscadores. El formulario del evento explica cada opción y el listado del panel marca los que no son públicos.',
+          },
+          {
+            titulo: 'El QR de la entrada, dentro del correo',
+            descripcion:
+              'El correo de confirmación muestra el código QR en el propio cuerpo, en vez de como adjunto.',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Cancelar desde el correo pide confirmación',
+            descripcion:
+              'El enlace para cancelar ya no cancela al abrirse: enseña el evento y si se devolvería el pago, y solo cancela al pulsar «Sí, cancelar mi inscripción». Una vez empezado el evento ya no se puede cancelar desde el enlace ni se ofrece la plaza a la lista de espera.',
+          },
+          {
+            titulo: 'Un reembolso total cancela la inscripción',
+            descripcion:
+              'Al devolver el importe completo de una entrada, desde el panel o desde Stripe, la inscripción se cancela, se revoca la entrada y la plaza pasa a la lista de espera.',
+          },
+          {
+            titulo: 'Zona horaria validada',
+            descripcion:
+              'Las horas de los correos van en la zona horaria del evento, y al crear o editar un evento se rechaza una zona que no exista.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.27.25',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Tipos de sesión propios de cada organización',
+            descripcion:
+              'En «Tipos de sesión» cada organización renombra, ordena, colorea y desactiva sus tipos (Charla, Taller, Descanso, Servicio y Otro de serie) y crea los suyos, como Mesa redonda o Keynote. Los que son pausa se pintan apagados y no piden ponentes. La agenda pública muestra el nombre y el color de cada tipo, y el asistente por MCP los usa por su nombre.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Pagar una entrada, sin pasar antes por el correo',
+            descripcion:
+              'En un evento de pago, tras el formulario se va directamente a la pasarela: ya no hace falta abrir antes un enlace de verificación en el correo (pagar ya confirma a la persona).',
+          },
+          {
+            titulo: 'La ficha de un evento con talleres ya no falla',
+            descripcion:
+              'Un evento con sesiones de tipo «Taller» daba error al abrir su ficha pública.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.27.18',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Asignar sesión desde la pantalla de ponentes',
+            descripcion:
+              'Cada ponente tiene «Asignar a sesión»: eliges una sesión de la agenda y el rol sin cambiar de pantalla, y se avisa si ya tiene otra a la misma hora.',
+          },
+          {
+            titulo: 'Mover la agenda al cambiar las fechas del evento',
+            descripcion:
+              'Si cambias las fechas de un evento y alguna sesión quedaría fuera, el panel lo dice y ofrece moverlas todas con el evento (aplazar una semana mueve la agenda entera).',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Ponentes: sus sesiones y su biografía a la vista',
+            descripcion:
+              'La tabla de ponentes lista todas las sesiones de cada persona; «Asignar sesión» solo aparece si no tiene ninguna, y «Pedir bio» pasa a «Ver bio» en cuanto la ha escrito.',
+          },
+          {
+            titulo: 'Editar una sesión, debajo de la sesión',
+            descripcion:
+              'En la agenda, «Editar» abre el formulario justo debajo de la sesión, igual que los participantes, en vez de al final de la página.',
+          },
+          {
+            titulo: 'Sesiones dentro de las fechas del evento',
+            descripcion:
+              'El calendario de una sesión solo deja elegir días y horas del evento, y avisa en el momento si el fin va antes que el inicio.',
+          },
+          {
+            titulo: 'Rol de cada participante en un desplegable',
+            descripcion:
+              'En «Gestionar participantes» el rol se elige de una lista (ponente, moderación, presentación) y se avisa de quien ya está en otra sesión a la misma hora.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.27.11',
+    fecha: '2026-10-20',
+    secciones: [
+      {
+        categoria: 'agregado',
+        items: [
+          {
+            titulo: 'Vista previa de los eventos, también en borrador',
+            descripcion:
+              'Desde el listado de eventos, «Vista previa» abre la ficha tal y como la verá el público, aunque el evento aún no esté publicado. Solo la ve el equipo y no aparece en buscadores.',
+          },
+          {
+            titulo: 'Modo, precio y aforo en el listado de eventos',
+            descripcion:
+              'La tabla de eventos del panel muestra si la inscripción es de acceso libre, con aprobación o de pago, cuánto cuesta (o «Desde» si hay varios precios) y el aforo.',
+          },
+          {
+            titulo: 'Aviso al organizador por cada inscripción',
+            descripcion:
+              'Quien gestiona las inscripciones recibe un correo con cada inscripción nueva (confirmada, en lista de espera, pendiente de aprobación o pagada), con enlace a su ficha en el panel. Si nadie del equipo puede recibirlo, va al correo de contacto de la organización.',
+          },
+          {
+            titulo: 'Correo de «pendiente de aprobación» al participante',
+            descripcion:
+              'En los eventos con aprobación, quien se inscribe recibe un correo que le confirma que su solicitud está pendiente, y otro cuando se acepta o se rechaza.',
+          },
+          {
+            titulo: 'Ficha de ponente editable',
+            descripcion:
+              'El ponente completa su biografía y el resto de su ficha desde «Mi cuenta», adonde lleva el correo que se la pide. El organizador también puede completarla desde Miembros.',
+          },
+          {
+            titulo: 'Ponentes enlazados en la ficha pública del evento',
+            descripcion:
+              'Enlazar un ponente al evento basta para que salga en la sección de ponentes, aunque aún no tenga sesión en la agenda. Sin perfil público sale con su nombre y sin enlace.',
+          },
+        ],
+      },
+      {
+        categoria: 'modificado',
+        items: [
+          {
+            titulo: 'Formulario del evento completo',
+            descripcion:
+              'Se pueden poner el resumen, la descripción (con editor de texto enriquecido), el modo de inscripción con sus precios y el aforo. El identificador se genera desde el título, las etiquetas se escriben como píldoras con sugerencias (hasta 10) y la fecha y la hora se piden por separado.',
+          },
+          {
+            titulo: 'Desplegables y avisos modernos en toda la aplicación',
+            descripcion:
+              'Fuera los desplegables nativos y las ventanas del navegador: todo usa los desplegables y los diálogos de la propia aplicación.',
+          },
+          {
+            titulo: 'El panel solo muestra lo que cada rol puede usar',
+            descripcion:
+              'El menú y las pantallas del panel se ajustan a los permisos de cada persona: un ponente solo ve su cuenta y su ficha.',
+          },
+        ],
+      },
+      {
+        categoria: 'corregido',
+        items: [
+          {
+            titulo: 'Sin aviso doble al pagar desde la lista de espera',
+            descripcion:
+              'Quien paga su entrada tras salir de la lista de espera o tras ser aprobado ya no genera un segundo aviso al organizador.',
+          },
+          {
+            titulo: 'Las cuentas dadas de baja dejan de anunciarse',
+            descripcion:
+              'Un ponente con la cuenta dada de baja ya no sale en la ficha del evento, ni en la agenda, ni conserva su perfil público.',
+          },
+          {
+            titulo: 'Enlaces internos en los textos legales',
+            descripcion:
+              'Los textos legales y las políticas pueden enlazar a otras páginas del sitio (por ejemplo «/legal/cookies») o a un apartado del propio texto.',
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.27.0',
     fecha: '2026-10-02',
@@ -480,565 +762,5 @@ export const CHANGELOG: readonly ChangelogVersion[] = [
       },
     ],
   },
-  {
-    version: '0.21.10',
-    fecha: '2026-09-15',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Ponentes del evento',
-            descripcion:
-              'Nueva pantalla con la ficha de cada ponente del evento, sus sesiones asignadas y sus datos de edición, siguiendo el mismo lenguaje visual que el resto del panel.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.9',
-    fecha: '2026-09-15',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Contabilidad con KPIs y rieles de presupuesto',
-            descripcion:
-              'El libro de contabilidad del evento se rediseña con KPIs, un riel visual que compara presupuesto frente a lo ejecutado por partida, el desglose del fondo de contingencia y una previsión de cierre.',
-          },
-        ],
-      },
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: 'El selector de personas del roster ya carga la organización entera',
-            descripcion:
-              'El backend limita cada página a 100 elementos y el selector pedía 200 de golpe: la petición no pasaba la validación y el desplegable se quedaba sin opciones. Ahora pagina hasta agotar la organización.',
-          },
-          {
-            titulo: 'Los correos de salida viajan como texto plano',
-            descripcion:
-              'Los correos enviados desde la plataforma no llevaban una versión en texto plano junto a la versión en HTML, lo que degradaba su entrega y su lectura en clientes de correo que priorizan texto plano.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.7',
-    fecha: '2026-09-15',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Inscripciones con embudo y motivo de rechazo',
-            descripcion:
-              'La pantalla de inscripciones gana KPIs, el embudo completo (formulario → verificado → aprobado → entrada emitida) y la posibilidad de rechazar una solicitud dejando escrito el motivo.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.6',
-    fecha: '2026-09-15',
-    secciones: [
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'Marca, catálogo de componentes y check-in con los patrones nuevos',
-            descripcion:
-              'Estas tres pantallas pasan a usar los patrones de página compartidos que se acaban de crear, en vez de su propia maquetación suelta.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.5',
-    fecha: '2026-09-15',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Patrones de página del prototipo, como componentes reutilizables',
-            descripcion:
-              'Arranca el pase visual del panel: los bloques recurrentes del prototipo (cabecera de página, panel con cabecera y pie de totales, tarjeta KPI) pasan a ser componentes del sistema compartido en vez de maquetarse suelto en cada pantalla.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.3',
-    fecha: '2026-09-14',
-    secciones: [
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'La organización deja de tener dominio propio',
-            descripcion:
-              'Se retira el subdominio por organización (`organization_domains`/`platform_domains`) siguiendo el modelo de directorio global ya adoptado: la home pasa a listar todas las organizaciones y el alta ya no pide un dominio. El listado público de eventos y el consentimiento de cookies dejan de depender de resolver una organización por el host visitado.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.1',
-    fecha: '2026-09-14',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'La organización activa vive en la sesión, no en el dominio visitado',
-            descripcion:
-              'Al no haber ya un subdominio por organización, iniciar sesión valida las credenciales en toda la instalación y elige una organización activa (la única, la de acceso más reciente, o ninguna); un nuevo endpoint permite cambiarla sin volver a iniciar sesión.',
-          },
-          {
-            titulo: 'Las páginas públicas se resuelven por el recurso, no por el dominio',
-            descripcion:
-              'El detalle de un evento, una sesión, un perfil de ponente o una inscripción encuentran su organización a través del propio recurso pedido (su slug único, o el token de un solo uso que llevan), no adivinándola por el host de la petición.',
-          },
-          {
-            titulo: 'Slugs de evento y de ponente únicos en toda la instalación',
-            descripcion:
-              'Sin dominio propio por organización, el slug pasa a ser la única forma de encontrar un evento o un perfil público en una URL, así que deja de bastar con que sea único solo dentro de su organización.',
-          },
-          {
-            titulo: 'Una cuenta puede dar de alta más de una organización',
-            descripcion:
-              'El formulario de alta de organización dejaba de funcionar para una cuenta que ya tenía una: ahora acepta también una sesión normal ya iniciada, no solo el token que se emite justo al verificar el correo por primera vez.',
-          },
-        ],
-      },
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'Las páginas legales pasan a ser solo de la plataforma',
-            descripcion:
-              'Eventarium es una instalación centralizada, no un conjunto de instalaciones independientes por organización: deja de poder editarse un aviso legal, una política de privacidad o unas condiciones de inscripción propios por organización, y las condiciones de inscripción se incorporan al catálogo legal de la plataforma.',
-          },
-          {
-            titulo: 'El catálogo de componentes vuelve a ser cosa de plataforma',
-            descripcion:
-              'El catálogo interno de componentes visuales, con el que se construyen la landing y las plantillas que luego usan las organizaciones, pasa de estar abierto a cualquier organizador a exigir superadministración, como el resto del panel de plataforma.',
-          },
-        ],
-      },
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: '/acceder avisa si ya hay una sesión activa',
-            descripcion:
-              'Un intento de inicio de sesión fallido con una cuenta ya no dejaba ver que seguía habiendo otra sesión abierta: ahora, si ya hay sesión, se redirige en vez de mostrar el formulario como si no hubiera nadie.',
-          },
-          {
-            titulo: 'El guard de plataforma vuelve a renovar la sesión antes de rendirse',
-            descripcion:
-              'Entrar directamente a una URL de plataforma por enlace o tras recargar la página expulsaba a quien tenía sesión válida, porque el guard no intentaba renovarla con la cookie antes de darla por caducada — solo funcionaba si se llegaba navegando primero por el panel de organización.',
-          },
-          {
-            titulo: 'El nombre de la organización activa se toma de la sesión',
-            descripcion:
-              'La pantalla de marca mostraba el nombre de una organización equivocada cuando la sesión no coincidía con la que se resolvía por el contexto antiguo.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.21.0',
-    fecha: '2026-09-14',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Invitaciones a organización y a evento, sin necesitar cuenta previa',
-            descripcion:
-              'Una organización puede invitar por correo a alguien que todavía no tiene cuenta: se le crea una cuenta sin contraseña y una invitación con estado, que acepta desde una pantalla pública propia sin pasar por el mecanismo de recuperar contraseña. Si el correo ya tiene cuenta, se añade directamente, sin esperar a que acepte nada.',
-          },
-          {
-            titulo: 'Invitar ponentes desde el propio evento',
-            descripcion:
-              'El roster de un evento gana su propio alta por correo: invita directamente con el rol de ponente, y al aceptar la invitación la persona entra a la organización y al roster del evento en el mismo paso.',
-          },
-          {
-            titulo: 'El listado de miembros se agrupa por persona',
-            descripcion:
-              'Quien tenía dos roles en la organización aparecía dos veces en el listado, como si fueran personas distintas. Ahora es una fila por persona, con sus roles listados como chips que se pueden quitar uno a uno sin sacarla de la organización.',
-          },
-        ],
-      },
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: 'La portada deja de anunciar «Próximamente» sobre eventos ya publicados',
-            descripcion:
-              'El hero de la portada repetía tres veces que la plataforma estaba «Próximamente» mientras debajo ya se podía listar e inscribirse a veinte eventos publicados — una contradicción para quien entraba.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.20.0',
-    fecha: '2026-09-13',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Patrocinadores, con niveles públicos y privados',
-            descripcion:
-              'Un evento puede tener patrocinadores organizados en niveles (tiers), cada uno con sus propios beneficios y con visibilidad pública o solo interna; el bloque de patrocinadores aparece en la página pública del evento.',
-          },
-          {
-            titulo: 'Páginas legales y consentimiento de cookies',
-            descripcion:
-              'Aviso legal, política de privacidad y política de cookies editables desde el panel, con un banner de cookies que registra la decisión de cada visitante y permite gestionarla más adelante.',
-          },
-          {
-            titulo:
-              'Panel de superadministración con auditoría, RGPD y validación de copias de seguridad',
-            descripcion:
-              'Nace el panel de plataforma: registro diferido de auditoría, exportación RGPD de los datos de inscripción de un evento, borrado de un inscrito bajo solicitud, y un script de restauración de copias de seguridad que valida de verdad la integridad de lo restaurado.',
-          },
-          {
-            titulo: 'Pagos con Stripe Connect',
-            descripcion:
-              'Cada organización conecta su propia cuenta de Stripe para cobrar sus eventos de pago: tipos de entrada, códigos de descuento, compra pública con confirmación por webhook, reembolsos (automáticos por plazo o manuales) y una pantalla de pagos por evento. Cierra los cuatro caminos que podían confirmar una inscripción de pago sin haber cobrado.',
-          },
-          {
-            titulo: 'Sistema de diseño con tokens de color OKLCH y plantillas de tema',
-            descripcion:
-              'Los colores de marca dejan de ser dos campos sueltos por organización y pasan a un catálogo de plantillas de tema completas (tipografía, colores claros y oscuros) fieles al prototipo visual de referencia, con tipografías autoalojadas y conmutador de tema claro/oscuro.',
-          },
-          {
-            titulo: 'Contabilidad del evento, con presupuesto y fondo de contingencia',
-            descripcion:
-              'Libro contable por evento: partidas de presupuesto, ingresos compuestos (patrocinios cobrados, entradas netas de reembolso, subvenciones manuales), gastos con IVA y aportaciones en especie de patrocinador, con un fondo de contingencia calculado automáticamente y exportación a CSV/PDF.',
-          },
-          {
-            titulo: 'Identidad propia de la plataforma, separada de cada organización',
-            descripcion:
-              'Eventarium pasa a tener su propio nombre, logotipo, favicon y páginas legales de instalación, visibles en el chrome de la web pública, distintos de la identidad de cada organización que aloja.',
-          },
-          {
-            titulo: 'Impersonación de solo lectura',
-            descripcion:
-              'Quien administra la plataforma puede entrar a la cuenta de una persona para ver lo que ve ella, sin poder modificar nada: la sesión caduca a los 15 minutos, queda registrada en la auditoría, y a la persona suplantada se le avisa por correo del acceso.',
-          },
-          {
-            titulo: 'El escritorio de cada evento, organización y plataforma deja de ser un saludo',
-            descripcion:
-              'Las tres portadas (evento, organización, plataforma) pasaban de un simple mensaje de bienvenida a mostrar de verdad cómo va lo que administran: el embudo completo de un evento, el negocio de una organización (ordenado primero por lo que pide una decisión) y la salud de la instalación sin ver el negocio de ninguna organización.',
-          },
-          {
-            titulo: 'Cada evento puede tener su propia plantilla visual',
-            descripcion:
-              'Un evento puede elegir su propio tema, heredando el de su organización si no elige ninguno — así una organización puede llevar a la vez una jornada técnica y una gala benéfica con identidades visuales distintas.',
-          },
-        ],
-      },
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'El panel de organización deja de vivir bajo /admin',
-            descripcion:
-              'La ruta `/admin` la usaba el organizador para gestionar su propia organización, un nombre que decía lo contrario de lo que hacía. Pasa a `/dashboard`; `/admin` queda para quien administra la plataforma, y `/acceder` para el acceso común a los dos.',
-          },
-          {
-            titulo: 'Los componentes compartidos se reescriben sobre el sistema de diseño nuevo',
-            descripcion:
-              'Botones, campos, tarjetas, tablas y el resto del catálogo interno pasan a usar los tokens visuales nuevos sin cambiar su forma de uso desde fuera, y ganan tabla accesible (`data-table`) y chip de estado por texto, no solo por color.',
-          },
-          {
-            titulo: 'Las tablas del panel pasan a un componente común',
-            descripcion:
-              'Las tablas de pagos, miembros, eventos, inscripciones y auditoría, antes cada una a su manera, pasan todas al mismo componente de tabla accesible con desplazamiento alcanzable por teclado.',
-          },
-          {
-            titulo: 'La navegación del panel se agrupa por ámbito',
-            descripcion:
-              'El menú del panel se reorganiza en tres grupos (organización, evento, plataforma) en vez de una lista plana de enlaces, con cada grupo visible solo para quien tiene permiso de verlo.',
-          },
-        ],
-      },
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: 'La auditoría de plataforma ya no filtraba importes de las organizaciones',
-            descripcion:
-              'El registro de auditoría que sirve `/admin/audit-log` guarda el detalle completo de cada acción, incluidos los importes de contabilidad cuando la acción los tocaba, y se estaba devolviendo tal cual: quien administra la plataforma podía ver cifras de negocio de una organización sin que nadie lo hubiera decidido así.',
-          },
-          {
-            titulo: 'Fidelidad visual real contra el prototipo de referencia',
-            descripcion:
-              'El sistema de diseño de las primeras fases no se parecía al prototipo real: tamaños de radio, sombras y tipografía de los componentes se corrigen uno a uno contra los valores literales del CSS de referencia.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.17.1',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: 'El check-in por QR volvía a fallar por un parámetro de ruta',
-            descripcion:
-              'La pantalla de control de acceso esperaba el identificador del evento con otro nombre que el que declaraba su ruta, así que ninguna llamada a la API del check-in (contador, cámara, sincronización, búsqueda) encontraba el evento.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.17.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Entradas con código QR y control de acceso',
-            descripcion:
-              'Cada inscripción confirmada emite automáticamente una entrada con QR, que se revoca si la inscripción se cancela. El panel gana una aplicación de escaneo instalable con cámara, cola sin conexión que sincroniza sola, búsqueda manual y contador en vivo; el correo de confirmación lleva el QR incrustado y hay una página pública para consultar la propia entrada.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.16.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Correos de inscripción y autocancelación',
-            descripcion:
-              'Cada paso del embudo de inscripción (confirmación, rechazo, entrada en lista de espera, promoción, cancelación) envía su propio correo con plantilla, y quien se inscribe puede cancelar su propia plaza desde un enlace de un solo uso.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.15.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Aprobación de inscripciones y lista de espera automática',
-            descripcion:
-              'El organizador puede aprobar, rechazar o cancelar una inscripción; al liberarse una plaza, la lista de espera promociona sola con un plazo para confirmar antes de pasar a la siguiente persona.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.14.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Formulario público de inscripción, con verificación por correo',
-            descripcion:
-              'Quien quiere inscribirse a un evento rellena un formulario con preguntas propias del evento y consentimientos, verifica su correo con un token de un solo uso, y la plaza se evalúa contra el aforo del evento en el mismo momento.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.13.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Modelo de inscripciones a eventos',
-            descripcion:
-              'Base de datos y permisos para que un evento tenga preguntas propias de inscripción, y para que las respuestas y los consentimientos de cada inscrito queden guardados de forma aislada por organización.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.12.0',
-    fecha: '2026-09-08',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Alta de organización con verificación de correo',
-            descripcion:
-              'El registro pasa a pedir solo correo y contraseña; nombre, apellidos y organización se piden después, en el momento en que de verdad hacen falta. Una cuenta sin verificar en una semana se elimina sola.',
-          },
-          {
-            titulo: 'Panel de organización editable, con marca propia',
-            descripcion:
-              'Nombre, razón social, descripción y datos de contacto de la organización pasan a poder editarse desde el panel, igual que el logotipo, los colores y las tipografías de su marca.',
-          },
-          {
-            titulo: 'Roles a medida y gestión de miembros',
-            descripcion:
-              'Una organización puede crear roles propios además de los del sistema, con sus propios permisos y campos de perfil, y gestionar de alta y de baja a las personas de su equipo.',
-          },
-          {
-            titulo: 'Cuenta propia: cambio de correo, contraseña y sesiones abiertas',
-            descripcion:
-              'Cualquier persona puede cambiar su correo (con aviso a la dirección antigua) o su contraseña, recuperarla si la olvida, y cerrar el resto de sus sesiones abiertas sin afectar a la actual.',
-          },
-          {
-            titulo: 'Modelo de eventos, agenda y ponentes',
-            descripcion:
-              'Un evento puede tener sesiones organizadas por día y un roster de ponentes asignados a cada una, con perfil público propio para cada ponente.',
-          },
-          {
-            titulo: 'Página pública del evento, con servidor',
-            descripcion:
-              'El listado y el detalle de un evento, su agenda y el perfil de cada ponente pasan a tener página pública propia, renderizada en servidor para que se indexe y comparta bien.',
-          },
-        ],
-      },
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'Política de contraseña con validación en vivo',
-            descripcion:
-              'El registro exige ya mayúscula, minúscula, número y símbolo, con un indicador que va marcando en el propio formulario qué requisito falta, no solo al enviarlo.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.7.0',
-    fecha: '2026-09-07',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Registro con verificación de correo y protección Turnstile',
-            descripcion:
-              'Primer alta pública de cuenta: correo, contraseña, verificación por token de un solo uso y protección contra registros automatizados.',
-          },
-        ],
-      },
-      {
-        categoria: 'modificado',
-        items: [
-          {
-            titulo: 'Despliegue de producción con EasyPanel',
-            descripcion:
-              'El proxy inverso y el TLS de producción pasan a resolverlos EasyPanel en vez de un Caddy propio, que queda solo como herramienta de desarrollo; se documenta el modelo de un subdominio por organización.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.5.2',
-    fecha: '2026-09-07',
-    secciones: [
-      {
-        categoria: 'corregido',
-        items: [
-          {
-            titulo: 'Renderizado en servidor reparado en desarrollo',
-            descripcion:
-              'Cuatro fallos que solo se veían leyendo el registro del proceso — Angular degradaba a renderizado en cliente en silencio — dejaban el servidor de desarrollo sirviendo la URL de producción y sin traducciones ni worker de tareas en marcha.',
-          },
-          {
-            titulo: 'Integración continua estabilizada',
-            descripcion:
-              'El almacenamiento de objetos de las pruebas no era alcanzable desde el runner, y faltaba el permiso necesario para que el escáner de secretos analizara pull requests.',
-          },
-        ],
-      },
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Arranque de la aplicación con un solo comando',
-            descripcion:
-              'Un único script levanta el entorno completo, junto o por partes, para no tener que recordar el orden de los servicios.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.5.0',
-    fecha: '2026-09-07',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Integración continua y despliegue de producción',
-            descripcion:
-              'La API se prueba contra base de datos, caché y almacenamiento reales; el frontend comprueba que sus tipos generados no se han quedado atrás; y un tercer job busca secretos filtrados en el historial. El despliegue de producción migra la base de datos una sola vez antes de arrancar las réplicas.',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    version: '0.4.0',
-    fecha: '2026-09-07',
-    secciones: [
-      {
-        categoria: 'agregado',
-        items: [
-          {
-            titulo: 'Arranque del proyecto: monorepo y entorno de desarrollo',
-            descripcion:
-              'Estructura del monorepo con PostgreSQL, almacenamiento de objetos compatible con S3, caché y proxy, levantable con un solo comando.',
-          },
-          {
-            titulo: 'Base de la API con autenticación y multi-tenant real',
-            descripcion:
-              'La API resuelve cada organización por su dominio antes de tocar cualquier tabla, con aislamiento entre organizaciones garantizado por políticas de seguridad a nivel de fila: sin contexto de organización fijado, ninguna consulta devuelve una fila, ni de la organización equivocada ni de ninguna otra.',
-          },
-          {
-            titulo: 'Aplicación Angular con marca por organización',
-            descripcion:
-              'Una sola aplicación sirve la web pública con servidor (porque el contenido depende del dominio visitado) y el panel de administración; los colores de marca de cada organización cambian la interfaz sin necesidad de recompilar nada.',
-          },
-        ],
-      },
-    ],
-  },
+  ...CHANGELOG_ANTERIOR,
 ];

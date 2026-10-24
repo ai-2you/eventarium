@@ -16,10 +16,13 @@ export interface EventUpdate {
   location_address?: (string | null);
   location_mode?: ('in_person' | 'online' | 'hybrid' | null);
   location_name?: (string | null);
+  mover_sesiones?: boolean;
   online_url?: (string | null);
   payment_checkout_window_minutes?: (number | null);
   registration_mode?: ('free' | 'approval' | 'paid' | null);
   registration_opens_at?: (string | null);
+  reminder_enabled?: (boolean | null);
+  reminder_hours_before?: (2 | 6 | 12 | 24 | 48 | 72 | null);
   starts_at?: (string | null);
   status?: ('draft' | 'published' | 'archived' | null);
   summary?: (string | null);

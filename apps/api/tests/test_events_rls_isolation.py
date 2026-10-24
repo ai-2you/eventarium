@@ -23,14 +23,33 @@ from app.modules.events.models import (
     EventSession,
     EventSessionParticipant,
     EventVenue,
+    SessionType,
     SpeakerPublicProfile,
 )
 from app.modules.organizations.repository import unsafe_select_all
 from tests.conftest import OrganizacionDePrueba
 
-TABLAS_CON_ORGANIZACION = (Event, EventSession, EventMember, EventSessionParticipant, EventVenue)
+TABLAS_CON_ORGANIZACION = (
+    Event,
+    EventSession,
+    EventMember,
+    EventSessionParticipant,
+    EventVenue,
+    SessionType,
+)
 
 AHORA = datetime.now(UTC)
+
+
+async def _tipo_de(organizacion: OrganizacionDePrueba) -> uuid.UUID:
+    """El tipo «Charla» de la organización (las altas crean los tipos base)."""
+    async with SessionMaintenance() as session:
+        tipo_id = await session.scalar(
+            text("SELECT id FROM session_types WHERE organization_id = :o AND base_key = 'talk'"),
+            {"o": organizacion.id},
+        )
+    assert tipo_id is not None
+    return uuid.UUID(str(tipo_id))
 
 
 class DatosDePrueba:
@@ -98,6 +117,7 @@ async def _crear_datos_de_prueba(organizacion: OrganizacionDePrueba) -> DatosDeP
             organization_id=organizacion.id,
             venue_id=sede.id,
             session_type="talk",
+            session_type_id=await _tipo_de(organizacion),
             title="Charla de prueba",
             starts_at=AHORA,
             ends_at=AHORA + timedelta(hours=1),
@@ -177,6 +197,7 @@ async def test_no_se_puede_crear_una_sesion_de_un_evento_ajeno(
 ) -> None:
     """La FK compuesta rechaza una sesión cuyo `event_id` es de otra organización."""
     datos_ajenos = await _crear_datos_de_prueba(otra_organizacion)
+    tipo_propio = await _tipo_de(organizacion)
 
     with pytest.raises(DBAPIError):
         async with SessionApp() as session:
@@ -187,6 +208,8 @@ async def test_no_se_puede_crear_una_sesion_de_un_evento_ajeno(
                         event_id=datos_ajenos.event_id,
                         organization_id=organizacion.id,
                         session_type="talk",
+                        # Tipo propio: así el único fallo posible es el evento ajeno.
+                        session_type_id=tipo_propio,
                         title="Sesión intrusa",
                         starts_at=AHORA,
                         ends_at=AHORA + timedelta(hours=1),
@@ -208,6 +231,7 @@ async def test_no_se_puede_asignar_una_sesion_a_una_sede_ajena(
     aunque el `event_id` sí sea propio."""
     datos_propios = await _crear_datos_de_prueba(organizacion)
     datos_ajenos = await _crear_datos_de_prueba(otra_organizacion)
+    tipo_propio = await _tipo_de(organizacion)
 
     with pytest.raises(DBAPIError):
         async with SessionApp() as session:
@@ -219,9 +243,54 @@ async def test_no_se_puede_asignar_una_sesion_a_una_sede_ajena(
                         organization_id=organizacion.id,
                         venue_id=datos_ajenos.venue_id,
                         session_type="talk",
+                        session_type_id=tipo_propio,
                         title="Sesión con sede intrusa",
                         starts_at=AHORA,
                         ends_at=AHORA + timedelta(hours=1),
+                    )
+                )
+                await session.flush()
+
+
+async def test_no_se_puede_usar_un_tipo_de_sesion_ajeno(
+    organizacion: OrganizacionDePrueba, otra_organizacion: OrganizacionDePrueba
+) -> None:
+    """La FK compuesta rechaza una sesión cuyo tipo es de otra organización."""
+    datos_propios = await _crear_datos_de_prueba(organizacion)
+    tipo_ajeno = await _tipo_de(otra_organizacion)
+
+    with pytest.raises(DBAPIError):
+        async with SessionApp() as session:
+            async with session.begin():
+                await set_organization_context(session, organizacion.id)
+                session.add(
+                    EventSession(
+                        event_id=datos_propios.event_id,
+                        organization_id=organizacion.id,
+                        session_type="talk",
+                        session_type_id=tipo_ajeno,
+                        title="Sesión con tipo intruso",
+                        starts_at=AHORA,
+                        ends_at=AHORA + timedelta(hours=1),
+                    )
+                )
+                await session.flush()
+
+
+async def test_no_se_puede_crear_un_tipo_para_otra_organizacion(
+    organizacion: OrganizacionDePrueba, otra_organizacion: OrganizacionDePrueba
+) -> None:
+    """El `WITH CHECK` de la política RLS impide escribir un tipo ajeno."""
+    with pytest.raises(DBAPIError):
+        async with SessionApp() as session:
+            async with session.begin():
+                await set_organization_context(session, organizacion.id)
+                session.add(
+                    SessionType(
+                        organization_id=otra_organizacion.id,
+                        name="Intruso",
+                        color="azul",
+                        display_order=9,
                     )
                 )
                 await session.flush()

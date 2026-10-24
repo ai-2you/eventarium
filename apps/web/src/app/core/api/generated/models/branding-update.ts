@@ -8,6 +8,6 @@ import { SocialLinkInput } from '../models/social-link-input';
  */
 export interface BrandingUpdate {
   organizer_blurb?: (string | null);
-  social_links?: Array<SocialLinkInput>;
+  social_links?: (Array<SocialLinkInput> | null);
   theme_template_id?: (string | null);
 }

@@ -17,6 +17,8 @@ erDiagram
   users ||--o{ user_social_links : "perfil"
   organizations ||--o{ events : "publica"
   events ||--o{ event_sessions : "agenda"
+  organizations ||--o{ session_types : "define"
+  session_types ||--o{ event_sessions : "clasifica"
   organizations ||--o{ event_members : "roster"
   organization_members ||--o{ event_members : "participa en"
   event_members ||--o{ event_session_participants : "asignado a"
@@ -121,6 +123,7 @@ erDiagram
     uuid event_id FK
     uuid organization_id FK
     text session_type
+    uuid session_type_id FK
     text title
     text description
     timestamptz starts_at
@@ -130,6 +133,17 @@ erDiagram
     text video_url
     jsonb materials
     int sort_order
+  }
+  session_types {
+    uuid id PK
+    uuid organization_id FK
+    text name
+    text description
+    text color
+    bool is_break
+    text base_key
+    int display_order
+    bool is_active
   }
   event_members {
     uuid id PK
@@ -476,10 +490,14 @@ RLS aísla por **organización**, no por si un evento está publicado: un borrad
 la propia organización sigue siendo visible bajo RLS para cualquiera con el
 contexto de esa organización fijado (incluido el contexto anónimo de los endpoints
 públicos, que solo fija `app.organization_id`, sin usuario — y que hoy se fija desde
-el propio evento vía `app_resolve_public_event`). El filtro `status = 'published'
-AND visibility = 'public'` de las páginas públicas (`public_router.py`) es por tanto
-explícito en cada consulta (y dentro de la propia función de resolución), nunca
-delegado a RLS — ver `docs/arquitectura.md`.
+el propio evento vía `app_resolve_public_event`). El filtro de publicación de las
+páginas públicas (`public_router.py`) es por tanto explícito en cada consulta (y
+dentro de la propia función de resolución), nunca delegado a RLS — ver
+`docs/arquitectura.md`. Desde la migración `0065`, la resolución de un evento por su
+URL acepta `visibility IN ('public', 'hidden')` («solo con enlace»), mientras que todos
+los listados públicos (organización, portada y su lista de organizaciones, perfil de
+ponente, otros eventos de un patrocinador) siguen exigiendo `public`; `private` no se
+abre nunca.
 
 `users` tiene además una política solo de `INSERT` que permite crear la fila cuando hay
 contexto de organización: dar de alta a alguien crea primero el usuario y después la
@@ -565,7 +583,7 @@ con el mismo patrón que `app_resolve_organization` y las funciones de la fase a
   sesión) y escribe solo la superadministración. No se borra: se desactiva. `events.category_id`
   (una por evento, FK `ON DELETE RESTRICT`) y `events.tags text[]` con índice GIN (`tags @> ...`
   para filtrar). Solo se asignan categorías activas, salvo la que el evento ya tiene; una
-  categoría desactivada deja de mostrarse en público. Etiquetas: minúsculas, máx. 5, 2–30
+  categoría desactivada deja de mostrarse en público. Etiquetas: minúsculas, máx. 10, 2–30
   caracteres, letras (con tildes), números, espacios y guiones.
 - `events.deleted_at` (migración `0060`): eliminación lógica de un evento **ya cancelado**
   (cancelar y eliminar son dos acciones; uno activo no se elimina). No se borra ninguna fila:
@@ -625,3 +643,61 @@ cuerpo o los argumentos de entrada.
 membresía ya es visible para la política `tenant_users` (que exige compartir
 organización) en cuanto la función marca el correo como verificado, sin depender de que
 `app_accept_invited_user` sea la única vía de lectura.
+
+### Tipos de sesión por organización (migración `0063`)
+
+`session_types` es el catálogo de tipos de sesión de cada organización, con RLS
+(`tenant_session_types`) como `sponsor_tiers`. Cada organización nace con cinco
+tipos base (`organizations/service.inicializar_organizacion`, usada por las dos
+altas): Charla (`talk`), Taller (`workshop`), Descanso (`break`, pausa), Servicio
+(`service`, pausa) y Otro (`other`). Puede renombrarlos, desactivarlos, reordenarlos
+o crear los suyos (`base_key` nulo).
+
+- Nombre único por organización sin distinguir mayúsculas ni espacios de los
+  extremos (índice funcional `lower(btrim(name))`).
+- `color`: clave de una paleta cerrada (`events/session_types.PALETA`), nunca libre.
+- `is_break`: pausa; se pinta apagada en la agenda y no pide ponentes.
+- `base_key`: empareja el texto heredado y los alias del MCP aunque cambie el nombre.
+
+`event_sessions.session_type_id` apunta al tipo con FK compuesta
+`(session_type_id, organization_id)` y sin `ondelete`: un tipo en uso no se borra,
+se desactiva (las sesiones que lo tienen lo conservan). `event_sessions.session_type`
+(texto) se mantiene durante la transición con la `base_key` del tipo, u `other`
+para los propios; se retirará en una migración posterior.
+
+
+### Recordatorio a los inscritos y ausencias (migración `0064`)
+
+`events.reminder_enabled` (por defecto `true`) y `events.reminder_hours_before`
+(`CHECK IN (2, 6, 12, 24, 48, 72)`; 24 por defecto, 48 en eventos de pago, a tiempo
+de cancelar con reembolso) controlan el recordatorio por correo a los inscritos
+confirmados (`app/modules/reminders/`). Cada inscripción guarda
+`reminder_claimed_at` (reclamada por la tarea cada 10 minutos, con `SKIP LOCKED`;
+caduca a los 30 minutos), `reminder_sent_at` y `reminder_sent_for_starts_at` (el
+`starts_at` al minuto para el que se envió: si el evento cambia de fecha, vuelve a
+ser elegible). Como mucho un recordatorio por fecha del evento.
+
+`events.attendance_closed_at` lo fija quien gestiona entradas tras el evento
+(`POST /events/{id}/attendance/close`; se reabre hasta 7 días después del fin).
+El historial de ausencias no se guarda: se calcula al consultar
+(`registrations/absences.py`) y solo cuenta inscripciones confirmadas antes del
+inicio, avisadas para esa fecha, con el correo verificado o un pago, en eventos
+presenciales con la asistencia cerrada en los últimos 12 meses y con la entrada sin
+escanear ni revocar. Nunca cruza organizaciones; índice parcial
+`ix_event_registrations_org_email_confirmadas`.
+
+### Sitios cercanos y ficha de la organización (migraciones `0066` y `0067`)
+
+`event_nearby_places` (módulo `app/modules/nearby/`) guarda lo que el organizador señala cerca
+de cada evento: `kind` (`hotel | restaurant | bar | parking | transport | pharmacy | other`, con
+`CHECK`), `custom_kind` (solo con `other`, `CHECK`), nombre, dirección, teléfono, web, nota y
+`display_order`. RLS forzada por organización y FK compuesta al evento (`ON DELETE CASCADE`),
+como las sedes. Máximo 50 por evento (el servicio bloquea la fila del evento antes de contar).
+
+`organizations.address` es la calle; `postal_code`, `city` y `province` van aparte (texto libre)
+y `address_public` decide si la dirección sale en la página pública (las cuatro claves llegan a
+`null` si está apagada). Las redes siguen en `organization_branding.social_links` (JSONB) con
+tipo cerrado (`linkedin | instagram | x | facebook | youtube | tiktok | other`, una por tipo;
+`other` lleva `label`) y se editan con `PATCH /organizations/me`; `PUT
+/organizations/me/branding` ya no las toca.
+

@@ -13,5 +13,6 @@
 export interface PublicParticipant {
   display_name: string;
   public_slug: (string | null);
+  ref: string;
   role_key: string;
 }

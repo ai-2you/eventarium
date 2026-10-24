@@ -112,7 +112,7 @@ describe('EventTicketTypes', () => {
     expect(fixture.nativeElement.textContent).toContain('Escribe el nombre del tipo de entrada.');
   });
 
-  it('en un evento sin pagos, explica que los tipos de entrada no aplican y no pide la lista', async () => {
+  it('en un evento gratuito avisa de que aún no se cobra, pero deja gestionar las entradas', async () => {
     const fixture = TestBed.createComponent(EventTicketTypes);
     fixture.componentRef.setInput('eventId', 'e1');
     fixture.detectChanges();
@@ -124,8 +124,9 @@ describe('EventTicketTypes', () => {
       });
     await avanzar(fixture);
 
-    http.expectNone((p) => p.url === TICKET_TYPES_URL);
-    expect(fixture.nativeElement.textContent).toContain('Este evento no acepta pagos');
-    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+    http.expectOne((p) => p.url === TICKET_TYPES_URL).flush([]);
+    await avanzar(fixture);
+    expect(fixture.nativeElement.textContent).toContain('Este evento todavía es gratuito');
+    expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
   });
 });

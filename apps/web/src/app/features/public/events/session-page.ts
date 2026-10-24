@@ -26,9 +26,15 @@ import { NotFoundStatusService } from '../../../core/ssr/not-found-status.servic
 import { iniciales } from '../../../shared/text/iniciales';
 import { Alert } from '../../../shared/ui/alert';
 import { Breadcrumb, type BreadcrumbItem } from '../../../shared/ui/breadcrumb';
+import { SessionTypeChip } from '../../../shared/ui/session-type-chip';
 import { Reveal } from '../../../shared/ui/reveal.directive';
 import { migasDeEvento, type OrganizacionPublica } from '../../../shared/ui/migas-de-evento';
-import { claveTipoSesion, rolLegible } from './event-page.types';
+import {
+  type TipoDeSesionPublico,
+  esPausa,
+  nombreTipoSesion,
+  rolLegible,
+} from './event-page.types';
 import { resolveVideoEmbed } from './video-embed';
 
 interface PublicParticipant {
@@ -38,8 +44,11 @@ interface PublicParticipant {
 }
 
 interface PublicSessionDetail {
+  /** `hidden` = «solo con enlace»: se marca `noindex`. */
+  readonly visibility?: 'public' | 'hidden' | 'private';
   readonly id: string;
   readonly session_type: string;
+  readonly type?: TipoDeSesionPublico;
   readonly title: string;
   readonly description: string | null;
   readonly starts_at: string;
@@ -77,7 +86,7 @@ const CLAVE_AGENDA = 'eventarium-agenda';
 @Component({
   selector: 'app-session-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, TranslocoDirective, Alert, Breadcrumb, Reveal],
+  imports: [DatePipe, RouterLink, TranslocoDirective, Alert, Breadcrumb, Reveal, SessionTypeChip],
   template: `
     <ng-container *transloco="let t">
       @if (cargando()) {
@@ -96,7 +105,7 @@ const CLAVE_AGENDA = 'eventarium-agenda';
           <div class="top" appReveal>
             <div>
               <span class="rotulo-seccion">
-                {{ t(claveTipoSesion(sesion.session_type)) }}
+                {{ nombreTipo(sesion, t) }}
                 @if (sesion.room) {
                   · {{ sesion.room }}
                 }
@@ -146,7 +155,11 @@ const CLAVE_AGENDA = 'eventarium-agenda';
             <aside class="lateral" aria-label="{{ t('publico.eventos.sesion.datosAria') }}">
               <div class="lateral__fila">
                 <span class="muted">{{ t('publico.eventos.sesion.lado.formato') }}</span>
-                <span>{{ t(claveTipoSesion(sesion.session_type)) }}</span>
+                <app-session-type-chip
+                  [nombre]="nombreTipo(sesion, t)"
+                  [color]="sesion.type?.color ?? 'gris'"
+                  [pausa]="esPausa(sesion)"
+                />
               </div>
               @if (sesion.room) {
                 <div class="lateral__fila">
@@ -427,7 +440,8 @@ export class SessionPage implements OnInit {
 
   protected readonly iniciales = iniciales;
   protected readonly rolLegible = rolLegible;
-  protected readonly claveTipoSesion = claveTipoSesion;
+  protected readonly nombreTipo = nombreTipoSesion;
+  protected readonly esPausa = esPausa;
 
   /**
    * `[src]` de un `iframe` exige una `SafeResourceUrl`: Angular la bloquearía si
@@ -572,6 +586,7 @@ export class SessionPage implements OnInit {
     this.seo.set({
       title: `${sesion.title} · ${sesion.event_title}`,
       description: sesion.description ?? this.transloco.translate('publico.eventos.sinResumen'),
+      noIndexar: sesion.visibility === 'hidden',
     });
   }
 }

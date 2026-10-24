@@ -52,6 +52,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import SessionApp, SessionMaintenance, set_organization_context
 from app.core.permissions import Permission
 from app.core.security import AccessTokenClaims, decode_access_token
+from app.core.tras_commit import despachar_tras_commit
 from app.shared.errors import (
     AuthenticationError,
     PermissionDeniedError,
@@ -70,6 +71,8 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     async with SessionApp() as session:
         async with session.begin():
             yield session
+        # Solo se llega aquí si el commit ha ido bien (ver `core/tras_commit.py`).
+        await despachar_tras_commit(session)
 
 
 #: Sesión sin ningún contexto de RLS fijado, para lo que no necesita ninguno:
@@ -110,6 +113,7 @@ async def get_maintenance_db() -> AsyncIterator[AsyncSession]:
     async with SessionMaintenance() as session:
         async with session.begin():
             yield session
+        await despachar_tras_commit(session)
 
 
 def _extraer_token(request: Request) -> str:

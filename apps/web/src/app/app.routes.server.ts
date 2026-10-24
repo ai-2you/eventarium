@@ -25,6 +25,9 @@ const PAGINAS_DE_TOKEN_DE_UN_SOLO_USO = [
   'verificar-correo',
   'recuperar-contrasena/nueva',
   'cuenta/confirmar-correo',
+  // El enlace de «Mis eventos» es de un solo uso: renderizado en servidor, el
+  // servidor lo gastaba y el navegador mostraba «enlace caducado».
+  'mis-eventos/ver',
 ];
 
 export const serverRoutes: ServerRoute[] = [
@@ -33,9 +36,14 @@ export const serverRoutes: ServerRoute[] = [
   // olvidara cualquiera de estos, `authGuard` denegaría en SSR y el panel no
   // cargaría.
   { path: 'acceder', renderMode: RenderMode.Client },
+  // La vista previa necesita la sesión del equipo, que el servidor no tiene.
+  { path: 'vista-previa/**', renderMode: RenderMode.Client },
   { path: 'espacio-de-trabajo', renderMode: RenderMode.Client },
   // Necesita la sesión, que el servidor no maneja.
   { path: 'oauth/consentimiento', renderMode: RenderMode.Client },
+  // Con la sesión iniciada lista sin pedir el correo; la sesión es la cookie
+  // que el servidor no maneja.
+  { path: 'mis-eventos', renderMode: RenderMode.Client },
   { path: 'admin', renderMode: RenderMode.Client },
   { path: 'admin/**', renderMode: RenderMode.Client },
   { path: 'dashboard', renderMode: RenderMode.Client },

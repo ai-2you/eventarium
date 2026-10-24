@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated, Any
 
@@ -14,12 +15,26 @@ from app.core.permissions import Permission
 from app.core.ratelimit import PEDIR_BIO_POR_IP, limit_per_ip
 from app.core.storage import build_object_key, get_storage, public_url_versionada, validate_upload
 from app.core.tasks import send_invitation_email, send_speaker_bio_request_email
-from app.modules.events import repository, service, speakers_repository
-from app.modules.events.models import Event, EventMember, EventSession, EventVenue
+from app.modules.events import (
+    public_router,
+    repository,
+    service,
+    session_types,
+    speakers_repository,
+)
+from app.modules.events.categories import LONGITUD_MAX_ETIQUETA
+from app.modules.events.models import (
+    Event,
+    EventMember,
+    EventSession,
+    EventSessionParticipant,
+    EventVenue,
+)
 from app.modules.events.schemas import (
     EventCategoryOut,
     EventCreate,
     EventInvitationCreate,
+    EventListItem,
     EventMemberCreate,
     EventMemberResponse,
     EventResponse,
@@ -32,8 +47,11 @@ from app.modules.events.schemas import (
     EventVenueCreate,
     EventVenueResponse,
     EventVenueUpdate,
+    PublicEventDetail,
     SessionParticipantResponse,
     SessionParticipantsUpdate,
+    SessionParticipationOut,
+    SessionTypeRef,
     SpeakerCompletitudOut,
     SpeakerHistoryItemOut,
     SpeakerRowOut,
@@ -50,6 +68,7 @@ from app.modules.organizations.schemas import (
     MemberResponse,
     MemberRoleOut,
 )
+from app.modules.payments import repository as payments_repository
 from app.modules.roles.models import Role
 from app.modules.roles.system_roles import SPEAKER_KEY
 from app.modules.users.models import User
@@ -104,6 +123,9 @@ async def _event_response(session: AsyncSession, evento: Event) -> EventResponse
         registration_opens_at=evento.registration_opens_at,
         email_verification_required=evento.email_verification_required,
         payment_checkout_window_minutes=evento.payment_checkout_window_minutes,
+        reminder_enabled=evento.reminder_enabled,
+        reminder_hours_before=evento.reminder_hours_before,
+        attendance_closed_at=evento.attendance_closed_at,
         latitude=float(evento.latitude) if evento.latitude is not None else None,
         longitude=float(evento.longitude) if evento.longitude is not None else None,
         contingency_fund_percent=evento.contingency_fund_percent,
@@ -131,7 +153,8 @@ def _venue_response(sede: EventVenue) -> EventVenueResponse:
 def _session_response(sesion: EventSession) -> EventSessionResponse:
     return EventSessionResponse(
         id=str(sesion.id),
-        session_type=sesion.session_type,  # type: ignore[arg-type]
+        session_type=sesion.session_type,
+        type=SessionTypeRef(**session_types.referencia(sesion.tipo)),
         title=sesion.title,
         description=sesion.description,
         starts_at=sesion.starts_at,
@@ -174,7 +197,12 @@ def _session_participant_response(fila: Any) -> SessionParticipantResponse:
 
 
 async def _obtener_evento_o_404(session: DbDep, usuario: CurrentUserDep, event_id: str) -> Event:
-    evento = await repository.get_event(session, usuario.organization_id, uuid.UUID(event_id))
+    try:
+        id_evento = uuid.UUID(event_id)
+    except ValueError as exc:
+        # Un enlace mal copiado (p. ej. a la vista previa) no es un error del servidor.
+        raise NotFoundError("El evento no existe.") from exc
+    evento = await repository.get_event(session, usuario.organization_id, id_evento)
     if evento is None:
         raise NotFoundError("El evento no existe.")
     return evento
@@ -190,7 +218,7 @@ def _media_id_o_422(valor: str) -> uuid.UUID:
 @router.get(
     "",
     summary="Listar eventos",
-    response_model=Page[EventResponse],
+    response_model=Page[EventListItem],
     dependencies=[require_permission(Permission.EVENTS_READ)],
 )
 async def list_events(
@@ -198,14 +226,37 @@ async def list_events(
     session: DbDep,
     paginacion: Annotated[PageParams, Depends(page_params)],
     estado: Annotated[EventStatus | None, Query(alias="status")] = None,
-) -> Page[EventResponse]:
+) -> Page[EventListItem]:
     consulta = repository.events_query(usuario.organization_id, status=estado)
     total = len((await session.execute(consulta)).all())
-    filas = (
-        await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
-    ).scalars()
-    return Page[EventResponse](
-        items=[await _event_response(session, evento) for evento in filas],
+    eventos = list(
+        (
+            await session.execute(consulta.limit(paginacion.limit).offset(paginacion.offset))
+        ).scalars()
+    )
+    # Una sola consulta de tipos de entrada para toda la página (sin N+1).
+    precios: dict[uuid.UUID, list[tuple[int, str]]] = {}
+    for tipo in await payments_repository.get_ticket_types_for_events(
+        session,
+        usuario.organization_id,
+        [evento.id for evento in eventos if evento.registration_mode == "paid"],
+    ):
+        if tipo.is_active:
+            precios.setdefault(tipo.event_id, []).append((tipo.price_cents, tipo.currency))
+
+    async def _item(evento: Event) -> EventListItem:
+        base = await _event_response(session, evento)
+        del_evento = precios.get(evento.id, [])
+        mas_barato = min(del_evento, default=None)
+        return EventListItem(
+            **base.model_dump(),
+            price_from_cents=mas_barato[0] if mas_barato else None,
+            price_currency=mas_barato[1] if mas_barato else None,
+            price_multiple=len({precio for precio, _ in del_evento}) > 1,
+        )
+
+    return Page[EventListItem](
+        items=[await _item(evento) for evento in eventos],
         total=total,
         limit=paginacion.limit,
         offset=paginacion.offset,
@@ -229,6 +280,26 @@ async def create_event(
 
 
 @router.get(
+    "/tags",
+    summary="Sugerir etiquetas ya usadas",
+    description=(
+        "Etiquetas de los eventos de la organización que contienen `q` (primero las "
+        "que empiezan por él), ordenadas por uso. Sin `q`, las más usadas. Alimenta "
+        "el autocompletado del campo de etiquetas."
+    ),
+    response_model=list[str],
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def suggest_event_tags(
+    usuario: CurrentUserDep,
+    session: DbDep,
+    q: Annotated[str, Query(max_length=LONGITUD_MAX_ETIQUETA)] = "",
+) -> list[str]:
+    texto = re.sub(r"\s+", " ", q.strip().lower())
+    return await repository.sugerir_etiquetas(session, usuario.organization_id, texto)
+
+
+@router.get(
     "/{event_id}",
     summary="Ver un evento",
     response_model=EventResponse,
@@ -238,6 +309,20 @@ async def get_event(
     evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
 ) -> EventResponse:
     return await _event_response(session, evento)
+
+
+@router.get(
+    "/{event_id}/preview",
+    summary="Vista previa de la ficha pública de un evento",
+    response_model=PublicEventDetail,
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def preview_event(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
+) -> PublicEventDetail:
+    """La ficha tal y como la verá el público, en cualquier estado (también un
+    borrador): para revisarla antes de publicar. Solo para el equipo."""
+    return await public_router.detalle_publico(session, evento)
 
 
 @router.patch(
@@ -348,6 +433,35 @@ async def upload_cover(
         and anterior_object_key != evento.cover_object_key
     ):
         background_tasks.add_task(almacen.delete_object, anterior_object_key)
+
+    return await _event_response(session, evento)
+
+
+@router.delete(
+    "/{event_id}/cover",
+    summary="Quitar la portada del evento",
+    description=(
+        "Deja el evento sin portada. Una imagen de la biblioteca de medios sigue "
+        "en la biblioteca; solo se borra el objeto de una portada legada, que no "
+        "tiene otro dueño."
+    ),
+    response_model=EventResponse,
+    dependencies=[require_permission(Permission.EVENTS_WRITE)],
+)
+async def remove_cover(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)],
+    session: DbDep,
+    background_tasks: BackgroundTasks,
+) -> EventResponse:
+    anterior_media_id = evento.cover_media_id
+    anterior_object_key = evento.cover_object_key
+    evento.cover_media_id = None
+    evento.cover_object_key = None
+    await session.flush()
+
+    # Mismo orden que en `upload_cover`: el objeto legado se borra tras el commit.
+    if anterior_media_id is None and anterior_object_key:
+        background_tasks.add_task(get_storage().delete_object, anterior_object_key)
 
     return await _event_response(session, evento)
 
@@ -482,18 +596,26 @@ async def list_event_speakers(
     items: list[SpeakerRowOut] = []
     for miembro, miembro_org, persona, _rol in filas:
         titular = miembro_org.profile_data.get("titular")
+        bio = miembro_org.profile_data.get("bio")
         items.append(
             SpeakerRowOut(
                 organization_member_id=str(miembro_org.id),
+                event_member_id=str(miembro.id),
                 user_id=str(persona.id),
                 email=persona.email,
                 first_name=persona.first_name,
                 last_name=persona.last_name,
                 titular=titular.strip() if isinstance(titular, str) and titular.strip() else None,
-                sesiones=[
-                    SpeakerSessionOut(id=str(id_sesion), titulo=titulo, starts_at=empieza)
-                    for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
-                ],
+                bio=bio.strip() if isinstance(bio, str) and bio.strip() else None,
+                # Una fila por sesión aunque tenga ahí varios roles.
+                sesiones=list(
+                    {
+                        str(id_sesion): SpeakerSessionOut(
+                            id=str(id_sesion), titulo=titulo, starts_at=empieza
+                        )
+                        for id_sesion, titulo, empieza in sesiones.get(miembro.id, [])
+                    }.values()
+                ),
                 completitud=_completitud_de_ficha(miembro_org.profile_data),
                 ediciones=ediciones.get(miembro_org.user_id, 0),
                 public_slug=slugs.get(miembro_org.user_id),
@@ -741,6 +863,37 @@ async def remove_event_member(
         event_id=evento.id,
         event_member_id=uuid.UUID(event_member_id),
     )
+
+
+@router.get(
+    "/{event_id}/participations",
+    summary="Participaciones del roster en las sesiones del evento",
+    response_model=list[SessionParticipationOut],
+    dependencies=[require_permission(Permission.EVENTS_READ)],
+)
+async def list_event_participations(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)], session: DbDep
+) -> list[SessionParticipationOut]:
+    filas = await session.execute(
+        select(EventSessionParticipant, EventSession)
+        .join(EventSession, EventSession.id == EventSessionParticipant.session_id)
+        .where(
+            EventSessionParticipant.organization_id == evento.organization_id,
+            EventSession.event_id == evento.id,
+        )
+        .order_by(EventSession.starts_at)
+    )
+    return [
+        SessionParticipationOut(
+            event_member_id=str(participacion.event_member_id),
+            session_id=str(sesion.id),
+            session_title=sesion.title,
+            starts_at=sesion.starts_at,
+            ends_at=sesion.ends_at,
+            role_key=participacion.role_key,
+        )
+        for participacion, sesion in filas.all()
+    ]
 
 
 @router.get(

@@ -71,6 +71,30 @@ describe('EventScope', () => {
     expect(fixture.componentInstance.scope.falloCarga()).toBe(false);
   });
 
+  it('`actualizar` cambia el modo del evento activo y lo deja en caché sin pedirlo de nuevo', async () => {
+    configurar();
+    http = TestBed.inject(HttpTestingController);
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/admin/events/e1');
+    const fixture = TestBed.createComponent(AnfitrionDePrueba);
+    await avanzar(fixture);
+    http.expectOne('/api/v1/events/e1').flush({ title: 'IA Week', registration_mode: 'free' });
+    await avanzar(fixture);
+
+    fixture.componentInstance.scope.actualizar('e1', {
+      title: 'IA Week',
+      registration_mode: 'paid',
+    });
+    expect(fixture.componentInstance.scope.registrationMode()).toBe('paid');
+
+    await router.navigateByUrl('/admin/events');
+    await avanzar(fixture);
+    await router.navigateByUrl('/admin/events/e1');
+    await avanzar(fixture);
+    http.expectNone('/api/v1/events/e1');
+    expect(fixture.componentInstance.scope.registrationMode()).toBe('paid');
+  });
+
   it('con `:eventId` activo (check-in): también entra en el ámbito de evento', async () => {
     configurar();
     http = TestBed.inject(HttpTestingController);

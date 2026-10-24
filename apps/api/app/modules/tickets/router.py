@@ -18,9 +18,10 @@ from app.core.permissions import Permission
 from app.modules.events import repository as events_repository
 from app.modules.events.models import Event
 from app.modules.registrations.models import EventRegistration
-from app.modules.tickets import repository, scanning
+from app.modules.tickets import attendance, repository, scanning
 from app.modules.tickets.models import EventTicket
 from app.modules.tickets.schemas import (
+    AttendanceOut,
     ScanBatchRequest,
     ScanRequest,
     TicketDetail,
@@ -195,3 +196,52 @@ async def get_ticket_detail(
         email=inscripcion.email,
         status=inscripcion.status,
     )
+
+
+def _asistencia(evento: Event) -> AttendanceOut:
+    return AttendanceOut(
+        attendance_closed_at=evento.attendance_closed_at,
+        ends_at=evento.ends_at,
+        can_close=attendance.admite_cierre(evento),
+    )
+
+
+@router.get(
+    "/attendance",
+    summary="Estado del cierre de asistencia de un evento",
+    response_model=AttendanceOut,
+    dependencies=[require_permission(Permission.TICKETS_WRITE)],
+)
+async def get_attendance(evento: Annotated[Event, Depends(_obtener_evento_o_404)]) -> AttendanceOut:
+    return _asistencia(evento)
+
+
+@router.post(
+    "/attendance/close",
+    summary="Cerrar la asistencia de un evento terminado",
+    description=(
+        "Declara completo el check-in: desde entonces, quien estaba confirmado y no se "
+        "escaneó cuenta como ausencia en el historial de la organización. Solo tras el fin "
+        "del evento; se puede reabrir durante 7 días."
+    ),
+    response_model=AttendanceOut,
+    dependencies=[require_permission(Permission.TICKETS_WRITE)],
+)
+async def close_attendance(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)],
+) -> AttendanceOut:
+    attendance.cerrar(evento)
+    return _asistencia(evento)
+
+
+@router.post(
+    "/attendance/reopen",
+    summary="Reabrir la asistencia de un evento",
+    response_model=AttendanceOut,
+    dependencies=[require_permission(Permission.TICKETS_WRITE)],
+)
+async def reopen_attendance(
+    evento: Annotated[Event, Depends(_obtener_evento_o_404)],
+) -> AttendanceOut:
+    attendance.reabrir(evento)
+    return _asistencia(evento)
